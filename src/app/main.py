@@ -6,6 +6,7 @@ from src.app.config import load_config
 from src.app.routes.entries import entries_api
 from src.app.storage.db import init_db
 from src.lib.logging import configure_logging
+from src.lib.validation import normalize_user_slug
 
 
 def create_app() -> Flask:
@@ -29,7 +30,33 @@ def create_app() -> Flask:
 
     @app.get("/")
     def index():
-        return render_template("index.html")
+        return render_template(
+            "index.html",
+            user_slug="",
+            user_valid=False,
+            user_message="Add /<name> to the URL (example: /suz).",
+        )
+
+    @app.get("/<user_slug>")
+    def user_home(user_slug: str):
+        try:
+            normalized = normalize_user_slug(user_slug)
+        except ValueError as exc:
+            return (
+                render_template(
+                    "index.html",
+                    user_slug="",
+                    user_valid=False,
+                    user_message=str(exc),
+                ),
+                400,
+            )
+        return render_template(
+            "index.html",
+            user_slug=normalized,
+            user_valid=True,
+            user_message=f"Logging as {normalized}",
+        )
 
     return app
 

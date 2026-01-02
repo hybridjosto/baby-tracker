@@ -7,6 +7,7 @@ def create_entry(conn: sqlite3.Connection, payload: dict) -> tuple[dict, bool]:
         cursor = conn.execute(
             """
             INSERT INTO entries (
+                user_slug,
                 type,
                 timestamp_utc,
                 client_event_id,
@@ -15,9 +16,10 @@ def create_entry(conn: sqlite3.Connection, payload: dict) -> tuple[dict, bool]:
                 caregiver_id,
                 created_at_utc,
                 updated_at_utc
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
+                payload["user_slug"],
                 payload["type"],
                 payload["timestamp_utc"],
                 payload["client_event_id"],
@@ -36,24 +38,37 @@ def create_entry(conn: sqlite3.Connection, payload: dict) -> tuple[dict, bool]:
         return existing, True
 
 
-def list_entries(conn: sqlite3.Connection, limit: int) -> list[dict]:
-    cursor = conn.execute(
-        """
-        SELECT id, type, timestamp_utc, client_event_id, notes, amount_ml,
-               caregiver_id, created_at_utc, updated_at_utc
-        FROM entries
-        ORDER BY timestamp_utc DESC
-        LIMIT ?
-        """,
-        (limit,),
-    )
+def list_entries(conn: sqlite3.Connection, limit: int, user_slug: str | None = None) -> list[dict]:
+    if user_slug:
+        cursor = conn.execute(
+            """
+            SELECT id, user_slug, type, timestamp_utc, client_event_id, notes, amount_ml,
+                   caregiver_id, created_at_utc, updated_at_utc
+            FROM entries
+            WHERE user_slug = ?
+            ORDER BY timestamp_utc DESC
+            LIMIT ?
+            """,
+            (user_slug, limit),
+        )
+    else:
+        cursor = conn.execute(
+            """
+            SELECT id, user_slug, type, timestamp_utc, client_event_id, notes, amount_ml,
+                   caregiver_id, created_at_utc, updated_at_utc
+            FROM entries
+            ORDER BY timestamp_utc DESC
+            LIMIT ?
+            """,
+            (limit,),
+        )
     return [dict(row) for row in cursor.fetchall()]
 
 
 def get_entry(conn: sqlite3.Connection, entry_id: int) -> Optional[dict]:
     cursor = conn.execute(
         """
-        SELECT id, type, timestamp_utc, client_event_id, notes, amount_ml,
+        SELECT id, user_slug, type, timestamp_utc, client_event_id, notes, amount_ml,
                caregiver_id, created_at_utc, updated_at_utc
         FROM entries
         WHERE id = ?
@@ -69,7 +84,7 @@ def get_entry_by_client_event_id(
 ) -> Optional[dict]:
     cursor = conn.execute(
         """
-        SELECT id, type, timestamp_utc, client_event_id, notes, amount_ml,
+        SELECT id, user_slug, type, timestamp_utc, client_event_id, notes, amount_ml,
                caregiver_id, created_at_utc, updated_at_utc
         FROM entries
         WHERE client_event_id = ?

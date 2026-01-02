@@ -9,21 +9,21 @@ from src.app.services.entries import (
     update_entry,
 )
 
-entries_api = Blueprint("entries_api", __name__, url_prefix="/api/entries")
+entries_api = Blueprint("entries_api", __name__, url_prefix="/api")
 
 
 def _db_path() -> str:
     return current_app.config["DB_PATH"]
 
 
-@entries_api.get("")
+@entries_api.get("/entries")
 def list_entries_route():
     limit = request.args.get("limit", default=50, type=int)
     entries = list_entries(_db_path(), limit=limit)
     return jsonify(entries)
 
 
-@entries_api.post("")
+@entries_api.post("/entries")
 def create_entry_route():
     payload = request.get_json(silent=True) or {}
     try:
@@ -35,7 +35,30 @@ def create_entry_route():
         return jsonify({"error": str(exc)}), 400
 
 
-@entries_api.patch("/<int:entry_id>")
+@entries_api.get("/users/<user_slug>/entries")
+def list_user_entries_route(user_slug: str):
+    limit = request.args.get("limit", default=50, type=int)
+    try:
+        entries = list_entries(_db_path(), limit=limit, user_slug=user_slug)
+        return jsonify(entries)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+
+@entries_api.post("/users/<user_slug>/entries")
+def create_user_entry_route(user_slug: str):
+    payload = request.get_json(silent=True) or {}
+    payload["user_slug"] = user_slug
+    try:
+        entry = create_entry(_db_path(), payload)
+        return jsonify(entry), 201
+    except DuplicateEntryError as exc:
+        return jsonify({"error": "duplicate", "entry": exc.entry}), 409
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+
+@entries_api.patch("/entries/<int:entry_id>")
 def update_entry_route(entry_id: int):
     payload = request.get_json(silent=True) or {}
     try:
@@ -47,7 +70,7 @@ def update_entry_route(entry_id: int):
         return jsonify({"error": str(exc)}), 400
 
 
-@entries_api.delete("/<int:entry_id>")
+@entries_api.delete("/entries/<int:entry_id>")
 def delete_entry_route(entry_id: int):
     try:
         delete_entry(_db_path(), entry_id)

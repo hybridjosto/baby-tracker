@@ -10,8 +10,8 @@ from iPhones. The UI is optimized for two-tap logging.
    - `source .venv/bin/activate`
    - `pip install -e .`
 2. Start the server: `python -m src.app.main`
-3. Open `http://<rpi-tailscale-ip>:8000` on the phone and add it to the home
-   screen for one-tap access.
+3. Open a user homepage like `http://<rpi-tailscale-ip>:8000/suz` (or `/josh`)
+   on the phone and add it to the home screen for one-tap access.
 
 ## Configuration
 

@@ -3,6 +3,8 @@
 Auto-generated from all feature plans. Last updated: 2026-01-02
 
 ## Active Technologies
+- Python 3.12 + Flask (002-user-homepages)
+- SQLite (local file) (002-user-homepages)
 
 - Python 3.11 + Flask (web), SQLite (embedded DB) (001-two-click-log)
 
@@ -22,6 +24,7 @@ cd src [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECHNOLO
 Python 3.11: Follow standard conventions
 
 ## Recent Changes
+- 002-user-homepages: Added Python 3.12 + Flask
 
 - 001-two-click-log: Added Python 3.11 + Flask (web), SQLite (embedded DB)
 

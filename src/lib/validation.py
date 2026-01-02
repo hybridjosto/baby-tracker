@@ -1,4 +1,7 @@
+import re
+
 VALID_TYPES = {"feed", "poo"}
+USER_SLUG_RE = re.compile(r"^[a-z0-9-]{1,24}$")
 
 
 def validate_entry_type(value: str) -> None:
@@ -23,3 +26,12 @@ def validate_entry_payload(payload: dict, require_client_event: bool = False) ->
             raise ValueError("notes must be a string")
 
     return dict(payload)
+
+
+def normalize_user_slug(value: str) -> str:
+    if value is None:
+        raise ValueError("user_slug is required")
+    slug = value.strip().lower()
+    if not USER_SLUG_RE.match(slug):
+        raise ValueError("user_slug must be 1-24 chars: a-z, 0-9, hyphen")
+    return slug

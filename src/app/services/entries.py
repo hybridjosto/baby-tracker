@@ -7,7 +7,11 @@ from src.app.storage.entries import (
     list_entries as repo_list_entries,
     update_entry as repo_update_entry,
 )
-from src.lib.validation import validate_entry_payload, validate_entry_type
+from src.lib.validation import (
+    normalize_user_slug,
+    validate_entry_payload,
+    validate_entry_type,
+)
 
 
 class DuplicateEntryError(Exception):
@@ -26,6 +30,7 @@ def _now_utc_iso() -> str:
 
 def create_entry(db_path: str, payload: dict) -> dict:
     validated = validate_entry_payload(payload, require_client_event=True)
+    validated["user_slug"] = normalize_user_slug(payload.get("user_slug"))
     timestamp = validated.get("timestamp_utc") or _now_utc_iso()
     validated["timestamp_utc"] = timestamp
     validated["created_at_utc"] = _now_utc_iso()
@@ -38,10 +43,11 @@ def create_entry(db_path: str, payload: dict) -> dict:
     return entry
 
 
-def list_entries(db_path: str, limit: int = 50) -> list[dict]:
+def list_entries(db_path: str, limit: int = 50, user_slug: str | None = None) -> list[dict]:
     safe_limit = max(1, min(limit, 200))
+    normalized_slug = normalize_user_slug(user_slug) if user_slug else None
     with get_connection(db_path) as conn:
-        return repo_list_entries(conn, safe_limit)
+        return repo_list_entries(conn, safe_limit, user_slug=normalized_slug)
 
 
 def update_entry(db_path: str, entry_id: int, payload: dict) -> dict:

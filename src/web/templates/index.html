@@ -8,13 +8,18 @@
     <style>
       :root {
         color-scheme: light;
+        --action-height: 88px;
       }
       body {
         font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
         margin: 0;
-        padding: 16px;
+        padding: 0;
         background: #f7f4ef;
         color: #1f1f1f;
+        min-height: 100vh;
+      }
+      .page {
+        padding: 16px 16px calc(var(--action-height) + 16px);
       }
       .card {
         background: #ffffff;
@@ -28,16 +33,21 @@
         margin: 0 0 12px 0;
         font-size: 22px;
       }
-      .buttons {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 12px;
-        margin-bottom: 16px;
+      .user-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 10px;
+        background: #f0ede7;
+        border-radius: 999px;
+        font-size: 12px;
+        color: #4a453f;
+        margin-bottom: 10px;
       }
       button {
-        font-size: 18px;
-        padding: 14px 12px;
-        border-radius: 12px;
+        font-size: 20px;
+        padding: 18px 12px;
+        border-radius: 16px;
         border: none;
         cursor: pointer;
       }
@@ -75,18 +85,48 @@
         color: #666;
         margin-top: 10px;
       }
+      .action-bar {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: #ffffff;
+        border-top: 1px solid #e5e1da;
+        padding: 12px 16px calc(env(safe-area-inset-bottom, 0) + 12px);
+      }
+      .action-bar .buttons {
+        max-width: 480px;
+        margin: 0 auto;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+      }
+      .action-bar button {
+        font-size: 22px;
+        padding: 18px 12px;
+        height: var(--action-height);
+      }
+      .disabled {
+        opacity: 0.5;
+        pointer-events: none;
+      }
     </style>
   </head>
-  <body>
-    <div class="card">
-      <h1>Baby Tracker</h1>
+  <body data-user="{{ user_slug }}" data-user-valid="{{ 'true' if user_valid else 'false' }}">
+    <div class="page">
+      <div class="card">
+        <h1>Baby Tracker</h1>
+        <div class="user-chip" id="user-chip">{{ user_message }}</div>
+        <div class="meta">Recent</div>
+        <ul id="entries"></ul>
+        <div class="status" id="status"></div>
+      </div>
+    </div>
+    <div class="action-bar">
       <div class="buttons">
         <button class="feed" id="log-feed">Feed</button>
         <button class="poo" id="log-poo">Poo</button>
       </div>
-      <div class="meta">Recent</div>
-      <ul id="entries"></ul>
-      <div class="status" id="status"></div>
     </div>
     <script src="/static/app.js"></script>
   </body>

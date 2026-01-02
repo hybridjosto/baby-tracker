@@ -1,5 +1,6 @@
 CREATE TABLE IF NOT EXISTS entries (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_slug TEXT NOT NULL,
     type TEXT NOT NULL CHECK (type IN ('feed', 'poo')),
     timestamp_utc TEXT NOT NULL,
     client_event_id TEXT NOT NULL UNIQUE,

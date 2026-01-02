@@ -1,5 +1,8 @@
 const entriesEl = document.getElementById("entries");
 const statusEl = document.getElementById("status");
+const bodyEl = document.body;
+const activeUser = bodyEl.dataset.user || "";
+const userValid = bodyEl.dataset.userValid === "true";
 
 function setStatus(message) {
   statusEl.textContent = message || "";
@@ -48,7 +51,7 @@ function renderEntries(entries) {
 }
 
 async function fetchEntries() {
-  const response = await fetch("/api/entries?limit=20");
+  const response = await fetch(`/api/users/${activeUser}/entries?limit=20`);
   const data = await response.json();
   renderEntries(data);
 }
@@ -60,7 +63,7 @@ async function addEntry(type) {
     timestamp_utc: new Date().toISOString(),
     client_event_id: generateId(),
   };
-  const response = await fetch("/api/entries", {
+  const response = await fetch(`/api/users/${activeUser}/entries`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -124,7 +127,12 @@ async function deleteEntry(entry) {
 const feedBtn = document.getElementById("log-feed");
 const pooBtn = document.getElementById("log-poo");
 
-feedBtn.addEventListener("click", () => addEntry("feed"));
-pooBtn.addEventListener("click", () => addEntry("poo"));
-
-fetchEntries().catch(() => setStatus("Failed to load entries"));
+if (!userValid) {
+  feedBtn.classList.add("disabled");
+  pooBtn.classList.add("disabled");
+  setStatus("Choose a valid /<name> URL to start logging.");
+} else {
+  feedBtn.addEventListener("click", () => addEntry("feed"));
+  pooBtn.addEventListener("click", () => addEntry("poo"));
+  fetchEntries().catch(() => setStatus("Failed to load entries"));
+}
