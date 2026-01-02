@@ -1,0 +1,9 @@
+[project]
+name = "baby"
+version = "0.1.0"
+description = "Private baby feed and poo tracker"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "Flask>=3.0.0",
+]

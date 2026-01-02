@@ -1,0 +1,144 @@
+openapi: 3.0.3
+info:
+  title: Baby Tracker API
+  version: 1.0.0
+servers:
+  - url: http://localhost:8000
+paths:
+  /api/entries:
+    get:
+      summary: List recent entries
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 50
+          description: Maximum number of entries to return
+      responses:
+        '200':
+          description: List of entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Entry'
+    post:
+      summary: Create a new entry
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewEntry'
+      responses:
+        '201':
+          description: Created entry
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Entry'
+        '409':
+          description: Duplicate client_event_id
+  /api/entries/{id}:
+    patch:
+      summary: Update an entry
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateEntry'
+      responses:
+        '200':
+          description: Updated entry
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Entry'
+        '404':
+          description: Entry not found
+    delete:
+      summary: Delete an entry
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Deleted
+        '404':
+          description: Entry not found
+components:
+  schemas:
+    Entry:
+      type: object
+      required: [id, type, timestamp_utc, client_event_id]
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+          enum: [feed, poo]
+        timestamp_utc:
+          type: string
+          format: date-time
+        client_event_id:
+          type: string
+        notes:
+          type: string
+          nullable: true
+        amount_ml:
+          type: integer
+          nullable: true
+        caregiver_id:
+          type: integer
+          nullable: true
+    NewEntry:
+      type: object
+      required: [type, timestamp_utc, client_event_id]
+      properties:
+        type:
+          type: string
+          enum: [feed, poo]
+        timestamp_utc:
+          type: string
+          format: date-time
+        client_event_id:
+          type: string
+        notes:
+          type: string
+          nullable: true
+        amount_ml:
+          type: integer
+          nullable: true
+        caregiver_id:
+          type: integer
+          nullable: true
+    UpdateEntry:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [feed, poo]
+        timestamp_utc:
+          type: string
+          format: date-time
+        notes:
+          type: string
+          nullable: true
+        amount_ml:
+          type: integer
+          nullable: true
+        caregiver_id:
+          type: integer
+          nullable: true
