@@ -58,27 +58,66 @@
         background: #c59b7f;
         color: #1d140e;
       }
-      ul {
-        list-style: none;
-        padding: 0;
-        margin: 0;
-      }
-      li {
+      .chart-header {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 8px 0;
-        border-bottom: 1px solid #e5e1da;
-        gap: 8px;
-      }
-      .meta {
+        margin-top: 10px;
         font-size: 14px;
         color: #444;
       }
-      .actions button {
+      .chart-header a {
+        color: #4a453f;
+        text-decoration: none;
+        font-weight: 600;
+      }
+      .chart-wrap {
+        position: relative;
+        margin-top: 12px;
+        background: linear-gradient(180deg, #fdf9f2, #f7f4ef);
+        border-radius: 14px;
+        padding: 10px;
+        border: 1px solid #efe9dd;
+        min-height: 150px;
+      }
+      #history-chart {
+        width: 100%;
+        height: 150px;
+        display: block;
+      }
+      .chart-empty {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 14px;
+        color: #8b857e;
+        text-align: center;
+        padding: 0 12px;
+      }
+      .chart-legend {
+        display: flex;
+        gap: 16px;
+        margin-top: 10px;
         font-size: 12px;
-        padding: 6px 8px;
-        margin-left: 6px;
+        color: #5a524a;
+      }
+      .legend-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .legend-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+      }
+      .legend-feed {
+        background: #f6c453;
+      }
+      .legend-poo {
+        background: #c59b7f;
       }
       .status {
         font-size: 12px;
@@ -112,13 +151,23 @@
       }
     </style>
   </head>
-  <body data-user="{{ user_slug }}" data-user-valid="{{ 'true' if user_valid else 'false' }}">
+  <body data-user="{{ user_slug }}" data-user-valid="{{ 'true' if user_valid else 'false' }}" data-page="{{ page }}">
     <div class="page">
       <div class="card">
         <h1>Baby Tracker</h1>
         <div class="user-chip" id="user-chip">{{ user_message }}</div>
-        <div class="meta">Recent</div>
-        <ul id="entries"></ul>
+        <div class="chart-header">
+          <span>Last 24 hours</span>
+          <a id="log-link" href="#">Event log</a>
+        </div>
+        <div class="chart-wrap">
+          <svg id="history-chart" viewBox="0 0 360 150" preserveAspectRatio="none"></svg>
+          <div class="chart-empty" id="chart-empty">No events in the last 24 hours.</div>
+        </div>
+        <div class="chart-legend">
+          <span class="legend-item"><span class="legend-dot legend-feed"></span>Feed</span>
+          <span class="legend-item"><span class="legend-dot legend-poo"></span>Poo</span>
+        </div>
         <div class="status" id="status"></div>
       </div>
     </div>

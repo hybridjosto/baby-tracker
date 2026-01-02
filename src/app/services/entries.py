@@ -43,11 +43,42 @@ def create_entry(db_path: str, payload: dict) -> dict:
     return entry
 
 
-def list_entries(db_path: str, limit: int = 50, user_slug: str | None = None) -> list[dict]:
+def _normalize_filter_ts(value: str | None) -> str | None:
+    if value is None:
+        return None
+    normalized = value.strip()
+    if normalized.endswith("Z"):
+        normalized = normalized[:-1] + "+00:00"
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError as exc:
+        raise ValueError("Invalid timestamp filter") from exc
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc).isoformat()
+
+
+def list_entries(
+    db_path: str,
+    limit: int = 50,
+    user_slug: str | None = None,
+    since_utc: str | None = None,
+    until_utc: str | None = None,
+) -> list[dict]:
     safe_limit = max(1, min(limit, 200))
     normalized_slug = normalize_user_slug(user_slug) if user_slug else None
+    normalized_since = _normalize_filter_ts(since_utc)
+    normalized_until = _normalize_filter_ts(until_utc)
+    if normalized_since and normalized_until and normalized_since > normalized_until:
+        raise ValueError("Invalid time window")
     with get_connection(db_path) as conn:
-        return repo_list_entries(conn, safe_limit, user_slug=normalized_slug)
+        return repo_list_entries(
+            conn,
+            safe_limit,
+            user_slug=normalized_slug,
+            since_utc=normalized_since,
+            until_utc=normalized_until,
+        )
 
 
 def update_entry(db_path: str, entry_id: int, payload: dict) -> dict:

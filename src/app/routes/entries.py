@@ -19,8 +19,18 @@ def _db_path() -> str:
 @entries_api.get("/entries")
 def list_entries_route():
     limit = request.args.get("limit", default=50, type=int)
-    entries = list_entries(_db_path(), limit=limit)
-    return jsonify(entries)
+    since_utc = request.args.get("since")
+    until_utc = request.args.get("until")
+    try:
+        entries = list_entries(
+            _db_path(),
+            limit=limit,
+            since_utc=since_utc,
+            until_utc=until_utc,
+        )
+        return jsonify(entries)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
 
 
 @entries_api.post("/entries")
@@ -38,8 +48,16 @@ def create_entry_route():
 @entries_api.get("/users/<user_slug>/entries")
 def list_user_entries_route(user_slug: str):
     limit = request.args.get("limit", default=50, type=int)
+    since_utc = request.args.get("since")
+    until_utc = request.args.get("until")
     try:
-        entries = list_entries(_db_path(), limit=limit, user_slug=user_slug)
+        entries = list_entries(
+            _db_path(),
+            limit=limit,
+            user_slug=user_slug,
+            since_utc=since_utc,
+            until_utc=until_utc,
+        )
         return jsonify(entries)
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400

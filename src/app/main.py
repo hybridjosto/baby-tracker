@@ -35,6 +35,7 @@ def create_app() -> Flask:
             user_slug="",
             user_valid=False,
             user_message="Add /<name> to the URL (example: /suz).",
+            page="home",
         )
 
     @app.get("/<user_slug>")
@@ -48,6 +49,7 @@ def create_app() -> Flask:
                     user_slug="",
                     user_valid=False,
                     user_message=str(exc),
+                    page="home",
                 ),
                 400,
             )
@@ -56,6 +58,30 @@ def create_app() -> Flask:
             user_slug=normalized,
             user_valid=True,
             user_message=f"Logging as {normalized}",
+            page="home",
+        )
+
+    @app.get("/<user_slug>/log")
+    def user_log(user_slug: str):
+        try:
+            normalized = normalize_user_slug(user_slug)
+        except ValueError as exc:
+            return (
+                render_template(
+                    "log.html",
+                    user_slug="",
+                    user_valid=False,
+                    user_message=str(exc),
+                    page="log",
+                ),
+                400,
+            )
+        return render_template(
+            "log.html",
+            user_slug=normalized,
+            user_valid=True,
+            user_message=f"Logging as {normalized}",
+            page="log",
         )
 
     return app

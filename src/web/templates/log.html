@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Baby Tracker Log</title>
+    <link rel="manifest" href="/static/manifest.json">
+    <style>
+      :root {
+        color-scheme: light;
+      }
+      body {
+        font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+        background: #f7f4ef;
+        color: #1f1f1f;
+        min-height: 100vh;
+      }
+      .page {
+        padding: 16px;
+      }
+      .card {
+        background: #ffffff;
+        border-radius: 16px;
+        padding: 16px;
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+        max-width: 480px;
+        margin: 0 auto;
+      }
+      h1 {
+        margin: 0 0 12px 0;
+        font-size: 22px;
+      }
+      .user-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 10px;
+        background: #f0ede7;
+        border-radius: 999px;
+        font-size: 12px;
+        color: #4a453f;
+        margin-bottom: 10px;
+      }
+      .nav-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 12px;
+        font-size: 14px;
+        color: #444;
+      }
+      .nav-row a {
+        color: #4a453f;
+        text-decoration: none;
+        font-weight: 600;
+      }
+      ul {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+      }
+      li {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 0;
+        border-bottom: 1px solid #e5e1da;
+        gap: 8px;
+      }
+      .entry-meta {
+        font-size: 14px;
+        color: #444;
+      }
+      .entry-type {
+        font-weight: 600;
+        text-transform: capitalize;
+      }
+      .log-actions {
+        display: flex;
+        gap: 6px;
+      }
+      .log-actions button {
+        font-size: 12px;
+        padding: 6px 8px;
+        border-radius: 10px;
+        border: 1px solid #e5e1da;
+        background: #f9f6f1;
+        cursor: pointer;
+      }
+      .log-wrap {
+        max-height: 60vh;
+        overflow-y: auto;
+        padding-right: 4px;
+      }
+      .log-empty {
+        text-align: center;
+        color: #8b857e;
+        font-size: 14px;
+        padding: 24px 12px;
+      }
+      .status {
+        font-size: 12px;
+        color: #666;
+        margin-top: 10px;
+      }
+      .disabled {
+        opacity: 0.5;
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body data-user="{{ user_slug }}" data-user-valid="{{ 'true' if user_valid else 'false' }}" data-page="{{ page }}">
+    <div class="page">
+      <div class="card">
+        <h1>Event Log</h1>
+        <div class="user-chip">{{ user_message }}</div>
+        <div class="nav-row">
+          <span>Recent entries</span>
+          <a id="home-link" href="#">Back to chart</a>
+        </div>
+        <div class="log-wrap">
+          <ul id="log-entries"></ul>
+          <div class="log-empty" id="log-empty">No entries yet.</div>
+        </div>
+        <div class="status" id="status"></div>
+      </div>
+    </div>
+    <script src="/static/app.js"></script>
+  </body>
+</html>

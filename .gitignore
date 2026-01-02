@@ -25,3 +25,6 @@ venv/
 # Local data
 data/
 *.sqlite
+
+# Codex session data
+baby-tracker/.codex/

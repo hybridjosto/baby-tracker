@@ -1,11 +1,32 @@
-const entriesEl = document.getElementById("entries");
 const statusEl = document.getElementById("status");
 const bodyEl = document.body;
 const activeUser = bodyEl.dataset.user || "";
 const userValid = bodyEl.dataset.userValid === "true";
+const pageType = bodyEl.dataset.page || "home";
+
+const feedBtn = document.getElementById("log-feed");
+const pooBtn = document.getElementById("log-poo");
+const logLinkEl = document.getElementById("log-link");
+const homeLinkEl = document.getElementById("home-link");
+
+const chartSvg = document.getElementById("history-chart");
+const chartEmptyEl = document.getElementById("chart-empty");
+const logListEl = document.getElementById("log-entries");
+const logEmptyEl = document.getElementById("log-empty");
+
+const CHART_CONFIG = {
+  width: 360,
+  height: 150,
+  paddingX: 16,
+  axisY: 122,
+  feedY: 70,
+  pooY: 100,
+};
 
 function setStatus(message) {
-  statusEl.textContent = message || "";
+  if (statusEl) {
+    statusEl.textContent = message || "";
+  }
 }
 
 function generateId() {
@@ -23,15 +44,161 @@ function formatTimestamp(value) {
   return date.toLocaleString();
 }
 
-function renderEntries(entries) {
-  entriesEl.innerHTML = "";
+function compute24hWindow() {
+  const until = new Date();
+  const since = new Date(until.getTime() - 24 * 60 * 60 * 1000);
+  return {
+    since,
+    until,
+    sinceIso: since.toISOString(),
+    untilIso: until.toISOString(),
+  };
+}
+
+function normalizeEntriesResponse(data) {
+  if (Array.isArray(data)) {
+    return data;
+  }
+  if (data && Array.isArray(data.entries)) {
+    return data.entries;
+  }
+  return [];
+}
+
+function buildQuery(params) {
+  const search = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== "") {
+      search.set(key, String(value));
+    }
+  });
+  const query = search.toString();
+  return query ? `?${query}` : "";
+}
+
+async function fetchEntries(params) {
+  const response = await fetch(
+    `/api/users/${activeUser}/entries${buildQuery(params)}`,
+  );
+  const data = await response.json();
+  return normalizeEntriesResponse(data);
+}
+
+function renderChart(entries, windowBounds) {
+  if (!chartSvg || !chartEmptyEl) {
+    return;
+  }
+  chartSvg.innerHTML = "";
+  if (!entries.length) {
+    chartEmptyEl.style.display = "flex";
+    return;
+  }
+  chartEmptyEl.style.display = "none";
+
+  const svgNS = "http://www.w3.org/2000/svg";
+  const { width, height, paddingX, axisY, feedY, pooY } = CHART_CONFIG;
+
+  const axisLine = document.createElementNS(svgNS, "line");
+  axisLine.setAttribute("x1", paddingX);
+  axisLine.setAttribute("x2", width - paddingX);
+  axisLine.setAttribute("y1", axisY);
+  axisLine.setAttribute("y2", axisY);
+  axisLine.setAttribute("stroke", "#d9d2c7");
+  axisLine.setAttribute("stroke-width", "2");
+  chartSvg.appendChild(axisLine);
+
+  const labels = ["24h ago", "18h", "12h", "6h", "now"];
+  labels.forEach((label, idx) => {
+    const x = paddingX + ((width - paddingX * 2) / 4) * idx;
+    const tick = document.createElementNS(svgNS, "line");
+    tick.setAttribute("x1", x);
+    tick.setAttribute("x2", x);
+    tick.setAttribute("y1", axisY - 6);
+    tick.setAttribute("y2", axisY + 6);
+    tick.setAttribute("stroke", "#d9d2c7");
+    tick.setAttribute("stroke-width", "1");
+    chartSvg.appendChild(tick);
+
+    const text = document.createElementNS(svgNS, "text");
+    text.setAttribute("x", x);
+    text.setAttribute("y", height - 8);
+    text.setAttribute("fill", "#8b857e");
+    text.setAttribute("font-size", "10");
+    text.setAttribute("text-anchor", "middle");
+    text.textContent = label;
+    chartSvg.appendChild(text);
+  });
+
+  const startMs = windowBounds.since.getTime();
+  const spanMs = windowBounds.until.getTime() - startMs;
+
+  entries.forEach((entry) => {
+    const timestamp = new Date(entry.timestamp_utc);
+    if (Number.isNaN(timestamp.getTime())) {
+      return;
+    }
+    const ratio = (timestamp.getTime() - startMs) / spanMs;
+    if (ratio < 0 || ratio > 1) {
+      return;
+    }
+    const x = paddingX + ratio * (width - paddingX * 2);
+    const isFeed = entry.type === "feed";
+    const y = isFeed ? feedY : pooY;
+    const color = isFeed ? "#f6c453" : "#c59b7f";
+
+    const stem = document.createElementNS(svgNS, "line");
+    stem.setAttribute("x1", x);
+    stem.setAttribute("x2", x);
+    stem.setAttribute("y1", y);
+    stem.setAttribute("y2", axisY);
+    stem.setAttribute("stroke", "#e1d8cc");
+    stem.setAttribute("stroke-width", "1");
+    chartSvg.appendChild(stem);
+
+    const dot = document.createElementNS(svgNS, "circle");
+    dot.setAttribute("cx", x);
+    dot.setAttribute("cy", y);
+    dot.setAttribute("r", "5");
+    dot.setAttribute("fill", color);
+    dot.setAttribute("stroke", "#ffffff");
+    dot.setAttribute("stroke-width", "1");
+    chartSvg.appendChild(dot);
+  });
+}
+
+function renderLogEntries(entries) {
+  if (!logListEl || !logEmptyEl) {
+    return;
+  }
+  logListEl.innerHTML = "";
+  if (!entries.length) {
+    logEmptyEl.style.display = "block";
+    return;
+  }
+  logEmptyEl.style.display = "none";
+
   entries.forEach((entry) => {
     const item = document.createElement("li");
-    const label = document.createElement("span");
-    label.textContent = `${entry.type} · ${formatTimestamp(entry.timestamp_utc)}`;
+    const left = document.createElement("div");
+    const typeEl = document.createElement("div");
+    typeEl.className = "entry-type";
+    typeEl.textContent = entry.type;
 
-    const actions = document.createElement("span");
-    actions.className = "actions";
+    const timeEl = document.createElement("div");
+    timeEl.className = "entry-meta";
+    timeEl.textContent = formatTimestamp(entry.timestamp_utc);
+
+    left.appendChild(typeEl);
+    left.appendChild(timeEl);
+
+    const right = document.createElement("div");
+    right.className = "log-actions";
+
+    const amountEl = document.createElement("span");
+    amountEl.className = "entry-meta";
+    if (entry.amount_ml) {
+      amountEl.textContent = `${entry.amount_ml} ml`;
+    }
 
     const editBtn = document.createElement("button");
     editBtn.textContent = "Edit";
@@ -41,19 +208,15 @@ function renderEntries(entries) {
     delBtn.textContent = "Delete";
     delBtn.addEventListener("click", () => deleteEntry(entry));
 
-    actions.appendChild(editBtn);
-    actions.appendChild(delBtn);
-
-    item.appendChild(label);
-    item.appendChild(actions);
-    entriesEl.appendChild(item);
+    if (amountEl.textContent) {
+      right.appendChild(amountEl);
+    }
+    right.appendChild(editBtn);
+    right.appendChild(delBtn);
+    item.appendChild(left);
+    item.appendChild(right);
+    logListEl.appendChild(item);
   });
-}
-
-async function fetchEntries() {
-  const response = await fetch(`/api/users/${activeUser}/entries?limit=20`);
-  const data = await response.json();
-  renderEntries(data);
 }
 
 async function addEntry(type) {
@@ -77,7 +240,7 @@ async function addEntry(type) {
     const err = await response.json();
     setStatus(`Error: ${err.error || "unknown"}`);
   }
-  await fetchEntries();
+  await loadHomeEntries();
 }
 
 async function editEntry(entry) {
@@ -101,7 +264,11 @@ async function editEntry(entry) {
 
   if (response.ok) {
     setStatus("Updated");
-    await fetchEntries();
+    if (pageType === "log") {
+      await loadLogEntries();
+    } else {
+      await loadHomeEntries();
+    }
   } else {
     const err = await response.json();
     setStatus(`Error: ${err.error || "unknown"}`);
@@ -117,22 +284,79 @@ async function deleteEntry(entry) {
   });
   if (response.status === 204) {
     setStatus("Deleted");
-    await fetchEntries();
+    if (pageType === "log") {
+      await loadLogEntries();
+    } else {
+      await loadHomeEntries();
+    }
   } else {
     const err = await response.json();
     setStatus(`Error: ${err.error || "unknown"}`);
   }
 }
 
-const feedBtn = document.getElementById("log-feed");
-const pooBtn = document.getElementById("log-poo");
+async function loadHomeEntries() {
+  if (!userValid) {
+    return;
+  }
+  try {
+    const windowBounds = compute24hWindow();
+    const entries = await fetchEntries({
+      limit: 200,
+      since: windowBounds.sinceIso,
+      until: windowBounds.untilIso,
+    });
+    renderChart(entries, windowBounds);
+  } catch (err) {
+    setStatus("Failed to load entries");
+  }
+}
+
+async function loadLogEntries() {
+  if (!userValid) {
+    return;
+  }
+  try {
+    const entries = await fetchEntries({ limit: 200 });
+    renderLogEntries(entries);
+  } catch (err) {
+    setStatus("Failed to load entries");
+  }
+}
+
+function initLinks() {
+  if (logLinkEl) {
+    if (userValid) {
+      logLinkEl.href = `/${activeUser}/log`;
+    } else {
+      logLinkEl.classList.add("disabled");
+      logLinkEl.href = "#";
+    }
+  }
+  if (homeLinkEl) {
+    if (userValid) {
+      homeLinkEl.href = `/${activeUser}`;
+    } else {
+      homeLinkEl.classList.add("disabled");
+      homeLinkEl.href = "#";
+    }
+  }
+}
+
+initLinks();
 
 if (!userValid) {
-  feedBtn.classList.add("disabled");
-  pooBtn.classList.add("disabled");
+  if (feedBtn) {
+    feedBtn.classList.add("disabled");
+  }
+  if (pooBtn) {
+    pooBtn.classList.add("disabled");
+  }
   setStatus("Choose a valid /<name> URL to start logging.");
-} else {
+} else if (pageType === "home") {
   feedBtn.addEventListener("click", () => addEntry("feed"));
   pooBtn.addEventListener("click", () => addEntry("poo"));
-  fetchEntries().catch(() => setStatus("Failed to load entries"));
+  loadHomeEntries();
+} else if (pageType === "log") {
+  loadLogEntries();
 }

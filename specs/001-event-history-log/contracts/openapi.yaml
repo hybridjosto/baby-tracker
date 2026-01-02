@@ -1,0 +1,100 @@
+openapi: 3.0.3
+info:
+  title: Baby Tracker History Visualization API
+  version: 1.0.0
+paths:
+  /api/users/{user}/entries:
+    get:
+      summary: List recent entries for a user
+      parameters:
+        - in: path
+          name: user
+          required: true
+          schema:
+            type: string
+            pattern: "^[a-z0-9-]+$"
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+        - in: query
+          name: since
+          required: false
+          schema:
+            type: string
+            description: ISO-8601 timestamp for the start of the window (UTC)
+        - in: query
+          name: until
+          required: false
+          schema:
+            type: string
+            description: ISO-8601 timestamp for the end of the window (UTC)
+      responses:
+        "200":
+          description: List of entries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  entries:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Entry"
+  /{user}:
+    get:
+      summary: User homepage with 24h chart
+      parameters:
+        - in: path
+          name: user
+          required: true
+          schema:
+            type: string
+            pattern: "^[a-z0-9-]+$"
+      responses:
+        "200":
+          description: HTML homepage
+          content:
+            text/html:
+              schema:
+                type: string
+  /{user}/log:
+    get:
+      summary: User event log page
+      parameters:
+        - in: path
+          name: user
+          required: true
+          schema:
+            type: string
+            pattern: "^[a-z0-9-]+$"
+      responses:
+        "200":
+          description: HTML event log
+          content:
+            text/html:
+              schema:
+                type: string
+components:
+  schemas:
+    Entry:
+      type: object
+      properties:
+        id:
+          type: integer
+        user_slug:
+          type: string
+        type:
+          type: string
+          enum: [feed, poo]
+        timestamp:
+          type: string
+        notes:
+          type: string
+        amount:
+          type: number
+        created_at:
+          type: string

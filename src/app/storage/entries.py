@@ -38,30 +38,37 @@ def create_entry(conn: sqlite3.Connection, payload: dict) -> tuple[dict, bool]:
         return existing, True
 
 
-def list_entries(conn: sqlite3.Connection, limit: int, user_slug: str | None = None) -> list[dict]:
+def list_entries(
+    conn: sqlite3.Connection,
+    limit: int,
+    user_slug: str | None = None,
+    since_utc: str | None = None,
+    until_utc: str | None = None,
+) -> list[dict]:
+    clauses: list[str] = []
+    params: list[object] = []
     if user_slug:
-        cursor = conn.execute(
-            """
-            SELECT id, user_slug, type, timestamp_utc, client_event_id, notes, amount_ml,
-                   caregiver_id, created_at_utc, updated_at_utc
-            FROM entries
-            WHERE user_slug = ?
-            ORDER BY timestamp_utc DESC
-            LIMIT ?
-            """,
-            (user_slug, limit),
-        )
-    else:
-        cursor = conn.execute(
-            """
-            SELECT id, user_slug, type, timestamp_utc, client_event_id, notes, amount_ml,
-                   caregiver_id, created_at_utc, updated_at_utc
-            FROM entries
-            ORDER BY timestamp_utc DESC
-            LIMIT ?
-            """,
-            (limit,),
-        )
+        clauses.append("user_slug = ?")
+        params.append(user_slug)
+    if since_utc:
+        clauses.append("timestamp_utc >= ?")
+        params.append(since_utc)
+    if until_utc:
+        clauses.append("timestamp_utc <= ?")
+        params.append(until_utc)
+
+    where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+    cursor = conn.execute(
+        f"""
+        SELECT id, user_slug, type, timestamp_utc, client_event_id, notes, amount_ml,
+               caregiver_id, created_at_utc, updated_at_utc
+        FROM entries
+        {where}
+        ORDER BY timestamp_utc DESC
+        LIMIT ?
+        """,
+        (*params, limit),
+    )
     return [dict(row) for row in cursor.fetchall()]
 
 
