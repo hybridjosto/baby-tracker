@@ -6,6 +6,7 @@ const pageType = bodyEl.dataset.page || "home";
 
 const feedBtn = document.getElementById("log-feed");
 const pooBtn = document.getElementById("log-poo");
+const weeBtn = document.getElementById("log-wee");
 const logLinkEl = document.getElementById("log-link");
 const homeLinkEl = document.getElementById("home-link");
 
@@ -13,6 +14,13 @@ const chartSvg = document.getElementById("history-chart");
 const chartEmptyEl = document.getElementById("chart-empty");
 const logListEl = document.getElementById("log-entries");
 const logEmptyEl = document.getElementById("log-empty");
+const statFeedEl = document.getElementById("stat-feed");
+const statWeeEl = document.getElementById("stat-wee");
+const statPooEl = document.getElementById("stat-poo");
+const lastActivityEl = document.getElementById("last-activity");
+const lastFeedEl = document.getElementById("last-feed");
+const lastWeeEl = document.getElementById("last-wee");
+const lastPooEl = document.getElementById("last-poo");
 
 const CHART_CONFIG = {
   width: 360,
@@ -21,6 +29,7 @@ const CHART_CONFIG = {
   axisY: 122,
   feedY: 70,
   pooY: 100,
+  weeY: 40,
 };
 
 function setStatus(message) {
@@ -80,6 +89,16 @@ async function fetchEntries(params) {
   const response = await fetch(
     `/api/users/${activeUser}/entries${buildQuery(params)}`,
   );
+  if (!response.ok) {
+    let detail = "";
+    try {
+      const err = await response.json();
+      detail = err.error || JSON.stringify(err);
+    } catch (parseError) {
+      detail = await response.text();
+    }
+    throw new Error(detail || `HTTP ${response.status}`);
+  }
   const data = await response.json();
   return normalizeEntriesResponse(data);
 }
@@ -96,7 +115,7 @@ function renderChart(entries, windowBounds) {
   chartEmptyEl.style.display = "none";
 
   const svgNS = "http://www.w3.org/2000/svg";
-  const { width, height, paddingX, axisY, feedY, pooY } = CHART_CONFIG;
+  const { width, height, paddingX, axisY, feedY, pooY, weeY } = CHART_CONFIG;
 
   const axisLine = document.createElementNS(svgNS, "line");
   axisLine.setAttribute("x1", paddingX);
@@ -142,9 +161,15 @@ function renderChart(entries, windowBounds) {
       return;
     }
     const x = paddingX + ratio * (width - paddingX * 2);
-    const isFeed = entry.type === "feed";
-    const y = isFeed ? feedY : pooY;
-    const color = isFeed ? "#f6c453" : "#c59b7f";
+    let y = pooY;
+    let color = "#fbbf24";
+    if (entry.type === "feed") {
+      y = feedY;
+      color = "#13ec5b";
+    } else if (entry.type === "wee") {
+      y = weeY;
+      color = "#7dd3fc";
+    }
 
     const stem = document.createElementNS(svgNS, "line");
     stem.setAttribute("x1", x);
@@ -219,6 +244,74 @@ function renderLogEntries(entries) {
   });
 }
 
+function renderStats(entries) {
+  if (!statFeedEl || !statWeeEl || !statPooEl) {
+    return;
+  }
+  let feedCount = 0;
+  let weeCount = 0;
+  let pooCount = 0;
+  entries.forEach((entry) => {
+    if (entry.type === "feed") {
+      feedCount += 1;
+    } else if (entry.type === "wee") {
+      weeCount += 1;
+    } else if (entry.type === "poo") {
+      pooCount += 1;
+    }
+  });
+  statFeedEl.textContent = String(feedCount);
+  statWeeEl.textContent = String(weeCount);
+  statPooEl.textContent = String(pooCount);
+}
+
+function renderLastActivity(entries) {
+  if (!lastActivityEl) {
+    return;
+  }
+  if (!entries.length) {
+    lastActivityEl.textContent = "Last activity: --";
+    return;
+  }
+  const sorted = [...entries].sort((a, b) => {
+    return new Date(b.timestamp_utc) - new Date(a.timestamp_utc);
+  });
+  const latest = sorted[0];
+  lastActivityEl.textContent = `Last activity: ${formatTimestamp(latest.timestamp_utc)}`;
+}
+
+function renderLastByType(entries) {
+  if (!lastFeedEl || !lastWeeEl || !lastPooEl) {
+    return;
+  }
+  const latestByType = {
+    feed: null,
+    wee: null,
+    poo: null,
+  };
+  entries.forEach((entry) => {
+    if (!latestByType[entry.type]) {
+      latestByType[entry.type] = entry;
+      return;
+    }
+    const prev = new Date(latestByType[entry.type].timestamp_utc);
+    const next = new Date(entry.timestamp_utc);
+    if (next > prev) {
+      latestByType[entry.type] = entry;
+    }
+  });
+
+  lastFeedEl.textContent = latestByType.feed
+    ? formatTimestamp(latestByType.feed.timestamp_utc)
+    : "--";
+  lastWeeEl.textContent = latestByType.wee
+    ? formatTimestamp(latestByType.wee.timestamp_utc)
+    : "--";
+  lastPooEl.textContent = latestByType.poo
+    ? formatTimestamp(latestByType.poo.timestamp_utc)
+    : "--";
+}
+
 async function addEntry(type) {
   setStatus("Saving...");
   const payload = {
@@ -226,21 +319,36 @@ async function addEntry(type) {
     timestamp_utc: new Date().toISOString(),
     client_event_id: generateId(),
   };
-  const response = await fetch(`/api/users/${activeUser}/entries`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
+  try {
+    const response = await fetch(`/api/users/${activeUser}/entries`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
 
-  if (response.status === 201) {
+    if (response.status === 409) {
+      setStatus("Already saved (duplicate tap)");
+      await loadHomeEntries();
+      return;
+    }
+
+    if (!response.ok) {
+      let detail = "";
+      try {
+        const err = await response.json();
+        detail = err.error || JSON.stringify(err);
+      } catch (parseError) {
+        detail = await response.text();
+      }
+      setStatus(`Error: ${detail || response.status}`);
+      return;
+    }
+
     setStatus("Saved");
-  } else if (response.status === 409) {
-    setStatus("Already saved (duplicate tap)");
-  } else {
-    const err = await response.json();
-    setStatus(`Error: ${err.error || "unknown"}`);
+    await loadHomeEntries();
+  } catch (err) {
+    setStatus("Error: network issue saving entry");
   }
-  await loadHomeEntries();
 }
 
 async function editEntry(entry) {
@@ -307,8 +415,11 @@ async function loadHomeEntries() {
       until: windowBounds.untilIso,
     });
     renderChart(entries, windowBounds);
+    renderStats(entries);
+    renderLastActivity(entries);
+    renderLastByType(entries);
   } catch (err) {
-    setStatus("Failed to load entries");
+    setStatus(`Failed to load entries: ${err.message || "unknown error"}`);
   }
 }
 
@@ -320,7 +431,7 @@ async function loadLogEntries() {
     const entries = await fetchEntries({ limit: 200 });
     renderLogEntries(entries);
   } catch (err) {
-    setStatus("Failed to load entries");
+    setStatus(`Failed to load entries: ${err.message || "unknown error"}`);
   }
 }
 
@@ -352,10 +463,16 @@ if (!userValid) {
   if (pooBtn) {
     pooBtn.classList.add("disabled");
   }
+  if (weeBtn) {
+    weeBtn.classList.add("disabled");
+  }
   setStatus("Choose a valid /<name> URL to start logging.");
 } else if (pageType === "home") {
   feedBtn.addEventListener("click", () => addEntry("feed"));
   pooBtn.addEventListener("click", () => addEntry("poo"));
+  if (weeBtn) {
+    weeBtn.addEventListener("click", () => addEntry("wee"));
+  }
   loadHomeEntries();
 } else if (pageType === "log") {
   loadLogEntries();
