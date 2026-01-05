@@ -54,7 +54,6 @@ def list_user_entries_route(user_slug: str):
         entries = list_entries(
             _db_path(),
             limit=limit,
-            user_slug=user_slug,
             since_utc=since_utc,
             until_utc=until_utc,
         )

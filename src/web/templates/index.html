@@ -128,6 +128,12 @@
         font-size: 22px;
         font-weight: 700;
       }
+      .stats-range {
+        margin-top: 10px;
+        font-size: 11px;
+        color: var(--text-secondary);
+        text-align: center;
+      }
       .chart-card {
         margin-top: 16px;
         background: #ffffff;
@@ -284,17 +290,20 @@
         color: #d9eee0;
       }
       .action-btn.primary {
-        background: var(--primary);
-        color: #0e2014;
-        flex-direction: row;
+        background: #e9f0eb;
+        color: #1b2b1f;
+        flex-direction: column;
         justify-content: center;
-        gap: 10px;
-        box-shadow: 0 0 18px rgba(19, 236, 91, 0.3);
+        gap: 6px;
+        box-shadow: none;
+      }
+      html.dark .action-btn.primary {
+        background: var(--card-dark);
+        color: #d9eee0;
       }
       .action-btn.primary span {
-        font-size: 18px;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
+        font-size: 14px;
+        letter-spacing: 0.02em;
       }
       .action-btn .material-symbols-outlined {
         font-size: 28px;
@@ -341,10 +350,11 @@
             <div class="stat-value" id="stat-poo">0</div>
           </div>
         </section>
+        <div class="stats-range" id="stat-window">Rolling 24h: --</div>
 
         <section class="chart-card">
           <div class="chart-header">
-            <h3>24 Hour Overview</h3>
+            <h3>Last 6 Hours</h3>
             <a class="log-link" id="log-link" href="#">Event log</a>
           </div>
           <div class="legend">
@@ -392,8 +402,8 @@
             Poo
           </button>
           <button class="action-btn primary" id="log-feed" type="button">
-            <span class="material-symbols-outlined">water_drop</span>
-            <span>Log Feed</span>
+            <span class="material-symbols-outlined" style="color: var(--primary);">water_drop</span>
+            Feed
           </button>
         </div>
       </div>

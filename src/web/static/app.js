@@ -17,6 +17,7 @@ const logEmptyEl = document.getElementById("log-empty");
 const statFeedEl = document.getElementById("stat-feed");
 const statWeeEl = document.getElementById("stat-wee");
 const statPooEl = document.getElementById("stat-poo");
+const statWindowEl = document.getElementById("stat-window");
 const lastActivityEl = document.getElementById("last-activity");
 const lastFeedEl = document.getElementById("last-feed");
 const lastWeeEl = document.getElementById("last-wee");
@@ -53,9 +54,9 @@ function formatTimestamp(value) {
   return date.toLocaleString();
 }
 
-function compute24hWindow() {
+function computeWindow(hours) {
   const until = new Date();
-  const since = new Date(until.getTime() - 24 * 60 * 60 * 1000);
+  const since = new Date(until.getTime() - hours * 60 * 60 * 1000);
   return {
     since,
     until,
@@ -126,7 +127,17 @@ function renderChart(entries, windowBounds) {
   axisLine.setAttribute("stroke-width", "2");
   chartSvg.appendChild(axisLine);
 
-  const labels = ["24h ago", "18h", "12h", "6h", "now"];
+  const hoursSpan = Math.round(
+    (windowBounds.until.getTime() - windowBounds.since.getTime()) / 3600000,
+  );
+  const ticks = [hoursSpan, hoursSpan * 0.75, hoursSpan * 0.5, hoursSpan * 0.25, 0];
+  const labels = ticks.map((tick) => {
+    if (tick === 0) {
+      return "now";
+    }
+    const label = tick % 1 === 0 ? `${tick}` : tick.toFixed(1);
+    return `${label}h`;
+  });
   labels.forEach((label, idx) => {
     const x = paddingX + ((width - paddingX * 2) / 4) * idx;
     const tick = document.createElementNS(svgNS, "line");
@@ -213,8 +224,15 @@ function renderLogEntries(entries) {
     timeEl.className = "entry-meta";
     timeEl.textContent = formatTimestamp(entry.timestamp_utc);
 
+    const byEl = document.createElement("div");
+    byEl.className = "entry-meta";
+    byEl.textContent = entry.user_slug
+      ? `Logged by ${entry.user_slug}`
+      : "Logged by --";
+
     left.appendChild(typeEl);
     left.appendChild(timeEl);
+    left.appendChild(byEl);
 
     const right = document.createElement("div");
     right.className = "log-actions";
@@ -263,6 +281,24 @@ function renderStats(entries) {
   statFeedEl.textContent = String(feedCount);
   statWeeEl.textContent = String(weeCount);
   statPooEl.textContent = String(pooCount);
+}
+
+function formatRangeLabel(since, until) {
+  const pad = (value) => String(value).padStart(2, "0");
+  const format = (value) => {
+    return `${pad(value.getMonth() + 1)}/${pad(value.getDate())} ${pad(value.getHours())}:${pad(value.getMinutes())}`;
+  };
+  return `${format(since)} - ${format(until)}`;
+}
+
+function renderStatsWindow(windowBounds) {
+  if (!statWindowEl) {
+    return;
+  }
+  statWindowEl.textContent = `Rolling 24h: ${formatRangeLabel(
+    windowBounds.since,
+    windowBounds.until,
+  )}`;
 }
 
 function renderLastActivity(entries) {
@@ -408,14 +444,20 @@ async function loadHomeEntries() {
     return;
   }
   try {
-    const windowBounds = compute24hWindow();
+    const statsWindow = computeWindow(24);
+    const chartWindow = computeWindow(6);
     const entries = await fetchEntries({
       limit: 200,
-      since: windowBounds.sinceIso,
-      until: windowBounds.untilIso,
+      since: statsWindow.sinceIso,
+      until: statsWindow.untilIso,
     });
-    renderChart(entries, windowBounds);
+    const chartEntries = entries.filter((entry) => {
+      const ts = new Date(entry.timestamp_utc);
+      return ts >= chartWindow.since && ts <= chartWindow.until;
+    });
+    renderChart(chartEntries, chartWindow);
     renderStats(entries);
+    renderStatsWindow(statsWindow);
     renderLastActivity(entries);
     renderLastByType(entries);
   } catch (err) {
