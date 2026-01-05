@@ -27,3 +27,9 @@
 {"session_id":"019b7de9-099f-7382-a88a-e6f983fbcc7a","ts":1767370881,"text":"lets merge all functions to main and clean up the branches"}
 {"session_id":"019b7de9-099f-7382-a88a-e6f983fbcc7a","ts":1767371709,"text":"lets use 001-two-click-log as teh main"}
 {"session_id":"019b7de9-099f-7382-a88a-e6f983fbcc7a","ts":1767371729,"text":"commit everything"}
+{"session_id":"019b7de9-099f-7382-a88a-e6f983fbcc7a","ts":1767613365,"text":"both users should see the same results, but they should be able to see who logged the event in the event log"}
+{"session_id":"019b7de9-099f-7382-a88a-e6f983fbcc7a","ts":1767613609,"text":"can we edit the chart to show the last 6 hours to make it more readable. add text to make it clear that the event counts at the top of the page are for a rolling 24h eg 04/01 11:45 - 05 11:45"}
+{"session_id":"019b7de9-099f-7382-a88a-e6f983fbcc7a","ts":1767614050,"text":"make the log feed look like the wee and poo buttons"}
+{"session_id":"019b7de9-099f-7382-a88a-e6f983fbcc7a","ts":1767614392,"text":"the feed icon is a bit smaller than the others"}
+{"session_id":"019b7de9-099f-7382-a88a-e6f983fbcc7a","ts":1767614815,"text":"on a new branch lets develop some more functionality. lets have one icon for logging a nappy, then if its wet or dirty (keeping the same icons). it should work via a popup /submenu"}
+{"session_id":"019b7de9-099f-7382-a88a-e6f983fbcc7a","ts":1767620738,"text":"commit everything untracked and then start a fresh branch"}
