@@ -1,0 +1,92 @@
+openapi: 3.0.3
+info:
+  title: Baby Tracker Wee Logging API
+  version: 1.0.0
+paths:
+  /api/users/{user}/entries:
+    post:
+      summary: Create a new entry for a user
+      parameters:
+        - in: path
+          name: user
+          required: true
+          schema:
+            type: string
+            pattern: "^[a-z0-9-]+$"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewEntry"
+      responses:
+        "201":
+          description: Entry created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Entry"
+        "409":
+          description: Duplicate idempotency key
+  /api/users/{user}/entries:
+    get:
+      summary: List recent entries for a user
+      parameters:
+        - in: path
+          name: user
+          required: true
+          schema:
+            type: string
+            pattern: "^[a-z0-9-]+$"
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+      responses:
+        "200":
+          description: List of entries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  entries:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Entry"
+components:
+  schemas:
+    Entry:
+      type: object
+      properties:
+        id:
+          type: integer
+        user_slug:
+          type: string
+        type:
+          type: string
+          enum: [feed, poo, wee]
+        timestamp:
+          type: string
+        notes:
+          type: string
+        amount:
+          type: number
+        created_at:
+          type: string
+    NewEntry:
+      type: object
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [feed, poo, wee]
+        timestamp:
+          type: string
+        notes:
+          type: string
+        amount:
+          type: number
