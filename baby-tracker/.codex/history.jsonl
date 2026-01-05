@@ -33,3 +33,9 @@
 {"session_id":"019b7de9-099f-7382-a88a-e6f983fbcc7a","ts":1767614392,"text":"the feed icon is a bit smaller than the others"}
 {"session_id":"019b7de9-099f-7382-a88a-e6f983fbcc7a","ts":1767614815,"text":"on a new branch lets develop some more functionality. lets have one icon for logging a nappy, then if its wet or dirty (keeping the same icons). it should work via a popup /submenu"}
 {"session_id":"019b7de9-099f-7382-a88a-e6f983fbcc7a","ts":1767620738,"text":"commit everything untracked and then start a fresh branch"}
+{"session_id":"019b7de9-099f-7382-a88a-e6f983fbcc7a","ts":1767621175,"text":"the wet didn't log as a wee, update it to say wee and make sure it logs in the same way as before but from the new submenu"}
+{"session_id":"019b7de9-099f-7382-a88a-e6f983fbcc7a","ts":1767621258,"text":"i get Error: type must be feed or poo"}
+{"session_id":"019b7de9-099f-7382-a88a-e6f983fbcc7a","ts":1767621387,"text":"great, lets add tests so we can maintain functionality through future changes"}
+{"session_id":"019b7de9-099f-7382-a88a-e6f983fbcc7a","ts":1767622071,"text":"uv run pytest\nerror: Failed to spawn: `pytest`\n  Caused by: No such file or directory (os error 2)"}
+{"session_id":"019b7de9-099f-7382-a88a-e6f983fbcc7a","ts":1767622107,"text":"ImportError while loading conftest '/Users/josh/my-code/baby/tests/conftest.py'.\ntests/conftest.py:3: in <module>\n    from src.app.main import create_app\nE   ModuleNotFoundError: No module named 'src'"}
+{"session_id":"019b7de9-099f-7382-a88a-e6f983fbcc7a","ts":1767622336,"text":"fix the spacing of the nappy button and commit all changes"}

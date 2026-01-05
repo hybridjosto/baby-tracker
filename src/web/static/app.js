@@ -5,8 +5,11 @@ const userValid = bodyEl.dataset.userValid === "true";
 const pageType = bodyEl.dataset.page || "home";
 
 const feedBtn = document.getElementById("log-feed");
+const nappyBtn = document.getElementById("log-nappy");
 const pooBtn = document.getElementById("log-poo");
 const weeBtn = document.getElementById("log-wee");
+const nappyMenu = document.getElementById("nappy-menu");
+const nappyBackdrop = document.getElementById("nappy-backdrop");
 const logLinkEl = document.getElementById("log-link");
 const homeLinkEl = document.getElementById("home-link");
 
@@ -32,6 +35,41 @@ const CHART_CONFIG = {
   pooY: 100,
   weeY: 40,
 };
+
+function openNappyMenu() {
+  if (!nappyMenu || !nappyBtn) {
+    return;
+  }
+  nappyMenu.classList.add("open");
+  nappyMenu.setAttribute("aria-hidden", "false");
+  nappyBtn.setAttribute("aria-expanded", "true");
+  if (nappyBackdrop) {
+    nappyBackdrop.classList.add("open");
+  }
+}
+
+function closeNappyMenu() {
+  if (!nappyMenu || !nappyBtn) {
+    return;
+  }
+  nappyMenu.classList.remove("open");
+  nappyMenu.setAttribute("aria-hidden", "true");
+  nappyBtn.setAttribute("aria-expanded", "false");
+  if (nappyBackdrop) {
+    nappyBackdrop.classList.remove("open");
+  }
+}
+
+function toggleNappyMenu() {
+  if (!nappyMenu) {
+    return;
+  }
+  if (nappyMenu.classList.contains("open")) {
+    closeNappyMenu();
+  } else {
+    openNappyMenu();
+  }
+}
 
 function setStatus(message) {
   if (statusEl) {
@@ -388,7 +426,7 @@ async function addEntry(type) {
 }
 
 async function editEntry(entry) {
-  const nextType = window.prompt("Type (feed or poo)", entry.type);
+  const nextType = window.prompt("Type (feed, poo, or wee)", entry.type);
   if (!nextType) {
     return;
   }
@@ -502,6 +540,9 @@ if (!userValid) {
   if (feedBtn) {
     feedBtn.classList.add("disabled");
   }
+  if (nappyBtn) {
+    nappyBtn.classList.add("disabled");
+  }
   if (pooBtn) {
     pooBtn.classList.add("disabled");
   }
@@ -511,10 +552,29 @@ if (!userValid) {
   setStatus("Choose a valid /<name> URL to start logging.");
 } else if (pageType === "home") {
   feedBtn.addEventListener("click", () => addEntry("feed"));
-  pooBtn.addEventListener("click", () => addEntry("poo"));
-  if (weeBtn) {
-    weeBtn.addEventListener("click", () => addEntry("wee"));
+  if (nappyBtn) {
+    nappyBtn.addEventListener("click", toggleNappyMenu);
   }
+  if (pooBtn) {
+    pooBtn.addEventListener("click", () => {
+      closeNappyMenu();
+      addEntry("poo");
+    });
+  }
+  if (weeBtn) {
+    weeBtn.addEventListener("click", () => {
+      closeNappyMenu();
+      addEntry("wee");
+    });
+  }
+  if (nappyBackdrop) {
+    nappyBackdrop.addEventListener("click", closeNappyMenu);
+  }
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      closeNappyMenu();
+    }
+  });
   loadHomeEntries();
 } else if (pageType === "log") {
   loadLogEntries();
