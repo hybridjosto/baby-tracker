@@ -92,6 +92,39 @@ function formatTimestamp(value) {
   return date.toLocaleString();
 }
 
+function formatRelativeTime(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  const diffMs = Date.now() - date.getTime();
+  const diffMinutes = Math.max(0, Math.floor(diffMs / 60000));
+  if (diffMinutes < 1) {
+    return "just now";
+  }
+  if (diffMinutes < 60) {
+    return `${diffMinutes} min${diffMinutes === 1 ? "" : "s"}`;
+  }
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) {
+    return `${diffHours} hour${diffHours === 1 ? "" : "s"}`;
+  }
+  const diffDays = Math.floor(diffHours / 24);
+  return `${diffDays} day${diffDays === 1 ? "" : "s"}`;
+}
+
+function bindTimestampPopup(element) {
+  if (!element) {
+    return;
+  }
+  element.addEventListener("click", () => {
+    const timestamp = element.dataset.timestamp;
+    if (timestamp) {
+      window.alert(formatTimestamp(timestamp));
+    }
+  });
+}
+
 function computeWindow(hours) {
   const until = new Date();
   const since = new Date(until.getTime() - hours * 60 * 60 * 1000);
@@ -375,15 +408,29 @@ function renderLastByType(entries) {
     }
   });
 
-  lastFeedEl.textContent = latestByType.feed
-    ? formatTimestamp(latestByType.feed.timestamp_utc)
-    : "--";
-  lastWeeEl.textContent = latestByType.wee
-    ? formatTimestamp(latestByType.wee.timestamp_utc)
-    : "--";
-  lastPooEl.textContent = latestByType.poo
-    ? formatTimestamp(latestByType.poo.timestamp_utc)
-    : "--";
+  if (latestByType.feed) {
+    lastFeedEl.textContent = formatRelativeTime(latestByType.feed.timestamp_utc);
+    lastFeedEl.dataset.timestamp = latestByType.feed.timestamp_utc;
+  } else {
+    lastFeedEl.textContent = "--";
+    delete lastFeedEl.dataset.timestamp;
+  }
+
+  if (latestByType.wee) {
+    lastWeeEl.textContent = formatRelativeTime(latestByType.wee.timestamp_utc);
+    lastWeeEl.dataset.timestamp = latestByType.wee.timestamp_utc;
+  } else {
+    lastWeeEl.textContent = "--";
+    delete lastWeeEl.dataset.timestamp;
+  }
+
+  if (latestByType.poo) {
+    lastPooEl.textContent = formatRelativeTime(latestByType.poo.timestamp_utc);
+    lastPooEl.dataset.timestamp = latestByType.poo.timestamp_utc;
+  } else {
+    lastPooEl.textContent = "--";
+    delete lastPooEl.dataset.timestamp;
+  }
 }
 
 async function addEntry(type) {
@@ -551,6 +598,9 @@ if (!userValid) {
   }
   setStatus("Choose a valid /<name> URL to start logging.");
 } else if (pageType === "home") {
+  bindTimestampPopup(lastFeedEl);
+  bindTimestampPopup(lastWeeEl);
+  bindTimestampPopup(lastPooEl);
   feedBtn.addEventListener("click", () => addEntry("feed"));
   if (nappyBtn) {
     nappyBtn.addEventListener("click", toggleNappyMenu);
