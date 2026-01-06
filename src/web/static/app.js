@@ -1,11 +1,18 @@
 const statusEl = document.getElementById("status");
 const bodyEl = document.body;
-const activeUser = bodyEl.dataset.user || "";
-const userValid = bodyEl.dataset.userValid === "true";
+let activeUser = bodyEl.dataset.user || "";
+let userValid = bodyEl.dataset.userValid === "true";
 const pageType = bodyEl.dataset.page || "home";
 
 const THEME_KEY = "baby-tracker-theme";
+const USER_KEY = "baby-tracker-user";
+const USER_RE = /^[a-z0-9-]{1,24}$/;
 const themeToggleBtn = document.getElementById("theme-toggle");
+const userFormEl = document.getElementById("user-form");
+const userInputEl = document.getElementById("user-input");
+const userMessageEl = document.getElementById("today-label")
+  || document.getElementById("user-message");
+const userChipEl = document.getElementById("user-chip");
 
 const feedBtn = document.getElementById("log-feed");
 const nappyBtn = document.getElementById("log-nappy");
@@ -73,6 +80,164 @@ function toggleTheme() {
   const next = current === "dark" ? "light" : "dark";
   window.localStorage.setItem(THEME_KEY, next);
   applyTheme(next);
+}
+
+function normalizeUserSlug(value) {
+  if (!value) {
+    return "";
+  }
+  const slug = value.trim().toLowerCase();
+  if (!USER_RE.test(slug)) {
+    return "";
+  }
+  return slug;
+}
+
+function updateUserDisplay() {
+  if (userMessageEl) {
+    userMessageEl.textContent = userValid
+      ? `Logging as ${activeUser}`
+      : "Choose a user to start logging.";
+  }
+  if (userChipEl) {
+    userChipEl.textContent = activeUser ? activeUser.slice(0, 2).toUpperCase() : "BT";
+  }
+}
+
+function toggleDisabled(element, disabled) {
+  if (!element) {
+    return;
+  }
+  element.classList.toggle("disabled", disabled);
+  if (disabled) {
+    element.setAttribute("aria-disabled", "true");
+  } else {
+    element.removeAttribute("aria-disabled");
+  }
+}
+
+let homeInitialized = false;
+let logInitialized = false;
+
+function initHomeHandlers() {
+  if (homeInitialized || pageType !== "home") {
+    return;
+  }
+  homeInitialized = true;
+  bindTimestampPopup(lastFeedEl);
+  bindTimestampPopup(lastWeeEl);
+  bindTimestampPopup(lastPooEl);
+  if (feedBtn) {
+    feedBtn.addEventListener("click", () => addEntry("feed"));
+  }
+  if (nappyBtn) {
+    nappyBtn.addEventListener("click", toggleNappyMenu);
+  }
+  if (pooBtn) {
+    pooBtn.addEventListener("click", () => {
+      closeNappyMenu();
+      addEntry("poo");
+    });
+  }
+  if (weeBtn) {
+    weeBtn.addEventListener("click", () => {
+      closeNappyMenu();
+      addEntry("wee");
+    });
+  }
+  if (nappyBackdrop) {
+    nappyBackdrop.addEventListener("click", closeNappyMenu);
+  }
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      closeNappyMenu();
+    }
+  });
+}
+
+function initLogHandlers() {
+  if (logInitialized || pageType !== "log") {
+    return;
+  }
+  logInitialized = true;
+}
+
+function applyUserState() {
+  toggleDisabled(feedBtn, !userValid);
+  toggleDisabled(nappyBtn, !userValid);
+  toggleDisabled(pooBtn, !userValid);
+  toggleDisabled(weeBtn, !userValid);
+  initLinks();
+  updateUserDisplay();
+  if (userFormEl) {
+    userFormEl.hidden = userValid;
+  }
+  if (!userValid) {
+    setStatus("Choose a user below to start logging.");
+    return;
+  }
+  setStatus("");
+  if (pageType === "home") {
+    initHomeHandlers();
+    loadHomeEntries();
+  }
+  if (pageType === "log") {
+    initLogHandlers();
+    loadLogEntries();
+  }
+}
+
+function setActiveUser(value, persist = true) {
+  const normalized = normalizeUserSlug(value);
+  activeUser = normalized;
+  userValid = Boolean(normalized);
+  bodyEl.dataset.user = activeUser;
+  bodyEl.dataset.userValid = userValid ? "true" : "false";
+  if (persist) {
+    if (userValid) {
+      window.localStorage.setItem(USER_KEY, activeUser);
+    } else {
+      window.localStorage.removeItem(USER_KEY);
+    }
+  }
+  applyUserState();
+}
+
+function initializeUser() {
+  const initialUser = normalizeUserSlug(activeUser);
+  if (userValid && !initialUser) {
+    userValid = false;
+  }
+  activeUser = initialUser;
+  if (!userValid) {
+    const stored = normalizeUserSlug(window.localStorage.getItem(USER_KEY));
+    if (stored) {
+      activeUser = stored;
+      userValid = true;
+    }
+  }
+  if (userValid) {
+    window.localStorage.setItem(USER_KEY, activeUser);
+  }
+  bodyEl.dataset.user = activeUser;
+  bodyEl.dataset.userValid = userValid ? "true" : "false";
+  applyUserState();
+}
+
+function handleUserSave(event) {
+  if (event) {
+    event.preventDefault();
+  }
+  if (!userInputEl) {
+    return;
+  }
+  const normalized = normalizeUserSlug(userInputEl.value);
+  if (!normalized) {
+    setStatus("User must be 1-24 chars: a-z, 0-9, hyphen.");
+    userInputEl.focus();
+    return;
+  }
+  setActiveUser(normalized);
 }
 
 function openNappyMenu() {
@@ -603,72 +768,20 @@ async function loadLogEntries() {
 
 function initLinks() {
   if (logLinkEl) {
-    if (userValid) {
-      logLinkEl.href = `/${activeUser}/log`;
-    } else {
-      logLinkEl.classList.add("disabled");
-      logLinkEl.href = "#";
-    }
+    logLinkEl.classList.toggle("disabled", !userValid);
+    logLinkEl.href = userValid ? "/log" : "#";
   }
   if (homeLinkEl) {
-    if (userValid) {
-      homeLinkEl.href = `/${activeUser}`;
-    } else {
-      homeLinkEl.classList.add("disabled");
-      homeLinkEl.href = "#";
-    }
+    homeLinkEl.classList.toggle("disabled", !userValid);
+    homeLinkEl.href = userValid ? "/" : "#";
   }
 }
 
-initLinks();
 applyTheme(getPreferredTheme());
 if (themeToggleBtn) {
   themeToggleBtn.addEventListener("click", toggleTheme);
 }
-
-if (!userValid) {
-  if (feedBtn) {
-    feedBtn.classList.add("disabled");
-  }
-  if (nappyBtn) {
-    nappyBtn.classList.add("disabled");
-  }
-  if (pooBtn) {
-    pooBtn.classList.add("disabled");
-  }
-  if (weeBtn) {
-    weeBtn.classList.add("disabled");
-  }
-  setStatus("Choose a valid /<name> URL to start logging.");
-} else if (pageType === "home") {
-  bindTimestampPopup(lastFeedEl);
-  bindTimestampPopup(lastWeeEl);
-  bindTimestampPopup(lastPooEl);
-  feedBtn.addEventListener("click", () => addEntry("feed"));
-  if (nappyBtn) {
-    nappyBtn.addEventListener("click", toggleNappyMenu);
-  }
-  if (pooBtn) {
-    pooBtn.addEventListener("click", () => {
-      closeNappyMenu();
-      addEntry("poo");
-    });
-  }
-  if (weeBtn) {
-    weeBtn.addEventListener("click", () => {
-      closeNappyMenu();
-      addEntry("wee");
-    });
-  }
-  if (nappyBackdrop) {
-    nappyBackdrop.addEventListener("click", closeNappyMenu);
-  }
-  document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") {
-      closeNappyMenu();
-    }
-  });
-  loadHomeEntries();
-} else if (pageType === "log") {
-  loadLogEntries();
+if (userFormEl) {
+  userFormEl.addEventListener("submit", handleUserSave);
 }
+initializeUser();

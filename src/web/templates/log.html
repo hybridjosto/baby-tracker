@@ -163,6 +163,62 @@
       html.dark .status {
         color: #9db9a6;
       }
+      .user-setup {
+        margin-top: 12px;
+        padding: 12px;
+        border-radius: 14px;
+        border: 1px dashed #e5e1da;
+        background: #f9f6f1;
+      }
+      html.dark .user-setup {
+        border-color: rgba(255, 255, 255, 0.08);
+        background: rgba(26, 44, 32, 0.9);
+      }
+      .user-setup label {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: #6a6259;
+      }
+      html.dark .user-setup label {
+        color: #9db9a6;
+      }
+      .user-row {
+        display: flex;
+        gap: 8px;
+        margin-top: 8px;
+      }
+      .user-input {
+        flex: 1;
+        border-radius: 10px;
+        border: 1px solid #e5e1da;
+        padding: 10px 12px;
+        font-size: 14px;
+        background: #ffffff;
+        color: #1f1f1f;
+      }
+      html.dark .user-input {
+        border-color: rgba(255, 255, 255, 0.12);
+        background: rgba(16, 24, 18, 0.8);
+        color: #f3f6f4;
+      }
+      .user-btn {
+        border-radius: 10px;
+        border: none;
+        padding: 0 16px;
+        background: #f6c453;
+        color: #1f1f1f;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      .user-hint {
+        margin-top: 6px;
+        font-size: 12px;
+        color: #7b736a;
+      }
+      html.dark .user-hint {
+        color: #9db9a6;
+      }
       .theme-toggle {
         width: 32px;
         height: 32px;
@@ -188,7 +244,7 @@
     <div class="page">
       <div class="card">
         <h1>Event Log</h1>
-        <div class="user-chip">{{ user_message }}</div>
+        <div class="user-chip" id="user-message">{{ user_message }}</div>
         <div class="nav-row">
           <span>Recent entries</span>
           <div class="nav-actions">
@@ -203,6 +259,22 @@
           <div class="log-empty" id="log-empty">No entries yet.</div>
         </div>
         <div class="status" id="status"></div>
+        <form class="user-setup" id="user-form" hidden>
+          <label for="user-input">User</label>
+          <div class="user-row">
+            <input
+              class="user-input"
+              id="user-input"
+              type="text"
+              inputmode="latin-prose"
+              autocapitalize="none"
+              autocomplete="off"
+              placeholder="Name (e.g. josh)"
+            >
+            <button class="user-btn" id="user-save" type="submit">Use</button>
+          </div>
+          <div class="user-hint">Saved on this device.</div>
+        </form>
       </div>
     </div>
     <script src="/static/app.js"></script>

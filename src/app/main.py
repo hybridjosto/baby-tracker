@@ -34,8 +34,18 @@ def create_app() -> Flask:
             "index.html",
             user_slug="",
             user_valid=False,
-            user_message="Add /<name> to the URL (example: /suz).",
+            user_message="Choose a user below (example: josh).",
             page="home",
+        )
+
+    @app.get("/log")
+    def log_index():
+        return render_template(
+            "log.html",
+            user_slug="",
+            user_valid=False,
+            user_message="Choose a user below (example: josh).",
+            page="log",
         )
 
     @app.get("/<user_slug>")
