@@ -1,12 +1,12 @@
 import re
 
-VALID_TYPES = {"feed", "poo"}
+VALID_TYPES = {"feed", "poo", "wee"}
 USER_SLUG_RE = re.compile(r"^[a-z0-9-]{1,24}$")
 
 
 def validate_entry_type(value: str) -> None:
     if value not in VALID_TYPES:
-        raise ValueError("type must be feed or poo")
+        raise ValueError("type must be feed, poo, or wee")
 
 
 def validate_entry_payload(payload: dict, require_client_event: bool = False) -> dict:

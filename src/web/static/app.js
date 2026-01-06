@@ -4,8 +4,15 @@ const activeUser = bodyEl.dataset.user || "";
 const userValid = bodyEl.dataset.userValid === "true";
 const pageType = bodyEl.dataset.page || "home";
 
+const THEME_KEY = "baby-tracker-theme";
+const themeToggleBtn = document.getElementById("theme-toggle");
+
 const feedBtn = document.getElementById("log-feed");
+const nappyBtn = document.getElementById("log-nappy");
 const pooBtn = document.getElementById("log-poo");
+const weeBtn = document.getElementById("log-wee");
+const nappyMenu = document.getElementById("nappy-menu");
+const nappyBackdrop = document.getElementById("nappy-backdrop");
 const logLinkEl = document.getElementById("log-link");
 const homeLinkEl = document.getElementById("home-link");
 
@@ -13,6 +20,14 @@ const chartSvg = document.getElementById("history-chart");
 const chartEmptyEl = document.getElementById("chart-empty");
 const logListEl = document.getElementById("log-entries");
 const logEmptyEl = document.getElementById("log-empty");
+const statFeedEl = document.getElementById("stat-feed");
+const statWeeEl = document.getElementById("stat-wee");
+const statPooEl = document.getElementById("stat-poo");
+const statWindowEl = document.getElementById("stat-window");
+const lastActivityEl = document.getElementById("last-activity");
+const lastFeedEl = document.getElementById("last-feed");
+const lastWeeEl = document.getElementById("last-wee");
+const lastPooEl = document.getElementById("last-poo");
 
 const CHART_CONFIG = {
   width: 360,
@@ -21,7 +36,79 @@ const CHART_CONFIG = {
   axisY: 122,
   feedY: 70,
   pooY: 100,
+  weeY: 40,
 };
+
+function getPreferredTheme() {
+  const stored = window.localStorage.getItem(THEME_KEY);
+  if (stored === "light" || stored === "dark") {
+    return stored;
+  }
+  if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {
+    return "dark";
+  }
+  return "light";
+}
+
+function updateThemeToggle(theme) {
+  if (!themeToggleBtn) {
+    return;
+  }
+  const icon = themeToggleBtn.querySelector(".material-symbols-outlined");
+  if (icon) {
+    icon.textContent = theme === "dark" ? "light_mode" : "dark_mode";
+  }
+  const label = theme === "dark" ? "Switch to light mode" : "Switch to dark mode";
+  themeToggleBtn.setAttribute("aria-label", label);
+  themeToggleBtn.setAttribute("title", label);
+}
+
+function applyTheme(theme) {
+  document.documentElement.classList.toggle("dark", theme === "dark");
+  updateThemeToggle(theme);
+}
+
+function toggleTheme() {
+  const current = document.documentElement.classList.contains("dark") ? "dark" : "light";
+  const next = current === "dark" ? "light" : "dark";
+  window.localStorage.setItem(THEME_KEY, next);
+  applyTheme(next);
+}
+
+function openNappyMenu() {
+  if (!nappyMenu || !nappyBtn) {
+    return;
+  }
+  nappyMenu.classList.add("open");
+  nappyMenu.setAttribute("aria-hidden", "false");
+  nappyBtn.setAttribute("aria-expanded", "true");
+  if (nappyBackdrop) {
+    nappyBackdrop.classList.add("open");
+  }
+}
+
+function closeNappyMenu() {
+  if (!nappyMenu || !nappyBtn) {
+    return;
+  }
+  nappyMenu.classList.remove("open");
+  nappyMenu.setAttribute("aria-hidden", "true");
+  nappyBtn.setAttribute("aria-expanded", "false");
+  if (nappyBackdrop) {
+    nappyBackdrop.classList.remove("open");
+  }
+}
+
+function toggleNappyMenu() {
+  if (!nappyMenu) {
+    return;
+  }
+  if (nappyMenu.classList.contains("open")) {
+    closeNappyMenu();
+  } else {
+    openNappyMenu();
+  }
+}
 
 function setStatus(message) {
   if (statusEl) {
@@ -44,9 +131,42 @@ function formatTimestamp(value) {
   return date.toLocaleString();
 }
 
-function compute24hWindow() {
+function formatRelativeTime(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  const diffMs = Date.now() - date.getTime();
+  const diffMinutes = Math.max(0, Math.floor(diffMs / 60000));
+  if (diffMinutes < 1) {
+    return "just now";
+  }
+  if (diffMinutes < 60) {
+    return `${diffMinutes} min${diffMinutes === 1 ? "" : "s"}`;
+  }
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) {
+    return `${diffHours} hour${diffHours === 1 ? "" : "s"}`;
+  }
+  const diffDays = Math.floor(diffHours / 24);
+  return `${diffDays} day${diffDays === 1 ? "" : "s"}`;
+}
+
+function bindTimestampPopup(element) {
+  if (!element) {
+    return;
+  }
+  element.addEventListener("click", () => {
+    const timestamp = element.dataset.timestamp;
+    if (timestamp) {
+      window.alert(formatTimestamp(timestamp));
+    }
+  });
+}
+
+function computeWindow(hours) {
   const until = new Date();
-  const since = new Date(until.getTime() - 24 * 60 * 60 * 1000);
+  const since = new Date(until.getTime() - hours * 60 * 60 * 1000);
   return {
     since,
     until,
@@ -80,6 +200,16 @@ async function fetchEntries(params) {
   const response = await fetch(
     `/api/users/${activeUser}/entries${buildQuery(params)}`,
   );
+  if (!response.ok) {
+    let detail = "";
+    try {
+      const err = await response.json();
+      detail = err.error || JSON.stringify(err);
+    } catch (parseError) {
+      detail = await response.text();
+    }
+    throw new Error(detail || `HTTP ${response.status}`);
+  }
   const data = await response.json();
   return normalizeEntriesResponse(data);
 }
@@ -96,7 +226,7 @@ function renderChart(entries, windowBounds) {
   chartEmptyEl.style.display = "none";
 
   const svgNS = "http://www.w3.org/2000/svg";
-  const { width, height, paddingX, axisY, feedY, pooY } = CHART_CONFIG;
+  const { width, height, paddingX, axisY, feedY, pooY, weeY } = CHART_CONFIG;
 
   const axisLine = document.createElementNS(svgNS, "line");
   axisLine.setAttribute("x1", paddingX);
@@ -107,7 +237,17 @@ function renderChart(entries, windowBounds) {
   axisLine.setAttribute("stroke-width", "2");
   chartSvg.appendChild(axisLine);
 
-  const labels = ["24h ago", "18h", "12h", "6h", "now"];
+  const hoursSpan = Math.round(
+    (windowBounds.until.getTime() - windowBounds.since.getTime()) / 3600000,
+  );
+  const ticks = [hoursSpan, hoursSpan * 0.75, hoursSpan * 0.5, hoursSpan * 0.25, 0];
+  const labels = ticks.map((tick) => {
+    if (tick === 0) {
+      return "now";
+    }
+    const label = tick % 1 === 0 ? `${tick}` : tick.toFixed(1);
+    return `${label}h`;
+  });
   labels.forEach((label, idx) => {
     const x = paddingX + ((width - paddingX * 2) / 4) * idx;
     const tick = document.createElementNS(svgNS, "line");
@@ -142,9 +282,15 @@ function renderChart(entries, windowBounds) {
       return;
     }
     const x = paddingX + ratio * (width - paddingX * 2);
-    const isFeed = entry.type === "feed";
-    const y = isFeed ? feedY : pooY;
-    const color = isFeed ? "#f6c453" : "#c59b7f";
+    let y = pooY;
+    let color = "#fbbf24";
+    if (entry.type === "feed") {
+      y = feedY;
+      color = "#13ec5b";
+    } else if (entry.type === "wee") {
+      y = weeY;
+      color = "#7dd3fc";
+    }
 
     const stem = document.createElementNS(svgNS, "line");
     stem.setAttribute("x1", x);
@@ -188,8 +334,15 @@ function renderLogEntries(entries) {
     timeEl.className = "entry-meta";
     timeEl.textContent = formatTimestamp(entry.timestamp_utc);
 
+    const byEl = document.createElement("div");
+    byEl.className = "entry-meta";
+    byEl.textContent = entry.user_slug
+      ? `Logged by ${entry.user_slug}`
+      : "Logged by --";
+
     left.appendChild(typeEl);
     left.appendChild(timeEl);
+    left.appendChild(byEl);
 
     const right = document.createElement("div");
     right.className = "log-actions";
@@ -219,6 +372,106 @@ function renderLogEntries(entries) {
   });
 }
 
+function renderStats(entries) {
+  if (!statFeedEl || !statWeeEl || !statPooEl) {
+    return;
+  }
+  let feedCount = 0;
+  let weeCount = 0;
+  let pooCount = 0;
+  entries.forEach((entry) => {
+    if (entry.type === "feed") {
+      feedCount += 1;
+    } else if (entry.type === "wee") {
+      weeCount += 1;
+    } else if (entry.type === "poo") {
+      pooCount += 1;
+    }
+  });
+  statFeedEl.textContent = String(feedCount);
+  statWeeEl.textContent = String(weeCount);
+  statPooEl.textContent = String(pooCount);
+}
+
+function formatRangeLabel(since, until) {
+  const pad = (value) => String(value).padStart(2, "0");
+  const format = (value) => {
+    return `${pad(value.getMonth() + 1)}/${pad(value.getDate())} ${pad(value.getHours())}:${pad(value.getMinutes())}`;
+  };
+  return `${format(since)} - ${format(until)}`;
+}
+
+function renderStatsWindow(windowBounds) {
+  if (!statWindowEl) {
+    return;
+  }
+  statWindowEl.textContent = `Rolling 24h: ${formatRangeLabel(
+    windowBounds.since,
+    windowBounds.until,
+  )}`;
+}
+
+function renderLastActivity(entries) {
+  if (!lastActivityEl) {
+    return;
+  }
+  if (!entries.length) {
+    lastActivityEl.textContent = "Last activity: --";
+    return;
+  }
+  const sorted = [...entries].sort((a, b) => {
+    return new Date(b.timestamp_utc) - new Date(a.timestamp_utc);
+  });
+  const latest = sorted[0];
+  lastActivityEl.textContent = `Last activity: ${formatTimestamp(latest.timestamp_utc)}`;
+}
+
+function renderLastByType(entries) {
+  if (!lastFeedEl || !lastWeeEl || !lastPooEl) {
+    return;
+  }
+  const latestByType = {
+    feed: null,
+    wee: null,
+    poo: null,
+  };
+  entries.forEach((entry) => {
+    if (!latestByType[entry.type]) {
+      latestByType[entry.type] = entry;
+      return;
+    }
+    const prev = new Date(latestByType[entry.type].timestamp_utc);
+    const next = new Date(entry.timestamp_utc);
+    if (next > prev) {
+      latestByType[entry.type] = entry;
+    }
+  });
+
+  if (latestByType.feed) {
+    lastFeedEl.textContent = formatRelativeTime(latestByType.feed.timestamp_utc);
+    lastFeedEl.dataset.timestamp = latestByType.feed.timestamp_utc;
+  } else {
+    lastFeedEl.textContent = "--";
+    delete lastFeedEl.dataset.timestamp;
+  }
+
+  if (latestByType.wee) {
+    lastWeeEl.textContent = formatRelativeTime(latestByType.wee.timestamp_utc);
+    lastWeeEl.dataset.timestamp = latestByType.wee.timestamp_utc;
+  } else {
+    lastWeeEl.textContent = "--";
+    delete lastWeeEl.dataset.timestamp;
+  }
+
+  if (latestByType.poo) {
+    lastPooEl.textContent = formatRelativeTime(latestByType.poo.timestamp_utc);
+    lastPooEl.dataset.timestamp = latestByType.poo.timestamp_utc;
+  } else {
+    lastPooEl.textContent = "--";
+    delete lastPooEl.dataset.timestamp;
+  }
+}
+
 async function addEntry(type) {
   setStatus("Saving...");
   const payload = {
@@ -226,25 +479,40 @@ async function addEntry(type) {
     timestamp_utc: new Date().toISOString(),
     client_event_id: generateId(),
   };
-  const response = await fetch(`/api/users/${activeUser}/entries`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
+  try {
+    const response = await fetch(`/api/users/${activeUser}/entries`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
 
-  if (response.status === 201) {
+    if (response.status === 409) {
+      setStatus("Already saved (duplicate tap)");
+      await loadHomeEntries();
+      return;
+    }
+
+    if (!response.ok) {
+      let detail = "";
+      try {
+        const err = await response.json();
+        detail = err.error || JSON.stringify(err);
+      } catch (parseError) {
+        detail = await response.text();
+      }
+      setStatus(`Error: ${detail || response.status}`);
+      return;
+    }
+
     setStatus("Saved");
-  } else if (response.status === 409) {
-    setStatus("Already saved (duplicate tap)");
-  } else {
-    const err = await response.json();
-    setStatus(`Error: ${err.error || "unknown"}`);
+    await loadHomeEntries();
+  } catch (err) {
+    setStatus("Error: network issue saving entry");
   }
-  await loadHomeEntries();
 }
 
 async function editEntry(entry) {
-  const nextType = window.prompt("Type (feed or poo)", entry.type);
+  const nextType = window.prompt("Type (feed, poo, or wee)", entry.type);
   if (!nextType) {
     return;
   }
@@ -300,15 +568,24 @@ async function loadHomeEntries() {
     return;
   }
   try {
-    const windowBounds = compute24hWindow();
+    const statsWindow = computeWindow(24);
+    const chartWindow = computeWindow(6);
     const entries = await fetchEntries({
       limit: 200,
-      since: windowBounds.sinceIso,
-      until: windowBounds.untilIso,
+      since: statsWindow.sinceIso,
+      until: statsWindow.untilIso,
     });
-    renderChart(entries, windowBounds);
+    const chartEntries = entries.filter((entry) => {
+      const ts = new Date(entry.timestamp_utc);
+      return ts >= chartWindow.since && ts <= chartWindow.until;
+    });
+    renderChart(chartEntries, chartWindow);
+    renderStats(entries);
+    renderStatsWindow(statsWindow);
+    renderLastActivity(entries);
+    renderLastByType(entries);
   } catch (err) {
-    setStatus("Failed to load entries");
+    setStatus(`Failed to load entries: ${err.message || "unknown error"}`);
   }
 }
 
@@ -320,7 +597,7 @@ async function loadLogEntries() {
     const entries = await fetchEntries({ limit: 200 });
     renderLogEntries(entries);
   } catch (err) {
-    setStatus("Failed to load entries");
+    setStatus(`Failed to load entries: ${err.message || "unknown error"}`);
   }
 }
 
@@ -344,18 +621,53 @@ function initLinks() {
 }
 
 initLinks();
+applyTheme(getPreferredTheme());
+if (themeToggleBtn) {
+  themeToggleBtn.addEventListener("click", toggleTheme);
+}
 
 if (!userValid) {
   if (feedBtn) {
     feedBtn.classList.add("disabled");
   }
+  if (nappyBtn) {
+    nappyBtn.classList.add("disabled");
+  }
   if (pooBtn) {
     pooBtn.classList.add("disabled");
   }
+  if (weeBtn) {
+    weeBtn.classList.add("disabled");
+  }
   setStatus("Choose a valid /<name> URL to start logging.");
 } else if (pageType === "home") {
+  bindTimestampPopup(lastFeedEl);
+  bindTimestampPopup(lastWeeEl);
+  bindTimestampPopup(lastPooEl);
   feedBtn.addEventListener("click", () => addEntry("feed"));
-  pooBtn.addEventListener("click", () => addEntry("poo"));
+  if (nappyBtn) {
+    nappyBtn.addEventListener("click", toggleNappyMenu);
+  }
+  if (pooBtn) {
+    pooBtn.addEventListener("click", () => {
+      closeNappyMenu();
+      addEntry("poo");
+    });
+  }
+  if (weeBtn) {
+    weeBtn.addEventListener("click", () => {
+      closeNappyMenu();
+      addEntry("wee");
+    });
+  }
+  if (nappyBackdrop) {
+    nappyBackdrop.addEventListener("click", closeNappyMenu);
+  }
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      closeNappyMenu();
+    }
+  });
   loadHomeEntries();
 } else if (pageType === "log") {
   loadLogEntries();

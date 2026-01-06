@@ -19,10 +19,59 @@ def init_db(db_path: str) -> None:
     try:
         with schema_path.open("r", encoding="utf-8") as schema_file:
             conn.executescript(schema_file.read())
+        _ensure_entry_type_constraint(conn)
         _ensure_user_slug_column(conn)
         conn.commit()
     finally:
         conn.close()
+
+
+def _ensure_entry_type_constraint(conn: sqlite3.Connection) -> None:
+    row = conn.execute(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='entries'"
+    ).fetchone()
+    if not row or not row["sql"]:
+        return
+    if "wee" in row["sql"]:
+        return
+
+    conn.execute("ALTER TABLE entries RENAME TO entries_old")
+    conn.execute(
+        """
+        CREATE TABLE entries (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_slug TEXT NOT NULL,
+            type TEXT NOT NULL CHECK (type IN ('feed', 'poo', 'wee')),
+            timestamp_utc TEXT NOT NULL,
+            client_event_id TEXT NOT NULL UNIQUE,
+            notes TEXT,
+            amount_ml INTEGER,
+            caregiver_id INTEGER,
+            created_at_utc TEXT NOT NULL,
+            updated_at_utc TEXT NOT NULL
+        )
+        """
+    )
+    new_cols = [
+        row["name"] for row in conn.execute("PRAGMA table_info(entries)").fetchall()
+    ]
+    old_cols = {
+        row["name"]
+        for row in conn.execute("PRAGMA table_info(entries_old)").fetchall()
+    }
+    copy_cols = [col for col in new_cols if col in old_cols]
+    if copy_cols:
+        col_list = ", ".join(copy_cols)
+        conn.execute(
+            f"INSERT INTO entries ({col_list}) SELECT {col_list} FROM entries_old"
+        )
+    conn.execute("DROP TABLE entries_old")
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_entries_timestamp_utc ON entries (timestamp_utc DESC)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_entries_user_slug ON entries (user_slug)"
+    )
 
 
 def _ensure_user_slug_column(conn: sqlite3.Connection) -> None:

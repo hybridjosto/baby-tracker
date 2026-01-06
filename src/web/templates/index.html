@@ -3,86 +3,211 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Baby Tracker</title>
+    <title>Baby Activity</title>
     <link rel="manifest" href="/static/manifest.json">
+    <script>
+      (() => {
+        const stored = localStorage.getItem("baby-tracker-theme");
+        const prefersDark = window.matchMedia
+          && window.matchMedia("(prefers-color-scheme: dark)").matches;
+        const theme = stored || (prefersDark ? "dark" : "light");
+        if (theme === "dark") {
+          document.documentElement.classList.add("dark");
+        }
+      })();
+    </script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    >
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@400,0"
+      rel="stylesheet"
+    >
     <style>
       :root {
-        color-scheme: light;
-        --action-height: 88px;
+        --primary: #13ec5b;
+        --bg-light: #f6f8f6;
+        --bg-dark: #102216;
+        --card-dark: #1a2c20;
+        --text-secondary: #9db9a6;
+        --action-height: 80px;
       }
-      body {
-        font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+      html {
+        color-scheme: light;
+      }
+      html.dark {
+        color-scheme: dark;
+      }
+      html, body {
         margin: 0;
         padding: 0;
-        background: #f7f4ef;
-        color: #1f1f1f;
-        min-height: 100vh;
+        min-height: 100%;
       }
-      .page {
-        padding: 16px 16px calc(var(--action-height) + 16px);
+      body {
+        font-family: "Manrope", "Helvetica Neue", Arial, sans-serif;
+        background: var(--bg-light);
+        color: #0f1a12;
       }
-      .card {
-        background: #ffffff;
-        border-radius: 16px;
-        padding: 16px;
-        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
-        max-width: 480px;
+      html.dark body {
+        background: var(--bg-dark);
+        color: #ffffff;
+      }
+      .app {
+        position: relative;
+        height: 100vh;
+        max-width: 420px;
         margin: 0 auto;
+        display: flex;
+        flex-direction: column;
+        background: var(--bg-light);
+        box-shadow: 0 18px 40px rgba(0, 0, 0, 0.12);
       }
-      h1 {
-        margin: 0 0 12px 0;
-        font-size: 22px;
+      html.dark .app {
+        background: var(--bg-dark);
       }
-      .user-chip {
-        display: inline-flex;
+      header {
+        display: flex;
         align-items: center;
-        gap: 8px;
-        padding: 6px 10px;
-        background: #f0ede7;
+        justify-content: space-between;
+        padding: 16px 16px 8px;
+      }
+      .avatar {
+        width: 40px;
+        height: 40px;
         border-radius: 999px;
+        background: var(--card-dark);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        display: grid;
+        place-items: center;
+        color: #d3e4d7;
+        font-weight: 700;
+        font-size: 14px;
+      }
+      .title-stack {
+        text-align: center;
+      }
+      .title-stack h2 {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 700;
+      }
+      .title-stack span {
         font-size: 12px;
-        color: #4a453f;
-        margin-bottom: 10px;
+        color: var(--text-secondary);
+        font-weight: 500;
       }
-      button {
-        font-size: 20px;
-        padding: 18px 12px;
-        border-radius: 16px;
+      .icon-btn {
+        width: 40px;
+        height: 40px;
+        border-radius: 999px;
+        display: grid;
+        place-items: center;
         border: none;
-        cursor: pointer;
+        background: transparent;
+        color: inherit;
       }
-      .feed {
-        background: #f6c453;
+      .content {
+        flex: 1;
+        overflow-y: auto;
+        padding: 8px 16px 170px;
       }
-      .poo {
-        background: #c59b7f;
-        color: #1d140e;
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+      }
+      .stat-card {
+        background: #ffffff;
+        border-radius: 14px;
+        padding: 12px;
+        border: 1px solid #e5ebe6;
+        text-align: center;
+        box-shadow: 0 6px 14px rgba(0, 0, 0, 0.06);
+      }
+      html.dark .stat-card {
+        background: var(--card-dark);
+        border-color: rgba(255, 255, 255, 0.06);
+      }
+      .stat-label {
+        font-size: 10px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-secondary);
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        margin-bottom: 6px;
+      }
+      .stat-value {
+        font-size: 22px;
+        font-weight: 700;
+      }
+      .stats-range {
+        margin-top: 10px;
+        font-size: 11px;
+        color: var(--text-secondary);
+        text-align: center;
+      }
+      .chart-card {
+        margin-top: 16px;
+        background: #ffffff;
+        border-radius: 18px;
+        padding: 16px;
+        border: 1px solid #e5ebe6;
+        box-shadow: 0 8px 18px rgba(0, 0, 0, 0.08);
+      }
+      html.dark .chart-card {
+        background: var(--card-dark);
+        border-color: rgba(255, 255, 255, 0.06);
       }
       .chart-header {
         display: flex;
-        justify-content: space-between;
         align-items: center;
-        margin-top: 10px;
-        font-size: 14px;
-        color: #444;
+        justify-content: space-between;
+        margin-bottom: 12px;
       }
-      .chart-header a {
-        color: #4a453f;
-        text-decoration: none;
-        font-weight: 600;
+      .chart-header h3 {
+        margin: 0;
+        font-size: 15px;
+        font-weight: 700;
+      }
+      .legend {
+        display: flex;
+        gap: 12px;
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--text-secondary);
+        font-weight: 700;
+      }
+      .legend-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .legend-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
       }
       .chart-wrap {
         position: relative;
-        margin-top: 12px;
-        background: linear-gradient(180deg, #fdf9f2, #f7f4ef);
+        margin-top: 6px;
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.12), transparent);
         border-radius: 14px;
         padding: 10px;
-        border: 1px solid #efe9dd;
-        min-height: 150px;
+        border: 1px dashed rgba(255, 255, 255, 0.08);
+      }
+      html.dark .chart-wrap {
+        background: linear-gradient(180deg, rgba(19, 236, 91, 0.06), transparent);
+        border-color: rgba(255, 255, 255, 0.08);
       }
       #history-chart {
         width: 100%;
-        height: 150px;
+        height: 170px;
         display: block;
       }
       .chart-empty {
@@ -91,59 +216,183 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 14px;
-        color: #8b857e;
-        text-align: center;
-        padding: 0 12px;
+        font-size: 13px;
+        color: var(--text-secondary);
       }
-      .chart-legend {
+      .last-events {
+        margin-top: 12px;
         display: flex;
-        gap: 16px;
-        margin-top: 10px;
+        flex-direction: column;
+        gap: 8px;
         font-size: 12px;
-        color: #5a524a;
+        color: var(--text-secondary);
       }
-      .legend-item {
-        display: inline-flex;
+      .last-row {
+        display: grid;
+        grid-template-columns: auto 1fr auto;
         align-items: center;
-        gap: 6px;
+        gap: 8px;
+        padding: 6px 8px;
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.06);
       }
-      .legend-dot {
-        width: 10px;
-        height: 10px;
-        border-radius: 50%;
+      html.dark .last-row {
+        background: rgba(255, 255, 255, 0.04);
       }
-      .legend-feed {
-        background: #f6c453;
+      .last-time {
+        font-weight: 600;
+        color: #2d3b31;
+        cursor: pointer;
       }
-      .legend-poo {
-        background: #c59b7f;
+      html.dark .last-time {
+        color: #dce8df;
+      }
+      .log-link {
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--text-secondary);
+        text-decoration: none;
       }
       .status {
         font-size: 12px;
-        color: #666;
+        color: var(--text-secondary);
         margin-top: 10px;
       }
-      .action-bar {
+      .bottom-bar {
         position: fixed;
-        left: 0;
-        right: 0;
+        left: 50%;
+        transform: translateX(-50%);
         bottom: 0;
-        background: #ffffff;
-        border-top: 1px solid #e5e1da;
-        padding: 12px 16px calc(env(safe-area-inset-bottom, 0) + 12px);
+        width: 100%;
+        max-width: 420px;
+        padding: 16px 16px calc(env(safe-area-inset-bottom, 0) + 20px);
+        background: rgba(246, 248, 246, 0.96);
+        border-top: 1px solid #e5ebe6;
+        backdrop-filter: blur(12px);
+        box-shadow: 0 -12px 30px rgba(0, 0, 0, 0.2);
+        z-index: 10;
       }
-      .action-bar .buttons {
-        max-width: 480px;
-        margin: 0 auto;
+      html.dark .bottom-bar {
+        background: rgba(21, 32, 25, 0.96);
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      .last-activity {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        font-size: 12px;
+        color: var(--text-secondary);
+        margin-bottom: 12px;
+      }
+      .action-grid {
         display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 12px;
+        grid-template-columns: 1fr 1fr 1.4fr;
+        gap: 10px;
       }
-      .action-bar button {
-        font-size: 22px;
-        padding: 18px 12px;
+      .action-grid.action-grid--two {
+        grid-template-columns: 1fr 1.4fr;
+      }
+      .action-btn {
         height: var(--action-height);
+        border-radius: 18px;
+        border: 1px solid transparent;
+        background: #e9f0eb;
+        color: #1b2b1f;
+        font-weight: 700;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        cursor: pointer;
+      }
+      html.dark .action-btn {
+        background: var(--card-dark);
+        color: #d9eee0;
+      }
+      .action-btn.primary {
+        background: #e9f0eb;
+        color: #1b2b1f;
+        flex-direction: column;
+        justify-content: center;
+        gap: 6px;
+        box-shadow: none;
+      }
+      html.dark .action-btn.primary {
+        background: var(--card-dark);
+        color: #d9eee0;
+      }
+      .action-btn.primary span {
+        font-size: 14px;
+        letter-spacing: 0.02em;
+      }
+      .action-btn .material-symbols-outlined {
+        font-size: 28px;
+      }
+      .nappy-wrap {
+        position: relative;
+        width: 100%;
+        height: 100%;
+      }
+      .nappy-wrap .action-btn {
+        width: 100%;
+      }
+      .nappy-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(10, 20, 12, 0.15);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.2s ease;
+        z-index: 9;
+      }
+      .nappy-backdrop.open {
+        opacity: 1;
+        pointer-events: auto;
+      }
+      .nappy-menu {
+        position: absolute;
+        bottom: calc(var(--action-height) + 12px);
+        left: 50%;
+        transform: translateX(-50%);
+        display: none;
+        grid-template-columns: 1fr;
+        gap: 8px;
+        padding: 10px;
+        min-width: 160px;
+        background: #f2f6f3;
+        border: 1px solid #d6ded8;
+        border-radius: 18px;
+        box-shadow: 0 12px 24px rgba(0, 0, 0, 0.2);
+        z-index: 12;
+      }
+      html.dark .nappy-menu {
+        background: #18231c;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      .nappy-menu.open {
+        display: grid;
+      }
+      .nappy-option {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        height: 44px;
+        border-radius: 14px;
+        border: 1px solid transparent;
+        background: rgba(230, 238, 232, 0.9);
+        color: #1b2b1f;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      html.dark .nappy-option {
+        background: rgba(32, 46, 36, 0.9);
+        color: #d9eee0;
+      }
+      .nappy-option .material-symbols-outlined {
+        font-size: 22px;
       }
       .disabled {
         opacity: 0.5;
@@ -152,29 +401,106 @@
     </style>
   </head>
   <body data-user="{{ user_slug }}" data-user-valid="{{ 'true' if user_valid else 'false' }}" data-page="{{ page }}">
-    <div class="page">
-      <div class="card">
-        <h1>Baby Tracker</h1>
-        <div class="user-chip" id="user-chip">{{ user_message }}</div>
-        <div class="chart-header">
-          <span>Last 24 hours</span>
-          <a id="log-link" href="#">Event log</a>
+    <div class="app">
+      <header>
+        <div class="avatar" id="user-chip">{{ user_slug[:2]|upper if user_slug else 'BT' }}</div>
+        <div class="title-stack">
+          <h2>Baby Activity</h2>
+          <span id="today-label">{{ user_message }}</span>
         </div>
-        <div class="chart-wrap">
-          <svg id="history-chart" viewBox="0 0 360 150" preserveAspectRatio="none"></svg>
-          <div class="chart-empty" id="chart-empty">No events in the last 24 hours.</div>
+        <button class="icon-btn" id="theme-toggle" type="button" aria-label="Switch to light mode">
+          <span class="material-symbols-outlined">dark_mode</span>
+        </button>
+      </header>
+      <main class="content">
+        <section class="stats">
+          <div class="stat-card">
+            <div class="stat-label">
+              <span class="material-symbols-outlined" style="font-size: 18px; color: var(--primary);">water_drop</span>
+              Feeds
+            </div>
+            <div class="stat-value" id="stat-feed">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">
+              <span class="material-symbols-outlined" style="font-size: 16px; color: #7dd3fc;">rainy</span>
+              Wet
+            </div>
+            <div class="stat-value" id="stat-wee">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">
+              <span class="material-symbols-outlined" style="font-size: 16px; color: #fbbf24;">spa</span>
+              Soiled
+            </div>
+            <div class="stat-value" id="stat-poo">0</div>
+          </div>
+        </section>
+        <div class="stats-range" id="stat-window">Rolling 24h: --</div>
+
+        <section class="chart-card">
+          <div class="chart-header">
+            <h3>Last 6 Hours</h3>
+            <a class="log-link" id="log-link" href="#">Event log</a>
+          </div>
+          <div class="legend">
+            <span class="legend-item"><span class="legend-dot" style="background: var(--primary);"></span>Feed</span>
+            <span class="legend-item"><span class="legend-dot" style="background: #7dd3fc;"></span>Wet</span>
+            <span class="legend-item"><span class="legend-dot" style="background: #fbbf24;"></span>Soiled</span>
+          </div>
+          <div class="chart-wrap">
+            <svg id="history-chart" viewBox="0 0 360 170" preserveAspectRatio="none"></svg>
+            <div class="chart-empty" id="chart-empty">No events in the last 24 hours.</div>
+          </div>
+          <div class="last-events">
+            <div class="last-row">
+              <span class="legend-dot" style="background: var(--primary);"></span>
+              <span>Last feed</span>
+              <span class="last-time" id="last-feed">--</span>
+            </div>
+            <div class="last-row">
+              <span class="legend-dot" style="background: #7dd3fc;"></span>
+              <span>Last wee</span>
+              <span class="last-time" id="last-wee">--</span>
+            </div>
+            <div class="last-row">
+              <span class="legend-dot" style="background: #fbbf24;"></span>
+              <span>Last poo</span>
+              <span class="last-time" id="last-poo">--</span>
+            </div>
+          </div>
+          <div class="status" id="status"></div>
+        </section>
+      </main>
+
+      <div class="nappy-backdrop" id="nappy-backdrop" aria-hidden="true"></div>
+      <div class="bottom-bar">
+        <div class="last-activity">
+          <span class="material-symbols-outlined" style="font-size: 16px;">schedule</span>
+          <span id="last-activity">Last activity: --</span>
         </div>
-        <div class="chart-legend">
-          <span class="legend-item"><span class="legend-dot legend-feed"></span>Feed</span>
-          <span class="legend-item"><span class="legend-dot legend-poo"></span>Poo</span>
+        <div class="action-grid action-grid--two">
+          <div class="nappy-wrap">
+            <button class="action-btn" id="log-nappy" type="button" aria-expanded="false">
+              <span class="material-symbols-outlined" style="color: #7dd3fc;">baby_changing_station</span>
+              Nappy
+            </button>
+            <div class="nappy-menu" id="nappy-menu" aria-hidden="true">
+              <button class="nappy-option" id="log-wee" type="button">
+                <span class="material-symbols-outlined" style="color: #7dd3fc;">rainy</span>
+                Wee
+              </button>
+              <button class="nappy-option" id="log-poo" type="button">
+                <span class="material-symbols-outlined" style="color: #fbbf24;">spa</span>
+                Poo
+              </button>
+            </div>
+          </div>
+          <button class="action-btn primary" id="log-feed" type="button">
+            <span class="material-symbols-outlined" style="color: var(--primary); font-size: 30px;">water_drop</span>
+            Feed
+          </button>
         </div>
-        <div class="status" id="status"></div>
-      </div>
-    </div>
-    <div class="action-bar">
-      <div class="buttons">
-        <button class="feed" id="log-feed">Feed</button>
-        <button class="poo" id="log-poo">Poo</button>
       </div>
     </div>
     <script src="/static/app.js"></script>
