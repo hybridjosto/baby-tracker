@@ -4,6 +4,9 @@ const activeUser = bodyEl.dataset.user || "";
 const userValid = bodyEl.dataset.userValid === "true";
 const pageType = bodyEl.dataset.page || "home";
 
+const THEME_KEY = "baby-tracker-theme";
+const themeToggleBtn = document.getElementById("theme-toggle");
+
 const feedBtn = document.getElementById("log-feed");
 const nappyBtn = document.getElementById("log-nappy");
 const pooBtn = document.getElementById("log-poo");
@@ -35,6 +38,42 @@ const CHART_CONFIG = {
   pooY: 100,
   weeY: 40,
 };
+
+function getPreferredTheme() {
+  const stored = window.localStorage.getItem(THEME_KEY);
+  if (stored === "light" || stored === "dark") {
+    return stored;
+  }
+  if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {
+    return "dark";
+  }
+  return "light";
+}
+
+function updateThemeToggle(theme) {
+  if (!themeToggleBtn) {
+    return;
+  }
+  const icon = themeToggleBtn.querySelector(".material-symbols-outlined");
+  if (icon) {
+    icon.textContent = theme === "dark" ? "light_mode" : "dark_mode";
+  }
+  const label = theme === "dark" ? "Switch to light mode" : "Switch to dark mode";
+  themeToggleBtn.setAttribute("aria-label", label);
+  themeToggleBtn.setAttribute("title", label);
+}
+
+function applyTheme(theme) {
+  document.documentElement.classList.toggle("dark", theme === "dark");
+  updateThemeToggle(theme);
+}
+
+function toggleTheme() {
+  const current = document.documentElement.classList.contains("dark") ? "dark" : "light";
+  const next = current === "dark" ? "light" : "dark";
+  window.localStorage.setItem(THEME_KEY, next);
+  applyTheme(next);
+}
 
 function openNappyMenu() {
   if (!nappyMenu || !nappyBtn) {
@@ -582,6 +621,10 @@ function initLinks() {
 }
 
 initLinks();
+applyTheme(getPreferredTheme());
+if (themeToggleBtn) {
+  themeToggleBtn.addEventListener("click", toggleTheme);
+}
 
 if (!userValid) {
   if (feedBtn) {

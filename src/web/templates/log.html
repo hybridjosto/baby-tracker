@@ -5,9 +5,27 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Baby Tracker Log</title>
     <link rel="manifest" href="/static/manifest.json">
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@400,0"
+      rel="stylesheet"
+    >
+    <script>
+      (() => {
+        const stored = localStorage.getItem("baby-tracker-theme");
+        const prefersDark = window.matchMedia
+          && window.matchMedia("(prefers-color-scheme: dark)").matches;
+        const theme = stored || (prefersDark ? "dark" : "light");
+        if (theme === "dark") {
+          document.documentElement.classList.add("dark");
+        }
+      })();
+    </script>
     <style>
-      :root {
+      html {
         color-scheme: light;
+      }
+      html.dark {
+        color-scheme: dark;
       }
       body {
         font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
@@ -16,6 +34,10 @@
         background: #f7f4ef;
         color: #1f1f1f;
         min-height: 100vh;
+      }
+      html.dark body {
+        background: #102216;
+        color: #ffffff;
       }
       .page {
         padding: 16px;
@@ -27,6 +49,10 @@
         box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
         max-width: 480px;
         margin: 0 auto;
+      }
+      html.dark .card {
+        background: #1a2c20;
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
       }
       h1 {
         margin: 0 0 12px 0;
@@ -43,6 +69,10 @@
         color: #4a453f;
         margin-bottom: 10px;
       }
+      html.dark .user-chip {
+        background: rgba(255, 255, 255, 0.08);
+        color: #d3e4d7;
+      }
       .nav-row {
         display: flex;
         justify-content: space-between;
@@ -51,10 +81,21 @@
         font-size: 14px;
         color: #444;
       }
+      html.dark .nav-row {
+        color: #d3e4d7;
+      }
+      .nav-actions {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
       .nav-row a {
         color: #4a453f;
         text-decoration: none;
         font-weight: 600;
+      }
+      html.dark .nav-row a {
+        color: #d3e4d7;
       }
       ul {
         list-style: none;
@@ -69,9 +110,15 @@
         border-bottom: 1px solid #e5e1da;
         gap: 8px;
       }
+      html.dark li {
+        border-bottom-color: rgba(255, 255, 255, 0.08);
+      }
       .entry-meta {
         font-size: 14px;
         color: #444;
+      }
+      html.dark .entry-meta {
+        color: #d3e4d7;
       }
       .entry-type {
         font-weight: 600;
@@ -89,6 +136,11 @@
         background: #f9f6f1;
         cursor: pointer;
       }
+      html.dark .log-actions button {
+        border-color: rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.08);
+        color: #d3e4d7;
+      }
       .log-wrap {
         max-height: 60vh;
         overflow-y: auto;
@@ -100,10 +152,31 @@
         font-size: 14px;
         padding: 24px 12px;
       }
+      html.dark .log-empty {
+        color: #9db9a6;
+      }
       .status {
         font-size: 12px;
         color: #666;
         margin-top: 10px;
+      }
+      html.dark .status {
+        color: #9db9a6;
+      }
+      .theme-toggle {
+        width: 32px;
+        height: 32px;
+        border-radius: 999px;
+        border: 1px solid #e5e1da;
+        background: #f9f6f1;
+        display: grid;
+        place-items: center;
+        cursor: pointer;
+      }
+      html.dark .theme-toggle {
+        border-color: rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.08);
+        color: #d3e4d7;
       }
       .disabled {
         opacity: 0.5;
@@ -118,7 +191,12 @@
         <div class="user-chip">{{ user_message }}</div>
         <div class="nav-row">
           <span>Recent entries</span>
-          <a id="home-link" href="#">Back to chart</a>
+          <div class="nav-actions">
+            <a id="home-link" href="#">Back to chart</a>
+            <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Switch to light mode">
+              <span class="material-symbols-outlined">dark_mode</span>
+            </button>
+          </div>
         </div>
         <div class="log-wrap">
           <ul id="log-entries"></ul>
