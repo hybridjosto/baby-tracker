@@ -21,6 +21,7 @@ def init_db(db_path: str) -> None:
             conn.executescript(schema_file.read())
         _ensure_entry_type_constraint(conn)
         _ensure_user_slug_column(conn)
+        _ensure_feed_duration_column(conn)
         conn.commit()
     finally:
         conn.close()
@@ -46,6 +47,7 @@ def _ensure_entry_type_constraint(conn: sqlite3.Connection) -> None:
             client_event_id TEXT NOT NULL UNIQUE,
             notes TEXT,
             amount_ml INTEGER,
+            feed_duration_min INTEGER,
             caregiver_id INTEGER,
             created_at_utc TEXT NOT NULL,
             updated_at_utc TEXT NOT NULL
@@ -85,6 +87,14 @@ def _ensure_user_slug_column(conn: sqlite3.Connection) -> None:
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_entries_user_slug ON entries (user_slug)"
     )
+
+
+def _ensure_feed_duration_column(conn: sqlite3.Connection) -> None:
+    columns = {
+        row["name"] for row in conn.execute("PRAGMA table_info(entries)").fetchall()
+    }
+    if "feed_duration_min" not in columns:
+        conn.execute("ALTER TABLE entries ADD COLUMN feed_duration_min INTEGER")
 
 
 def get_connection(db_path: str) -> sqlite3.Connection:

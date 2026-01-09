@@ -6,6 +6,8 @@ const pageType = bodyEl.dataset.page || "home";
 
 const THEME_KEY = "baby-tracker-theme";
 const USER_KEY = "baby-tracker-user";
+const FEED_INTERVAL_KEY = "baby-tracker-feed-interval-min";
+const DOB_KEY = "baby-tracker-dob";
 const USER_RE = /^[a-z0-9-]{1,24}$/;
 const themeToggleBtn = document.getElementById("theme-toggle");
 const userFormEl = document.getElementById("user-form");
@@ -33,8 +35,14 @@ const statPooEl = document.getElementById("stat-poo");
 const statWindowEl = document.getElementById("stat-window");
 const lastActivityEl = document.getElementById("last-activity");
 const lastFeedEl = document.getElementById("last-feed");
+const nextFeedEl = document.getElementById("next-feed");
 const lastWeeEl = document.getElementById("last-wee");
 const lastPooEl = document.getElementById("last-poo");
+
+const settingsFormEl = document.getElementById("settings-form");
+const dobInputEl = document.getElementById("dob-input");
+const ageOutputEl = document.getElementById("age-output");
+const intervalInputEl = document.getElementById("interval-input");
 
 const CHART_CONFIG = {
   width: 360,
@@ -93,6 +101,55 @@ function normalizeUserSlug(value) {
   return slug;
 }
 
+function getFeedIntervalMinutes() {
+  const raw = window.localStorage.getItem(FEED_INTERVAL_KEY);
+  if (!raw) {
+    return null;
+  }
+  const value = Number.parseInt(raw, 10);
+  if (Number.isNaN(value) || value <= 0) {
+    return null;
+  }
+  return value;
+}
+
+function parseDob(value) {
+  if (!value) {
+    return null;
+  }
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+  return date;
+}
+
+function formatAge(dob) {
+  if (!dob) {
+    return "Age: --";
+  }
+  const today = new Date();
+  const diffMs = today.getTime() - dob.getTime();
+  if (diffMs < 0) {
+    return "Age: --";
+  }
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  const weeks = Math.floor(diffDays / 7);
+  const days = diffDays % 7;
+  if (weeks < 1) {
+    return `Age: ${days} day${days === 1 ? "" : "s"}`;
+  }
+  return `Age: ${weeks}w ${days}d`;
+}
+
+function updateAgeDisplay() {
+  if (!ageOutputEl) {
+    return;
+  }
+  const dob = parseDob(dobInputEl ? dobInputEl.value : "");
+  ageOutputEl.textContent = formatAge(dob);
+}
+
 function updateUserDisplay() {
   if (userMessageEl) {
     userMessageEl.textContent = userValid
@@ -118,6 +175,8 @@ function toggleDisabled(element, disabled) {
 
 let homeInitialized = false;
 let logInitialized = false;
+let settingsInitialized = false;
+let nextFeedTimer = null;
 
 function initHomeHandlers() {
   if (homeInitialized || pageType !== "home") {
@@ -125,6 +184,7 @@ function initHomeHandlers() {
   }
   homeInitialized = true;
   bindTimestampPopup(lastFeedEl);
+  bindTimestampPopup(nextFeedEl);
   bindTimestampPopup(lastWeeEl);
   bindTimestampPopup(lastPooEl);
   if (feedBtn) {
@@ -153,6 +213,9 @@ function initHomeHandlers() {
       closeNappyMenu();
     }
   });
+  if (!nextFeedTimer) {
+    nextFeedTimer = window.setInterval(updateNextFeed, 60000);
+  }
 }
 
 function initLogHandlers() {
@@ -162,7 +225,55 @@ function initLogHandlers() {
   logInitialized = true;
 }
 
+function initSettingsHandlers() {
+  if (settingsInitialized || pageType !== "settings") {
+    return;
+  }
+  settingsInitialized = true;
+  if (dobInputEl) {
+    const storedDob = window.localStorage.getItem(DOB_KEY);
+    if (storedDob) {
+      dobInputEl.value = storedDob;
+    }
+    updateAgeDisplay();
+    dobInputEl.addEventListener("change", () => {
+      const value = dobInputEl.value;
+      if (value) {
+        window.localStorage.setItem(DOB_KEY, value);
+      } else {
+        window.localStorage.removeItem(DOB_KEY);
+      }
+      updateAgeDisplay();
+    });
+  }
+  if (intervalInputEl) {
+    const storedInterval = getFeedIntervalMinutes();
+    if (storedInterval) {
+      intervalInputEl.value = String(storedInterval / 60);
+    }
+    intervalInputEl.addEventListener("change", () => {
+      const nextValue = Number.parseFloat(intervalInputEl.value);
+      if (Number.isNaN(nextValue) || nextValue <= 0) {
+        window.localStorage.removeItem(FEED_INTERVAL_KEY);
+        intervalInputEl.value = "";
+      } else {
+        const minutes = Math.round(nextValue * 60);
+        window.localStorage.setItem(FEED_INTERVAL_KEY, String(minutes));
+      }
+    });
+  }
+  if (settingsFormEl) {
+    settingsFormEl.addEventListener("submit", (event) => {
+      event.preventDefault();
+    });
+  }
+}
+
 function applyUserState() {
+  if (pageType === "settings") {
+    initSettingsHandlers();
+    return;
+  }
   toggleDisabled(feedBtn, !userValid);
   toggleDisabled(nappyBtn, !userValid);
   toggleDisabled(pooBtn, !userValid);
@@ -315,6 +426,48 @@ function formatRelativeTime(value) {
   }
   const diffDays = Math.floor(diffHours / 24);
   return `${diffDays} day${diffDays === 1 ? "" : "s"}`;
+}
+
+function formatTimeUntil(target) {
+  if (!target || Number.isNaN(target.getTime())) {
+    return "--";
+  }
+  const diffMs = target.getTime() - Date.now();
+  if (diffMs <= 0) {
+    return "due now";
+  }
+  const diffMinutes = Math.round(diffMs / 60000);
+  if (diffMinutes < 60) {
+    return `in ${diffMinutes}m`;
+  }
+  const hours = Math.floor(diffMinutes / 60);
+  const minutes = diffMinutes % 60;
+  if (minutes === 0) {
+    return `in ${hours}h`;
+  }
+  return `in ${hours}h ${minutes}m`;
+}
+
+function updateNextFeed() {
+  if (!nextFeedEl) {
+    return;
+  }
+  const intervalMinutes = getFeedIntervalMinutes();
+  const lastTimestamp = lastFeedEl ? lastFeedEl.dataset.timestamp : null;
+  if (!intervalMinutes || !lastTimestamp) {
+    nextFeedEl.textContent = "--";
+    nextFeedEl.removeAttribute("data-timestamp");
+    return;
+  }
+  const lastDate = new Date(lastTimestamp);
+  if (Number.isNaN(lastDate.getTime())) {
+    nextFeedEl.textContent = "--";
+    nextFeedEl.removeAttribute("data-timestamp");
+    return;
+  }
+  const nextDate = new Date(lastDate.getTime() + intervalMinutes * 60000);
+  nextFeedEl.textContent = formatTimeUntil(nextDate);
+  nextFeedEl.dataset.timestamp = nextDate.toISOString();
 }
 
 function bindTimestampPopup(element) {
@@ -508,6 +661,12 @@ function renderLogEntries(entries) {
     left.appendChild(typeEl);
     left.appendChild(timeEl);
     left.appendChild(byEl);
+    if (entry.feed_duration_min !== null && entry.feed_duration_min !== undefined) {
+      const durationEl = document.createElement("div");
+      durationEl.className = "entry-meta";
+      durationEl.textContent = `Duration ${entry.feed_duration_min} min`;
+      left.appendChild(durationEl);
+    }
 
     const right = document.createElement("div");
     right.className = "log-actions";
@@ -619,6 +778,7 @@ function renderLastByType(entries) {
     lastFeedEl.textContent = "--";
     delete lastFeedEl.dataset.timestamp;
   }
+  updateNextFeed();
 
   if (latestByType.wee) {
     lastWeeEl.textContent = formatRelativeTime(latestByType.wee.timestamp_utc);
@@ -644,6 +804,22 @@ async function addEntry(type) {
     timestamp_utc: new Date().toISOString(),
     client_event_id: generateId(),
   };
+  if (type === "feed") {
+    const minutesInput = window.prompt("Feed duration (minutes)", "");
+    if (minutesInput === null) {
+      setStatus("");
+      return;
+    }
+    const trimmed = minutesInput.trim();
+    if (trimmed !== "") {
+      const minutes = Number.parseInt(trimmed, 10);
+      if (Number.isNaN(minutes) || minutes < 0) {
+        setStatus("Duration must be a non-negative number");
+        return;
+      }
+      payload.feed_duration_min = minutes;
+    }
+  }
   try {
     const response = await fetch(`/api/users/${activeUser}/entries`, {
       method: "POST",
@@ -688,11 +864,32 @@ async function editEntry(entry) {
   if (!nextTime) {
     return;
   }
+  const payload = { type: nextType, timestamp_utc: nextTime };
+  if (nextType === "feed") {
+    const currentDuration = entry.feed_duration_min ?? "";
+    const durationInput = window.prompt("Feed duration (minutes)", String(currentDuration));
+    if (durationInput === null) {
+      return;
+    }
+    const trimmed = durationInput.trim();
+    if (trimmed === "") {
+      payload.feed_duration_min = null;
+    } else {
+      const minutes = Number.parseInt(trimmed, 10);
+      if (Number.isNaN(minutes) || minutes < 0) {
+        setStatus("Duration must be a non-negative number");
+        return;
+      }
+      payload.feed_duration_min = minutes;
+    }
+  } else if (entry.feed_duration_min !== null && entry.feed_duration_min !== undefined) {
+    payload.feed_duration_min = null;
+  }
 
   const response = await fetch(`/api/entries/${entry.id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ type: nextType, timestamp_utc: nextTime }),
+    body: JSON.stringify(payload),
   });
 
   if (response.ok) {

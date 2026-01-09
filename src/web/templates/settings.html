@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Baby Tracker Settings</title>
+    <link rel="manifest" href="/static/manifest.json">
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@400,0"
+      rel="stylesheet"
+    >
+    <script>
+      (() => {
+        const stored = localStorage.getItem("baby-tracker-theme");
+        const prefersDark = window.matchMedia
+          && window.matchMedia("(prefers-color-scheme: dark)").matches;
+        const theme = stored || (prefersDark ? "dark" : "light");
+        if (theme === "dark") {
+          document.documentElement.classList.add("dark");
+        }
+      })();
+    </script>
+    <style>
+      html {
+        color-scheme: light;
+      }
+      html.dark {
+        color-scheme: dark;
+      }
+      body {
+        font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+        background: #f7f4ef;
+        color: #1f1f1f;
+        min-height: 100vh;
+      }
+      html.dark body {
+        background: #102216;
+        color: #ffffff;
+      }
+      .page {
+        padding: 16px;
+      }
+      .card {
+        background: #ffffff;
+        border-radius: 16px;
+        padding: 18px;
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+        max-width: 520px;
+        margin: 0 auto;
+      }
+      html.dark .card {
+        background: #1a2c20;
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+      }
+      .nav-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 18px;
+        font-size: 14px;
+        color: #444;
+      }
+      html.dark .nav-row {
+        color: #d3e4d7;
+      }
+      .nav-actions {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .nav-row a {
+        color: #4a453f;
+        text-decoration: none;
+        font-weight: 600;
+      }
+      html.dark .nav-row a {
+        color: #d3e4d7;
+      }
+      h1 {
+        margin: 0;
+        font-size: 22px;
+      }
+      .field {
+        margin-bottom: 16px;
+      }
+      label {
+        display: block;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: #6a6259;
+        margin-bottom: 6px;
+      }
+      html.dark label {
+        color: #9db9a6;
+      }
+      input {
+        width: 100%;
+        border-radius: 10px;
+        border: 1px solid #e5e1da;
+        padding: 10px 12px;
+        font-size: 14px;
+        background: #ffffff;
+        color: #1f1f1f;
+        box-sizing: border-box;
+      }
+      html.dark input {
+        background: rgba(26, 44, 32, 0.9);
+        border-color: rgba(255, 255, 255, 0.12);
+        color: #ffffff;
+      }
+      .hint {
+        font-size: 12px;
+        color: #8b857e;
+        margin-top: 6px;
+      }
+      html.dark .hint {
+        color: #9db9a6;
+      }
+      .age-output {
+        font-weight: 600;
+        margin-top: 6px;
+      }
+      .theme-toggle {
+        border: none;
+        background: transparent;
+        color: inherit;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body data-page="settings">
+    <div class="page">
+      <div class="card">
+        <div class="nav-row">
+          <h1>Settings</h1>
+          <div class="nav-actions">
+            <a href="/">Back to home</a>
+            <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Switch to light mode">
+              <span class="material-symbols-outlined">dark_mode</span>
+            </button>
+          </div>
+        </div>
+        <form id="settings-form">
+          <div class="field">
+            <label for="dob-input">Baby date of birth</label>
+            <input id="dob-input" type="date" name="dob">
+            <div class="hint age-output" id="age-output">Age: --</div>
+          </div>
+          <div class="field">
+            <label for="interval-input">Current feed interval (hours)</label>
+            <input id="interval-input" type="number" name="feed_interval" min="0" step="0.25" inputmode="decimal">
+            <div class="hint">Used to estimate time to next feed.</div>
+          </div>
+        </form>
+      </div>
+    </div>
+    <script src="/static/app.js"></script>
+  </body>
+</html>
