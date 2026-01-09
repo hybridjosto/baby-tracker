@@ -407,6 +407,15 @@ function formatTimestamp(value) {
   return date.toLocaleString();
 }
 
+function toLocalDateTimeValue(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+  const pad = (item) => String(item).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
 function formatRelativeTime(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
@@ -681,6 +690,10 @@ function renderLogEntries(entries) {
     editBtn.textContent = "Edit";
     editBtn.addEventListener("click", () => editEntry(entry));
 
+    const timeBtn = document.createElement("button");
+    timeBtn.textContent = "Edit time";
+    timeBtn.addEventListener("click", () => editEntryTime(entry));
+
     const delBtn = document.createElement("button");
     delBtn.textContent = "Delete";
     delBtn.addEventListener("click", () => deleteEntry(entry));
@@ -689,6 +702,7 @@ function renderLogEntries(entries) {
       right.appendChild(amountEl);
     }
     right.appendChild(editBtn);
+    right.appendChild(timeBtn);
     right.appendChild(delBtn);
     item.appendChild(left);
     item.appendChild(right);
@@ -894,6 +908,37 @@ async function editEntry(entry) {
 
   if (response.ok) {
     setStatus("Updated");
+    if (pageType === "log") {
+      await loadLogEntries();
+    } else {
+      await loadHomeEntries();
+    }
+  } else {
+    const err = await response.json();
+    setStatus(`Error: ${err.error || "unknown"}`);
+  }
+}
+
+async function editEntryTime(entry) {
+  const current = toLocalDateTimeValue(entry.timestamp_utc);
+  const nextValue = window.prompt("Timestamp (YYYY-MM-DDTHH:MM)", current);
+  if (!nextValue) {
+    return;
+  }
+  const nextDate = new Date(nextValue);
+  if (Number.isNaN(nextDate.getTime())) {
+    setStatus("Invalid timestamp");
+    return;
+  }
+
+  const response = await fetch(`/api/entries/${entry.id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ timestamp_utc: nextDate.toISOString() }),
+  });
+
+  if (response.ok) {
+    setStatus("Updated time");
     if (pageType === "log") {
       await loadLogEntries();
     } else {
