@@ -1,5 +1,5 @@
 import sqlite3
-from typing import Iterable, Optional
+from typing import Optional
 
 
 def create_entry(conn: sqlite3.Connection, payload: dict) -> tuple[dict, bool]:

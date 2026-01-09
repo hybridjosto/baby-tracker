@@ -6,8 +6,6 @@ const pageType = bodyEl.dataset.page || "home";
 
 const THEME_KEY = "baby-tracker-theme";
 const USER_KEY = "baby-tracker-user";
-const FEED_INTERVAL_KEY = "baby-tracker-feed-interval-min";
-const DOB_KEY = "baby-tracker-dob";
 const USER_RE = /^[a-z0-9-]{1,24}$/;
 const themeToggleBtn = document.getElementById("theme-toggle");
 const userFormEl = document.getElementById("user-form");
@@ -43,6 +41,9 @@ const settingsFormEl = document.getElementById("settings-form");
 const dobInputEl = document.getElementById("dob-input");
 const ageOutputEl = document.getElementById("age-output");
 const intervalInputEl = document.getElementById("interval-input");
+
+let babyDob = null;
+let feedIntervalMinutes = null;
 
 const CHART_CONFIG = {
   width: 360,
@@ -102,15 +103,7 @@ function normalizeUserSlug(value) {
 }
 
 function getFeedIntervalMinutes() {
-  const raw = window.localStorage.getItem(FEED_INTERVAL_KEY);
-  if (!raw) {
-    return null;
-  }
-  const value = Number.parseInt(raw, 10);
-  if (Number.isNaN(value) || value <= 0) {
-    return null;
-  }
-  return value;
+  return feedIntervalMinutes;
 }
 
 function parseDob(value) {
@@ -146,7 +139,7 @@ function updateAgeDisplay() {
   if (!ageOutputEl) {
     return;
   }
-  const dob = parseDob(dobInputEl ? dobInputEl.value : "");
+  const dob = parseDob(dobInputEl ? dobInputEl.value : babyDob || "");
   ageOutputEl.textContent = formatAge(dob);
 }
 
@@ -231,34 +224,21 @@ function initSettingsHandlers() {
   }
   settingsInitialized = true;
   if (dobInputEl) {
-    const storedDob = window.localStorage.getItem(DOB_KEY);
-    if (storedDob) {
-      dobInputEl.value = storedDob;
-    }
-    updateAgeDisplay();
     dobInputEl.addEventListener("change", () => {
       const value = dobInputEl.value;
-      if (value) {
-        window.localStorage.setItem(DOB_KEY, value);
-      } else {
-        window.localStorage.removeItem(DOB_KEY);
-      }
       updateAgeDisplay();
+      void saveBabySettings({ dob: value || null });
     });
   }
   if (intervalInputEl) {
-    const storedInterval = getFeedIntervalMinutes();
-    if (storedInterval) {
-      intervalInputEl.value = String(storedInterval / 60);
-    }
     intervalInputEl.addEventListener("change", () => {
       const nextValue = Number.parseFloat(intervalInputEl.value);
       if (Number.isNaN(nextValue) || nextValue <= 0) {
-        window.localStorage.removeItem(FEED_INTERVAL_KEY);
         intervalInputEl.value = "";
+        void saveBabySettings({ feed_interval_min: null });
       } else {
         const minutes = Math.round(nextValue * 60);
-        window.localStorage.setItem(FEED_INTERVAL_KEY, String(minutes));
+        void saveBabySettings({ feed_interval_min: minutes });
       }
     });
   }
@@ -525,7 +505,7 @@ function buildQuery(params) {
 
 async function fetchEntries(params) {
   const response = await fetch(
-    `/api/users/${activeUser}/entries${buildQuery(params)}`,
+    `/api/entries${buildQuery(params)}`,
   );
   if (!response.ok) {
     let detail = "";
@@ -1019,6 +999,54 @@ function initLinks() {
   }
 }
 
+async function loadBabySettings() {
+  try {
+    const response = await fetch("/api/settings");
+    if (!response.ok) {
+      return;
+    }
+    const data = await response.json();
+    babyDob = data.dob || null;
+    feedIntervalMinutes = Number.isInteger(data.feed_interval_min)
+      ? data.feed_interval_min
+      : null;
+    if (dobInputEl) {
+      dobInputEl.value = babyDob || "";
+    }
+    if (intervalInputEl) {
+      intervalInputEl.value = feedIntervalMinutes
+        ? String(feedIntervalMinutes / 60)
+        : "";
+    }
+    updateAgeDisplay();
+    updateNextFeed();
+  } catch (err) {
+    console.error("Failed to load settings", err);
+  }
+}
+
+async function saveBabySettings(patch) {
+  try {
+    const response = await fetch("/api/settings", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    });
+    if (!response.ok) {
+      return;
+    }
+    const data = await response.json();
+    babyDob = data.dob || null;
+    feedIntervalMinutes = Number.isInteger(data.feed_interval_min)
+      ? data.feed_interval_min
+      : null;
+    updateAgeDisplay();
+    updateNextFeed();
+  } catch (err) {
+    console.error("Failed to save settings", err);
+  }
+}
+
 applyTheme(getPreferredTheme());
 if (themeToggleBtn) {
   themeToggleBtn.addEventListener("click", toggleTheme);
@@ -1026,4 +1054,5 @@ if (themeToggleBtn) {
 if (userFormEl) {
   userFormEl.addEventListener("submit", handleUserSave);
 }
+void loadBabySettings();
 initializeUser();

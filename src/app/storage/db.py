@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 import sqlite3
 from pathlib import Path
 
@@ -22,6 +23,7 @@ def init_db(db_path: str) -> None:
         _ensure_entry_type_constraint(conn)
         _ensure_user_slug_column(conn)
         _ensure_feed_duration_column(conn)
+        _ensure_settings_table(conn)
         conn.commit()
     finally:
         conn.close()
@@ -95,6 +97,26 @@ def _ensure_feed_duration_column(conn: sqlite3.Connection) -> None:
     }
     if "feed_duration_min" not in columns:
         conn.execute("ALTER TABLE entries ADD COLUMN feed_duration_min INTEGER")
+
+
+def _ensure_settings_table(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS baby_settings (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            dob TEXT,
+            feed_interval_min INTEGER,
+            updated_at_utc TEXT NOT NULL
+        )
+        """
+    )
+    row = conn.execute("SELECT id FROM baby_settings WHERE id = 1").fetchone()
+    if not row:
+        now = datetime.now(timezone.utc).isoformat()
+        conn.execute(
+            "INSERT INTO baby_settings (id, dob, feed_interval_min, updated_at_utc) VALUES (1, NULL, NULL, ?)",
+            (now,),
+        )
 
 
 def get_connection(db_path: str) -> sqlite3.Connection:

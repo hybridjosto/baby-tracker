@@ -13,3 +13,12 @@ CREATE TABLE IF NOT EXISTS entries (
 );
 
 CREATE INDEX IF NOT EXISTS idx_entries_timestamp_utc ON entries (timestamp_utc DESC);
+
+CREATE TABLE IF NOT EXISTS baby_settings (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    dob TEXT,
+    feed_interval_min INTEGER,
+    updated_at_utc TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+INSERT OR IGNORE INTO baby_settings (id) VALUES (1);
