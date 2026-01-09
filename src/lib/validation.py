@@ -21,6 +21,13 @@ def validate_entry_payload(payload: dict, require_client_event: bool = False) ->
         if not isinstance(payload["amount_ml"], int) or payload["amount_ml"] < 0:
             raise ValueError("amount_ml must be a non-negative integer")
 
+    if "feed_duration_min" in payload and payload["feed_duration_min"] is not None:
+        if (
+            not isinstance(payload["feed_duration_min"], int)
+            or payload["feed_duration_min"] < 0
+        ):
+            raise ValueError("feed_duration_min must be a non-negative integer")
+
     if "notes" in payload and payload["notes"] is not None:
         if not isinstance(payload["notes"], str):
             raise ValueError("notes must be a string")

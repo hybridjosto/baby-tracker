@@ -46,7 +46,7 @@ def create_entry(db_path: str, payload: dict) -> dict:
 def _normalize_filter_ts(value: str | None) -> str | None:
     if value is None:
         return None
-    normalized = value.strip()
+    normalized = value.strip().replace(" ", "+")
     if normalized.endswith("Z"):
         normalized = normalized[:-1] + "+00:00"
     try:
@@ -92,6 +92,13 @@ def update_entry(db_path: str, entry_id: int, payload: dict) -> dict:
         fields["notes"] = payload["notes"]
     if "amount_ml" in payload:
         fields["amount_ml"] = payload["amount_ml"]
+    if "feed_duration_min" in payload:
+        if payload["feed_duration_min"] is not None and (
+            not isinstance(payload["feed_duration_min"], int)
+            or payload["feed_duration_min"] < 0
+        ):
+            raise ValueError("feed_duration_min must be a non-negative integer")
+        fields["feed_duration_min"] = payload["feed_duration_min"]
     if "caregiver_id" in payload:
         fields["caregiver_id"] = payload["caregiver_id"]
     fields["updated_at_utc"] = _now_utc_iso()

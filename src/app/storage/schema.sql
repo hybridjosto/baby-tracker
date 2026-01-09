@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS entries (
     client_event_id TEXT NOT NULL UNIQUE,
     notes TEXT,
     amount_ml INTEGER,
+    feed_duration_min INTEGER,
     caregiver_id INTEGER,
     created_at_utc TEXT NOT NULL,
     updated_at_utc TEXT NOT NULL

@@ -72,6 +72,11 @@
         justify-content: space-between;
         padding: 16px 16px 8px;
       }
+      .header-actions {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
       .avatar {
         width: 40px;
         height: 40px;
@@ -106,6 +111,7 @@
         border: none;
         background: transparent;
         color: inherit;
+        text-decoration: none;
       }
       .content {
         flex: 1;
@@ -458,9 +464,14 @@
           <h2>Baby Activity</h2>
           <span id="today-label">{{ user_message }}</span>
         </div>
-        <button class="icon-btn" id="theme-toggle" type="button" aria-label="Switch to light mode">
-          <span class="material-symbols-outlined">dark_mode</span>
-        </button>
+        <div class="header-actions">
+          <a class="icon-btn" href="/settings" aria-label="Settings">
+            <span class="material-symbols-outlined">settings</span>
+          </a>
+          <button class="icon-btn" id="theme-toggle" type="button" aria-label="Switch to light mode">
+            <span class="material-symbols-outlined">dark_mode</span>
+          </button>
+        </div>
       </header>
       <main class="content">
         <section class="stats">
@@ -507,6 +518,11 @@
               <span class="legend-dot" style="background: var(--primary);"></span>
               <span>Last feed</span>
               <span class="last-time" id="last-feed">--</span>
+            </div>
+            <div class="last-row">
+              <span class="legend-dot" style="background: #f6c453;"></span>
+              <span>Next feed</span>
+              <span class="last-time" id="next-feed">--</span>
             </div>
             <div class="last-row">
               <span class="legend-dot" style="background: #7dd3fc;"></span>

@@ -17,3 +17,108 @@ def test_create_user_entry_rejects_unknown_type(client):
     assert response.status_code == 400
     payload = response.get_json()
     assert payload["error"] == "type must be feed, poo, or wee"
+
+
+def test_list_entries_returns_all_users(client):
+    first = client.post(
+        "/api/users/suz/entries",
+        json={
+            "type": "feed",
+            "client_event_id": "evt-10",
+            "timestamp_utc": "2024-01-01T00:00:00+00:00",
+        },
+    ).get_json()
+    second = client.post(
+        "/api/users/rob/entries",
+        json={
+            "type": "poo",
+            "client_event_id": "evt-11",
+            "timestamp_utc": "2024-01-02T00:00:00+00:00",
+        },
+    ).get_json()
+
+    response = client.get("/api/users/any/entries")
+    assert response.status_code == 200
+    entries = response.get_json()
+    assert {entry["id"] for entry in entries} == {first["id"], second["id"]}
+
+    response = client.get("/api/entries")
+    assert response.status_code == 200
+    entries = response.get_json()
+    assert {entry["id"] for entry in entries} == {first["id"], second["id"]}
+
+
+def test_create_entry_duplicate_client_event_returns_409(client):
+    response = client.post(
+        "/api/users/suz/entries",
+        json={"type": "feed", "client_event_id": "evt-dup"},
+    )
+    assert response.status_code == 201
+    created = response.get_json()
+
+    duplicate = client.post(
+        "/api/users/suz/entries",
+        json={"type": "feed", "client_event_id": "evt-dup"},
+    )
+    assert duplicate.status_code == 409
+    payload = duplicate.get_json()
+    assert payload["error"] == "duplicate"
+    assert payload["entry"]["id"] == created["id"]
+
+
+def test_update_entry_success(client):
+    created = client.post(
+        "/api/users/suz/entries",
+        json={"type": "feed", "client_event_id": "evt-20"},
+    ).get_json()
+
+    response = client.patch(
+        f"/api/entries/{created['id']}",
+        json={"type": "poo", "notes": "Changed", "amount_ml": 120},
+    )
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["type"] == "poo"
+    assert payload["notes"] == "Changed"
+    assert payload["amount_ml"] == 120
+
+
+def test_update_entry_missing_returns_404(client):
+    response = client.patch("/api/entries/9999", json={"type": "poo"})
+    assert response.status_code == 404
+
+
+def test_delete_entry_success(client):
+    created = client.post(
+        "/api/users/suz/entries",
+        json={"type": "feed", "client_event_id": "evt-30"},
+    ).get_json()
+
+    response = client.delete(f"/api/entries/{created['id']}")
+    assert response.status_code == 204
+
+    response = client.delete(f"/api/entries/{created['id']}")
+    assert response.status_code == 404
+
+
+def test_list_entries_rejects_invalid_since_filter(client):
+    response = client.get("/api/entries?since=not-a-timestamp")
+    assert response.status_code == 400
+    payload = response.get_json()
+    assert payload["error"] == "Invalid timestamp filter"
+
+
+def test_list_entries_rejects_invalid_time_window(client):
+    response = client.get(
+        "/api/entries?since=2024-01-02T00:00:00+00:00&until=2024-01-01T00:00:00+00:00"
+    )
+    assert response.status_code == 400
+    payload = response.get_json()
+    assert payload["error"] == "Invalid time window"
+
+
+def test_list_entries_accepts_plus_offset_in_query(client):
+    response = client.get(
+        "/api/entries?since=2024-01-01T00:00:00+00:00&until=2024-01-02T00:00:00+00:00"
+    )
+    assert response.status_code == 200

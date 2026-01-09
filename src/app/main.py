@@ -48,6 +48,10 @@ def create_app() -> Flask:
             page="log",
         )
 
+    @app.get("/settings")
+    def settings():
+        return render_template("settings.html", page="settings")
+
     @app.get("/<user_slug>")
     def user_home(user_slug: str):
         try:
