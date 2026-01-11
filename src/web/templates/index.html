@@ -132,6 +132,18 @@
         text-align: center;
         box-shadow: 0 6px 14px rgba(0, 0, 0, 0.06);
       }
+      .stat-card.is-clickable {
+        cursor: pointer;
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+      }
+      .stat-card.is-clickable:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 10px 18px rgba(0, 0, 0, 0.08);
+      }
+      .stat-card.is-clickable:focus {
+        outline: 2px solid var(--primary);
+        outline-offset: 2px;
+      }
       html.dark .stat-card {
         background: var(--card-dark);
         border-color: rgba(255, 255, 255, 0.06);
@@ -479,21 +491,21 @@
       </header>
       <main class="content">
         <section class="stats">
-          <div class="stat-card">
+          <div class="stat-card" data-log-type="feed" role="button" tabindex="0" aria-label="View feed events">
             <div class="stat-label">
               <span class="material-symbols-outlined" style="font-size: 18px; color: var(--primary);">water_drop</span>
               Feeds
             </div>
             <div class="stat-value" id="stat-feed">0</div>
           </div>
-          <div class="stat-card">
+          <div class="stat-card" data-log-type="wee" role="button" tabindex="0" aria-label="View wee events">
             <div class="stat-label">
               <span class="material-symbols-outlined" style="font-size: 16px; color: #7dd3fc;">rainy</span>
               Wet
             </div>
             <div class="stat-value" id="stat-wee">0</div>
           </div>
-          <div class="stat-card">
+          <div class="stat-card" data-log-type="poo" role="button" tabindex="0" aria-label="View poo events">
             <div class="stat-label">
               <span class="material-symbols-outlined" style="font-size: 16px; color: #fbbf24;">spa</span>
               Soiled

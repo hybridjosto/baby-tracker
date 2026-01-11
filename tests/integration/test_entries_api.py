@@ -48,6 +48,48 @@ def test_list_entries_returns_all_users(client):
     assert {entry["id"] for entry in entries} == {first["id"], second["id"]}
 
 
+def test_list_entries_filters_by_time_window(client):
+    inside = client.post(
+        "/api/users/suz/entries",
+        json={
+            "type": "feed",
+            "client_event_id": "evt-12",
+            "timestamp_utc": "2024-01-02T05:00:00+00:00",
+        },
+    ).get_json()
+    client.post(
+        "/api/users/suz/entries",
+        json={
+            "type": "poo",
+            "client_event_id": "evt-13",
+            "timestamp_utc": "2024-01-03T05:00:00+00:00",
+        },
+    )
+
+    response = client.get(
+        "/api/entries?since=2024-01-02T00:00:00+00:00&until=2024-01-02T23:59:59+00:00"
+    )
+    assert response.status_code == 200
+    entries = response.get_json()
+    assert {entry["id"] for entry in entries} == {inside["id"]}
+
+
+def test_list_entries_filters_by_type(client):
+    feed = client.post(
+        "/api/users/suz/entries",
+        json={"type": "feed", "client_event_id": "evt-14"},
+    ).get_json()
+    client.post(
+        "/api/users/suz/entries",
+        json={"type": "wee", "client_event_id": "evt-15"},
+    )
+
+    response = client.get("/api/entries?type=feed")
+    assert response.status_code == 200
+    entries = response.get_json()
+    assert {entry["id"] for entry in entries} == {feed["id"]}
+
+
 def test_create_entry_duplicate_client_event_returns_409(client):
     response = client.post(
         "/api/users/suz/entries",

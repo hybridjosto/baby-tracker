@@ -21,12 +21,14 @@ def list_entries_route():
     limit = request.args.get("limit", default=50, type=int)
     since_utc = request.args.get("since")
     until_utc = request.args.get("until")
+    entry_type = request.args.get("type")
     try:
         entries = list_entries(
             _db_path(),
             limit=limit,
             since_utc=since_utc,
             until_utc=until_utc,
+            entry_type=entry_type,
         )
         return jsonify(entries)
     except ValueError as exc:
@@ -50,12 +52,14 @@ def list_user_entries_route(user_slug: str):
     limit = request.args.get("limit", default=50, type=int)
     since_utc = request.args.get("since")
     until_utc = request.args.get("until")
+    entry_type = request.args.get("type")
     try:
         entries = list_entries(
             _db_path(),
             limit=limit,
             since_utc=since_utc,
             until_utc=until_utc,
+            entry_type=entry_type,
         )
         return jsonify(entries)
     except ValueError as exc:

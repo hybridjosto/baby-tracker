@@ -241,13 +241,19 @@
       }
     </style>
   </head>
-  <body data-user="{{ user_slug }}" data-user-valid="{{ 'true' if user_valid else 'false' }}" data-page="{{ page }}">
+  <body
+    data-user="{{ user_slug }}"
+    data-user-valid="{{ 'true' if user_valid else 'false' }}"
+    data-page="{{ page }}"
+    data-log-type="{{ log_type or '' }}"
+    data-log-window-hours="{{ log_window_hours or '' }}"
+  >
     <div class="page">
       <div class="card">
-        <h1>Event Log</h1>
+        <h1>{{ log_title or "Event Log" }}</h1>
         <div class="user-chip" id="user-message">{{ user_message }}</div>
         <div class="nav-row">
-          <span>Recent entries</span>
+          <span>{{ log_subtitle or "Recent entries" }}</span>
           <div class="nav-actions">
             <a id="home-link" href="#">Back to chart</a>
             <button class="theme-toggle" id="refresh-btn" type="button" aria-label="Refresh entries" title="Refresh entries">

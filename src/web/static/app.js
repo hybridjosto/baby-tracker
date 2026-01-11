@@ -3,6 +3,8 @@ const bodyEl = document.body;
 let activeUser = bodyEl.dataset.user || "";
 let userValid = bodyEl.dataset.userValid === "true";
 const pageType = bodyEl.dataset.page || "home";
+const logFilterType = bodyEl.dataset.logType || "";
+const logWindowHours = Number.parseInt(bodyEl.dataset.logWindowHours || "", 10);
 
 const THEME_KEY = "baby-tracker-theme";
 const USER_KEY = "baby-tracker-user";
@@ -37,6 +39,7 @@ const lastFeedEl = document.getElementById("last-feed");
 const nextFeedEl = document.getElementById("next-feed");
 const lastWeeEl = document.getElementById("last-wee");
 const lastPooEl = document.getElementById("last-poo");
+const statCardEls = document.querySelectorAll(".stat-card[data-log-type]");
 
 const settingsFormEl = document.getElementById("settings-form");
 const dobInputEl = document.getElementById("dob-input");
@@ -218,6 +221,7 @@ function initHomeHandlers() {
   if (!nextFeedTimer) {
     nextFeedTimer = window.setInterval(updateNextFeed, 60000);
   }
+  bindStatCardNavigation();
   startAutoRefresh(loadHomeEntries);
 }
 
@@ -234,6 +238,7 @@ function initLogHandlers() {
     });
   }
   startAutoRefresh(loadLogEntries);
+  updateLogEmptyMessage();
 }
 
 function initSettingsHandlers() {
@@ -277,6 +282,10 @@ function applyUserState() {
   toggleDisabled(pooBtn, !userValid);
   toggleDisabled(weeBtn, !userValid);
   toggleDisabled(refreshBtn, !userValid);
+  statCardEls.forEach((card) => {
+    card.classList.toggle("is-clickable", userValid);
+    toggleDisabled(card, !userValid);
+  });
   initLinks();
   updateUserDisplay();
   if (userFormEl) {
@@ -510,6 +519,20 @@ function computeWindow(hours) {
     sinceIso: since.toISOString(),
     untilIso: until.toISOString(),
   };
+}
+
+function updateLogEmptyMessage() {
+  if (!logEmptyEl) {
+    return;
+  }
+  const hasWindow = Number.isFinite(logWindowHours);
+  if (!logFilterType && !hasWindow) {
+    return;
+  }
+  const windowLabel = hasWindow ? ` in the last ${logWindowHours} hours` : "";
+  const typeLabel = logFilterType ? logFilterType : "entries";
+  const prefix = logFilterType ? `No ${typeLabel} entries` : "No entries";
+  logEmptyEl.textContent = `${prefix}${windowLabel}.`;
 }
 
 function normalizeEntriesResponse(data) {
@@ -821,6 +844,40 @@ function renderLastByType(entries) {
   }
 }
 
+function buildLogTypeUrl(type) {
+  if (!type) {
+    return "/log";
+  }
+  return `/log/${type}`;
+}
+
+function handleStatCardNavigate(event) {
+  if (!userValid) {
+    return;
+  }
+  const target = event.currentTarget;
+  if (!target) {
+    return;
+  }
+  const type = target.dataset.logType;
+  if (!type) {
+    return;
+  }
+  window.location.href = buildLogTypeUrl(type);
+}
+
+function bindStatCardNavigation() {
+  statCardEls.forEach((card) => {
+    card.addEventListener("click", handleStatCardNavigate);
+    card.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        handleStatCardNavigate(event);
+      }
+    });
+  });
+}
+
 async function addEntry(type) {
   setStatus("Saving...");
   const payload = {
@@ -1011,7 +1068,16 @@ async function loadLogEntries() {
     return;
   }
   try {
-    const entries = await fetchEntries({ limit: 200 });
+    const params = { limit: 200 };
+    if (Number.isFinite(logWindowHours)) {
+      const window = computeWindow(logWindowHours);
+      params.since = window.sinceIso;
+      params.until = window.untilIso;
+    }
+    if (logFilterType) {
+      params.type = logFilterType;
+    }
+    const entries = await fetchEntries(params);
     renderLogEntries(entries);
   } catch (err) {
     setStatus(`Failed to load entries: ${err.message || "unknown error"}`);
