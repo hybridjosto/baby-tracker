@@ -22,6 +22,7 @@ const nappyMenu = document.getElementById("nappy-menu");
 const nappyBackdrop = document.getElementById("nappy-backdrop");
 const logLinkEl = document.getElementById("log-link");
 const homeLinkEl = document.getElementById("home-link");
+const refreshBtn = document.getElementById("refresh-btn");
 
 const chartSvg = document.getElementById("history-chart");
 const chartEmptyEl = document.getElementById("chart-empty");
@@ -170,12 +171,20 @@ let homeInitialized = false;
 let logInitialized = false;
 let settingsInitialized = false;
 let nextFeedTimer = null;
+let refreshTimer = null;
 
 function initHomeHandlers() {
   if (homeInitialized || pageType !== "home") {
     return;
   }
   homeInitialized = true;
+  if (refreshBtn) {
+    refreshBtn.addEventListener("click", () => {
+      if (userValid) {
+        void loadHomeEntries();
+      }
+    });
+  }
   bindTimestampPopup(lastFeedEl);
   bindTimestampPopup(nextFeedEl);
   bindTimestampPopup(lastWeeEl);
@@ -209,6 +218,7 @@ function initHomeHandlers() {
   if (!nextFeedTimer) {
     nextFeedTimer = window.setInterval(updateNextFeed, 60000);
   }
+  startAutoRefresh(loadHomeEntries);
 }
 
 function initLogHandlers() {
@@ -216,6 +226,14 @@ function initLogHandlers() {
     return;
   }
   logInitialized = true;
+  if (refreshBtn) {
+    refreshBtn.addEventListener("click", () => {
+      if (userValid) {
+        void loadLogEntries();
+      }
+    });
+  }
+  startAutoRefresh(loadLogEntries);
 }
 
 function initSettingsHandlers() {
@@ -258,6 +276,7 @@ function applyUserState() {
   toggleDisabled(nappyBtn, !userValid);
   toggleDisabled(pooBtn, !userValid);
   toggleDisabled(weeBtn, !userValid);
+  toggleDisabled(refreshBtn, !userValid);
   initLinks();
   updateUserDisplay();
   if (userFormEl) {
@@ -370,6 +389,17 @@ function setStatus(message) {
   if (statusEl) {
     statusEl.textContent = message || "";
   }
+}
+
+function startAutoRefresh(refreshFn) {
+  if (refreshTimer) {
+    return;
+  }
+  refreshTimer = window.setInterval(() => {
+    if (userValid) {
+      void refreshFn();
+    }
+  }, 120000);
 }
 
 function generateId() {
