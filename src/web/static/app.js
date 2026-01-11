@@ -934,7 +934,11 @@ async function addEntry(type) {
 }
 
 async function editEntry(entry) {
-  const nextType = window.prompt("Type (feed, poo, or wee)", entry.type);
+  const rawType = window.prompt("Type (feed, poo, or wee)", entry.type);
+  if (!rawType) {
+    return;
+  }
+  const nextType = rawType.trim().toLowerCase();
   if (!nextType) {
     return;
   }
@@ -947,8 +951,11 @@ async function editEntry(entry) {
   }
   const payload = { type: nextType, timestamp_utc: nextTime };
   if (nextType === "feed") {
-    const currentDuration = entry.feed_duration_min ?? "";
-    const durationInput = window.prompt("Feed duration (minutes)", String(currentDuration));
+    const currentDuration =
+      entry.feed_duration_min !== null && entry.feed_duration_min !== undefined
+        ? String(entry.feed_duration_min)
+        : "";
+    const durationInput = window.prompt("Feed duration (minutes)", currentDuration);
     if (durationInput === null) {
       return;
     }
