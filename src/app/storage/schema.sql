@@ -22,3 +22,61 @@ CREATE TABLE IF NOT EXISTS baby_settings (
 );
 
 INSERT OR IGNORE INTO baby_settings (id) VALUES (1);
+
+CREATE TABLE IF NOT EXISTS reminders (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    interval_min INTEGER NOT NULL CHECK (interval_min > 0),
+    message TEXT NOT NULL,
+    active INTEGER NOT NULL DEFAULT 1,
+    last_sent_at_utc TEXT,
+    next_due_at_utc TEXT NOT NULL,
+    created_at_utc TEXT NOT NULL,
+    updated_at_utc TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_reminders_next_due_at_utc
+    ON reminders (next_due_at_utc);
+
+INSERT INTO reminders (
+    name,
+    kind,
+    interval_min,
+    message,
+    active,
+    next_due_at_utc,
+    created_at_utc,
+    updated_at_utc
+)
+SELECT
+    'Nappy check',
+    'nappy',
+    180,
+    'Time for a nappy check.',
+    1,
+    datetime('now', '+180 minutes'),
+    datetime('now'),
+    datetime('now')
+WHERE NOT EXISTS (SELECT 1 FROM reminders);
+
+INSERT INTO reminders (
+    name,
+    kind,
+    interval_min,
+    message,
+    active,
+    next_due_at_utc,
+    created_at_utc,
+    updated_at_utc
+)
+SELECT
+    'Feed',
+    'food',
+    180,
+    'Time for a feed.',
+    1,
+    datetime('now', '+180 minutes'),
+    datetime('now'),
+    datetime('now')
+WHERE (SELECT COUNT(*) FROM reminders) = 1;

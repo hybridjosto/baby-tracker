@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import sqlite3
 from pathlib import Path
 
@@ -24,6 +24,8 @@ def init_db(db_path: str) -> None:
         _ensure_user_slug_column(conn)
         _ensure_feed_duration_column(conn)
         _ensure_settings_table(conn)
+        _ensure_reminders_table(conn)
+        _ensure_default_reminders(conn)
         conn.commit()
     finally:
         conn.close()
@@ -116,6 +118,62 @@ def _ensure_settings_table(conn: sqlite3.Connection) -> None:
         conn.execute(
             "INSERT INTO baby_settings (id, dob, feed_interval_min, updated_at_utc) VALUES (1, NULL, NULL, ?)",
             (now,),
+        )
+
+
+def _ensure_reminders_table(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS reminders (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            kind TEXT NOT NULL,
+            interval_min INTEGER NOT NULL CHECK (interval_min > 0),
+            message TEXT NOT NULL,
+            active INTEGER NOT NULL DEFAULT 1,
+            last_sent_at_utc TEXT,
+            next_due_at_utc TEXT NOT NULL,
+            created_at_utc TEXT NOT NULL,
+            updated_at_utc TEXT NOT NULL
+        )
+        """
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_reminders_next_due_at_utc ON reminders (next_due_at_utc)"
+    )
+
+
+def _ensure_default_reminders(conn: sqlite3.Connection) -> None:
+    row = conn.execute("SELECT COUNT(*) AS count FROM reminders").fetchone()
+    if not row:
+        return
+    if row["count"] >= 2:
+        return
+
+    now = datetime.now(timezone.utc)
+    created_at = now.isoformat()
+    next_due_at = (now + timedelta(minutes=180)).isoformat()
+    defaults = [
+        ("Nappy check", "nappy", 180, "Time for a nappy check."),
+        ("Feed", "food", 180, "Time for a feed."),
+    ]
+    for name, kind, interval_min, message in defaults[row["count"] :]:
+        conn.execute(
+            """
+            INSERT INTO reminders (
+                name,
+                kind,
+                interval_min,
+                message,
+                active,
+                last_sent_at_utc,
+                next_due_at_utc,
+                created_at_utc,
+                updated_at_utc
+            )
+            VALUES (?, ?, ?, ?, 1, NULL, ?, ?, ?)
+            """,
+            (name, kind, interval_min, message, next_due_at, created_at, created_at),
         )
 
 
