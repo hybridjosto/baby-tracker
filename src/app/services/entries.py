@@ -64,11 +64,16 @@ def list_entries(
     user_slug: str | None = None,
     since_utc: str | None = None,
     until_utc: str | None = None,
+    entry_type: str | None = None,
 ) -> list[dict]:
     safe_limit = max(1, min(limit, 200))
     normalized_slug = normalize_user_slug(user_slug) if user_slug else None
     normalized_since = _normalize_filter_ts(since_utc)
     normalized_until = _normalize_filter_ts(until_utc)
+    normalized_type = None
+    if entry_type:
+        validate_entry_type(entry_type)
+        normalized_type = entry_type
     if normalized_since and normalized_until and normalized_since > normalized_until:
         raise ValueError("Invalid time window")
     with get_connection(db_path) as conn:
@@ -78,6 +83,7 @@ def list_entries(
             user_slug=normalized_slug,
             since_utc=normalized_since,
             until_utc=normalized_until,
+            entry_type=normalized_type,
         )
 
 

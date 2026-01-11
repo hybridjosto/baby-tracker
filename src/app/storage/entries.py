@@ -46,12 +46,16 @@ def list_entries(
     user_slug: str | None = None,
     since_utc: str | None = None,
     until_utc: str | None = None,
+    entry_type: str | None = None,
 ) -> list[dict]:
     clauses: list[str] = []
     params: list[object] = []
     if user_slug:
         clauses.append("user_slug = ?")
         params.append(user_slug)
+    if entry_type:
+        clauses.append("type = ?")
+        params.append(entry_type)
     if since_utc:
         clauses.append("timestamp_utc >= ?")
         params.append(since_utc)
