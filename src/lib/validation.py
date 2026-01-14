@@ -1,12 +1,17 @@
 import re
 
-VALID_TYPES = {"feed", "poo", "wee"}
 USER_SLUG_RE = re.compile(r"^[a-z0-9-]{1,24}$")
+ENTRY_TYPE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 /-]{0,31}$")
 
 
 def validate_entry_type(value: str) -> None:
-    if value not in VALID_TYPES:
-        raise ValueError("type must be feed, poo, or wee")
+    if not isinstance(value, str):
+        raise ValueError("type must be a non-empty string")
+    trimmed = value.strip()
+    if not trimmed:
+        raise ValueError("type must be a non-empty string")
+    if not ENTRY_TYPE_RE.match(trimmed):
+        raise ValueError("type must use letters, numbers, spaces, / or -")
 
 
 def validate_entry_payload(payload: dict, require_client_event: bool = False) -> dict:
@@ -32,7 +37,10 @@ def validate_entry_payload(payload: dict, require_client_event: bool = False) ->
         if not isinstance(payload["notes"], str):
             raise ValueError("notes must be a string")
 
-    return dict(payload)
+    validated = dict(payload)
+    if isinstance(validated.get("type"), str):
+        validated["type"] = validated["type"].strip()
+    return validated
 
 
 def normalize_user_slug(value: str) -> str:

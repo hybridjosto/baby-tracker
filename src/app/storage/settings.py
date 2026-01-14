@@ -1,4 +1,19 @@
+import json
 import sqlite3
+
+
+def _parse_custom_event_types(value: object) -> list[str]:
+    if not value:
+        return []
+    if not isinstance(value, str):
+        return []
+    try:
+        loaded = json.loads(value)
+    except json.JSONDecodeError:
+        return []
+    if not isinstance(loaded, list):
+        return []
+    return [item for item in loaded if isinstance(item, str)]
 
 
 def _ensure_settings_row(conn: sqlite3.Connection) -> None:
@@ -16,18 +31,24 @@ def _ensure_settings_row(conn: sqlite3.Connection) -> None:
 def get_settings(conn: sqlite3.Connection) -> dict:
     _ensure_settings_row(conn)
     row = conn.execute(
-        "SELECT dob, feed_interval_min FROM baby_settings WHERE id = 1"
+        """
+        SELECT dob, feed_interval_min, custom_event_types
+        FROM baby_settings
+        WHERE id = 1
+        """
     ).fetchone()
     if not row:
-        return {"dob": None, "feed_interval_min": None}
-    return dict(row)
+        return {"dob": None, "feed_interval_min": None, "custom_event_types": []}
+    data = dict(row)
+    data["custom_event_types"] = _parse_custom_event_types(data.get("custom_event_types"))
+    return data
 
 
 def update_settings(conn: sqlite3.Connection, fields: dict) -> dict:
     _ensure_settings_row(conn)
     assignments: list[str] = []
     values: list[object] = []
-    for key in ("dob", "feed_interval_min", "updated_at_utc"):
+    for key in ("dob", "feed_interval_min", "custom_event_types", "updated_at_utc"):
         if key in fields:
             assignments.append(f"{key} = ?")
             values.append(fields[key])

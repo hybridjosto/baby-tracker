@@ -37,7 +37,7 @@ def _ensure_entry_type_constraint(conn: sqlite3.Connection) -> None:
     ).fetchone()
     if not row or not row["sql"]:
         return
-    if "wee" in row["sql"]:
+    if "CHECK (type IN" not in row["sql"]:
         return
 
     conn.execute("ALTER TABLE entries RENAME TO entries_old")
@@ -46,7 +46,7 @@ def _ensure_entry_type_constraint(conn: sqlite3.Connection) -> None:
         CREATE TABLE entries (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_slug TEXT NOT NULL,
-            type TEXT NOT NULL CHECK (type IN ('feed', 'poo', 'wee')),
+            type TEXT NOT NULL,
             timestamp_utc TEXT NOT NULL,
             client_event_id TEXT NOT NULL UNIQUE,
             notes TEXT,
@@ -108,15 +108,25 @@ def _ensure_settings_table(conn: sqlite3.Connection) -> None:
             id INTEGER PRIMARY KEY CHECK (id = 1),
             dob TEXT,
             feed_interval_min INTEGER,
+            custom_event_types TEXT,
             updated_at_utc TEXT NOT NULL
         )
         """
     )
+    columns = {
+        row["name"] for row in conn.execute("PRAGMA table_info(baby_settings)").fetchall()
+    }
+    if "custom_event_types" not in columns:
+        conn.execute("ALTER TABLE baby_settings ADD COLUMN custom_event_types TEXT")
     row = conn.execute("SELECT id FROM baby_settings WHERE id = 1").fetchone()
     if not row:
         now = datetime.now(timezone.utc).isoformat()
         conn.execute(
-            "INSERT INTO baby_settings (id, dob, feed_interval_min, updated_at_utc) VALUES (1, NULL, NULL, ?)",
+            """
+            INSERT INTO baby_settings
+                (id, dob, feed_interval_min, custom_event_types, updated_at_utc)
+            VALUES (1, NULL, NULL, NULL, ?)
+            """,
             (now,),
         )
 

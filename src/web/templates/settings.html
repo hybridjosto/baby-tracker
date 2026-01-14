@@ -107,10 +107,32 @@
         color: #1f1f1f;
         box-sizing: border-box;
       }
+      .inline-row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      .inline-row input {
+        flex: 1;
+      }
+      .add-btn {
+        border-radius: 10px;
+        border: none;
+        padding: 10px 14px;
+        background: #f6c453;
+        color: #1f1f1f;
+        font-weight: 700;
+        cursor: pointer;
+        white-space: nowrap;
+      }
       html.dark input {
         background: rgba(26, 44, 32, 0.9);
         border-color: rgba(255, 255, 255, 0.12);
         color: #ffffff;
+      }
+      html.dark .add-btn {
+        background: #f0b428;
+        color: #1f1f1f;
       }
       .hint {
         font-size: 12px;
@@ -129,6 +151,37 @@
         background: transparent;
         color: inherit;
         cursor: pointer;
+      }
+      .pill-list {
+        list-style: none;
+        padding: 0;
+        margin: 10px 0 0;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+      .pill-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        border-radius: 999px;
+        padding: 6px 10px;
+        background: #f0ede7;
+        font-size: 12px;
+        color: #4a453f;
+      }
+      html.dark .pill-item {
+        background: rgba(255, 255, 255, 0.08);
+        color: #d3e4d7;
+      }
+      .pill-remove {
+        border: none;
+        background: transparent;
+        color: inherit;
+        font-size: 11px;
+        cursor: pointer;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
       }
     </style>
   </head>
@@ -154,6 +207,22 @@
             <label for="interval-input">Current feed interval (hours)</label>
             <input id="interval-input" type="number" name="feed_interval" min="0" step="0.25" inputmode="decimal">
             <div class="hint">Used to estimate time to next feed.</div>
+          </div>
+          <div class="field">
+            <label for="custom-type-input">Custom event types</label>
+            <div class="inline-row">
+              <input
+                id="custom-type-input"
+                type="text"
+                name="custom_type"
+                placeholder="e.g. room/body temp"
+                maxlength="32"
+              >
+              <button class="add-btn" id="custom-type-add" type="button">Add</button>
+            </div>
+            <div class="hint" id="custom-type-hint">Use letters, numbers, spaces, / or -.</div>
+            <ul class="pill-list" id="custom-type-list"></ul>
+            <div class="hint" id="custom-type-empty">No custom types yet.</div>
           </div>
         </form>
       </div>

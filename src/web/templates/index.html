@@ -362,6 +362,9 @@
       .action-grid.action-grid--two {
         grid-template-columns: 1fr 1.4fr;
       }
+      .action-grid.action-grid--three {
+        grid-template-columns: repeat(3, 1fr);
+      }
       .action-btn {
         height: var(--action-height);
         border-radius: 18px;
@@ -404,7 +407,15 @@
         width: 100%;
         height: 100%;
       }
+      .misc-wrap {
+        position: relative;
+        width: 100%;
+        height: 100%;
+      }
       .nappy-wrap .action-btn {
+        width: 100%;
+      }
+      .misc-wrap .action-btn {
         width: 100%;
       }
       .nappy-backdrop {
@@ -417,6 +428,19 @@
         z-index: 9;
       }
       .nappy-backdrop.open {
+        opacity: 1;
+        pointer-events: auto;
+      }
+      .misc-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(10, 20, 12, 0.15);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.2s ease;
+        z-index: 9;
+      }
+      .misc-backdrop.open {
         opacity: 1;
         pointer-events: auto;
       }
@@ -443,6 +467,29 @@
       .nappy-menu.open {
         display: grid;
       }
+      .misc-menu {
+        position: absolute;
+        bottom: calc(var(--action-height) + 12px);
+        left: 50%;
+        transform: translateX(-50%);
+        display: none;
+        grid-template-columns: 1fr;
+        gap: 8px;
+        padding: 10px;
+        min-width: 160px;
+        background: #f2f6f3;
+        border: 1px solid #d6ded8;
+        border-radius: 18px;
+        box-shadow: 0 12px 24px rgba(0, 0, 0, 0.2);
+        z-index: 12;
+      }
+      html.dark .misc-menu {
+        background: #18231c;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      .misc-menu.open {
+        display: grid;
+      }
       .nappy-option {
         display: flex;
         align-items: center;
@@ -462,6 +509,9 @@
       }
       .nappy-option .material-symbols-outlined {
         font-size: 22px;
+      }
+      .misc-option {
+        text-transform: capitalize;
       }
       .disabled {
         opacity: 0.5;
@@ -572,12 +622,13 @@
       </main>
 
       <div class="nappy-backdrop" id="nappy-backdrop" aria-hidden="true"></div>
+      <div class="misc-backdrop" id="misc-backdrop" aria-hidden="true"></div>
       <div class="bottom-bar">
         <div class="last-activity">
           <span class="material-symbols-outlined" style="font-size: 16px;">schedule</span>
           <span id="last-activity">Last activity: --</span>
         </div>
-        <div class="action-grid action-grid--two">
+        <div class="action-grid action-grid--three">
           <div class="nappy-wrap">
             <button class="action-btn" id="log-nappy" type="button" aria-expanded="false">
               <span class="material-symbols-outlined" style="color: #7dd3fc;">baby_changing_station</span>
@@ -593,6 +644,13 @@
                 Poo
               </button>
             </div>
+          </div>
+          <div class="misc-wrap">
+            <button class="action-btn" id="log-misc" type="button" aria-expanded="false">
+              <span class="material-symbols-outlined" style="color: #8b5cf6;">dashboard</span>
+              Misc
+            </button>
+            <div class="misc-menu" id="misc-menu" aria-hidden="true"></div>
           </div>
           <button class="action-btn primary" id="log-feed" type="button">
             <span class="material-symbols-outlined" style="color: var(--primary); font-size: 30px;">water_drop</span>
