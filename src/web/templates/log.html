@@ -184,6 +184,55 @@
       html.dark .user-setup label {
         color: #9db9a6;
       }
+      .import-panel {
+        margin-top: 12px;
+        padding: 12px;
+        border-radius: 14px;
+        border: 1px dashed #e5e1da;
+        background: #f9f6f1;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      html.dark .import-panel {
+        border-color: rgba(255, 255, 255, 0.08);
+        background: rgba(26, 44, 32, 0.9);
+      }
+      .import-panel label {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: #6a6259;
+      }
+      html.dark .import-panel label {
+        color: #9db9a6;
+      }
+      .import-row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      .import-file {
+        flex: 1;
+        border-radius: 10px;
+        border: 1px solid #e5e1da;
+        padding: 8px 10px;
+        font-size: 12px;
+        background: #ffffff;
+        color: #1f1f1f;
+      }
+      html.dark .import-file {
+        border-color: rgba(255, 255, 255, 0.12);
+        background: rgba(16, 24, 18, 0.8);
+        color: #f3f6f4;
+      }
+      .import-hint {
+        font-size: 12px;
+        color: #7b736a;
+      }
+      html.dark .import-hint {
+        color: #9db9a6;
+      }
       .user-row {
         display: flex;
         gap: 8px;
@@ -270,6 +319,19 @@
           <div class="log-empty" id="log-empty">No entries yet.</div>
         </div>
         <div class="status" id="status"></div>
+        <form class="import-panel" id="csv-upload-form">
+          <label for="csv-file">Import CSV</label>
+          <div class="import-row">
+            <input
+              class="import-file"
+              id="csv-file"
+              type="file"
+              accept=".csv,text/csv"
+            >
+            <button class="user-btn" id="csv-upload-btn" type="submit">Upload</button>
+          </div>
+          <div class="import-hint">Headers: timestamp, type, duration, comment.</div>
+        </form>
         <form class="user-setup" id="user-form" hidden>
           <label for="user-input">User</label>
           <div class="user-row">

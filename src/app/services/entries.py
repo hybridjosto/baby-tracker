@@ -1,4 +1,7 @@
 from datetime import datetime, timezone
+import csv
+import io
+import uuid
 
 from src.app.storage.db import get_connection
 from src.app.storage.entries import (
@@ -26,6 +29,23 @@ class EntryNotFoundError(Exception):
 
 def _now_utc_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _parse_csv_timestamp(value: str) -> str:
+    cleaned = (value or "").strip()
+    if not cleaned:
+        raise ValueError("timestamp is required")
+    if cleaned.endswith("Z"):
+        cleaned = cleaned[:-1] + "+00:00"
+    if "T" not in cleaned and " " in cleaned:
+        cleaned = cleaned.replace(" ", "T", 1)
+    try:
+        parsed = datetime.fromisoformat(cleaned)
+    except ValueError as exc:
+        raise ValueError("timestamp must be ISO-8601") from exc
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc).isoformat()
 
 
 def create_entry(db_path: str, payload: dict) -> dict:
@@ -85,6 +105,81 @@ def list_entries(
             until_utc=normalized_until,
             entry_type=normalized_type,
         )
+
+
+def import_entries_csv(db_path: str, user_slug: str, file_storage) -> dict:
+    if not file_storage:
+        raise ValueError("CSV file is required")
+    try:
+        file_storage.stream.seek(0)
+    except Exception:
+        pass
+    text_stream = io.TextIOWrapper(file_storage.stream, encoding="utf-8")
+    reader = csv.DictReader(text_stream)
+    if not reader.fieldnames:
+        raise ValueError("CSV must include headers")
+    field_map = {
+        name.strip().lower(): name for name in reader.fieldnames if name is not None
+    }
+    required = ["timestamp", "type", "duration", "comment"]
+    missing = [name for name in required if name not in field_map]
+    if missing:
+        raise ValueError("CSV must have headings: timestamp, type, duration, comment")
+
+    normalized_slug = normalize_user_slug(user_slug)
+    rows: list[dict] = []
+    errors: list[str] = []
+    for index, row in enumerate(reader, start=2):
+        if not any((value or "").strip() for value in row.values()):
+            continue
+        try:
+            timestamp = _parse_csv_timestamp(row.get(field_map["timestamp"]))
+            entry_type = (row.get(field_map["type"]) or "").strip()
+            if not entry_type:
+                raise ValueError("type is required")
+            validate_entry_type(entry_type)
+            duration_raw = (row.get(field_map["duration"]) or "").strip()
+            duration = None
+            if duration_raw:
+                try:
+                    duration = int(duration_raw)
+                except ValueError as exc:
+                    raise ValueError("duration must be an integer") from exc
+                if duration < 0:
+                    raise ValueError("duration must be a non-negative integer")
+            comment_raw = (row.get(field_map["comment"]) or "").strip()
+            notes = comment_raw or None
+        except ValueError as exc:
+            errors.append(f"Row {index}: {exc}")
+            continue
+        rows.append(
+            {
+                "user_slug": normalized_slug,
+                "type": entry_type,
+                "timestamp_utc": timestamp,
+                "client_event_id": f"csv-{uuid.uuid4().hex}",
+                "notes": notes,
+                "feed_duration_min": duration,
+            }
+        )
+    if errors:
+        raise ValueError("; ".join(errors))
+    if not rows:
+        raise ValueError("CSV did not include any entries")
+
+    created = 0
+    duplicates = 0
+    with get_connection(db_path) as conn:
+        for payload in rows:
+            now = _now_utc_iso()
+            payload["created_at_utc"] = now
+            payload["updated_at_utc"] = now
+            _, duplicate = repo_create_entry(conn, payload)
+            if duplicate:
+                duplicates += 1
+            else:
+                created += 1
+    return {"created": created, "duplicates": duplicates}
 
 
 def update_entry(db_path: str, entry_id: int, payload: dict) -> dict:
