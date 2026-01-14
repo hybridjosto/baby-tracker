@@ -28,6 +28,9 @@ const miscBackdrop = document.getElementById("misc-backdrop");
 const logLinkEl = document.getElementById("log-link");
 const homeLinkEl = document.getElementById("home-link");
 const refreshBtn = document.getElementById("refresh-btn");
+const csvFormEl = document.getElementById("csv-upload-form");
+const csvFileEl = document.getElementById("csv-file");
+const csvUploadBtn = document.getElementById("csv-upload-btn");
 
 const chartSvg = document.getElementById("history-chart");
 const chartEmptyEl = document.getElementById("chart-empty");
@@ -341,6 +344,9 @@ function initLogHandlers() {
       }
     });
   }
+  if (csvFormEl) {
+    csvFormEl.addEventListener("submit", handleCsvUpload);
+  }
   startAutoRefresh(loadLogEntries);
   updateLogEmptyMessage();
 }
@@ -417,6 +423,12 @@ function applyUserState() {
   toggleDisabled(pooBtn, !userValid);
   toggleDisabled(weeBtn, !userValid);
   toggleDisabled(refreshBtn, !userValid);
+  if (csvFileEl) {
+    csvFileEl.disabled = !userValid;
+  }
+  if (csvUploadBtn) {
+    csvUploadBtn.disabled = !userValid;
+  }
   statCardEls.forEach((card) => {
     card.classList.toggle("is-clickable", userValid);
     toggleDisabled(card, !userValid);
@@ -572,6 +584,42 @@ function toggleMiscMenu() {
 function setStatus(message) {
   if (statusEl) {
     statusEl.textContent = message || "";
+  }
+}
+
+async function handleCsvUpload(event) {
+  event.preventDefault();
+  if (!userValid) {
+    setStatus("Choose a user below to start logging.");
+    return;
+  }
+  if (!csvFileEl || !csvFileEl.files || !csvFileEl.files.length) {
+    setStatus("Choose a CSV file to upload.");
+    return;
+  }
+  const file = csvFileEl.files[0];
+  const formData = new FormData();
+  formData.append("file", file);
+  setStatus("Uploading CSV...");
+  try {
+    const response = await fetch(`/api/users/${activeUser}/entries/import`, {
+      method: "POST",
+      body: formData,
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      setStatus(payload.error || "Upload failed.");
+      return;
+    }
+    const created = payload.created ?? 0;
+    const suffix = created === 1 ? "entry" : "entries";
+    setStatus(`Imported ${created} ${suffix}.`);
+    if (csvFormEl) {
+      csvFormEl.reset();
+    }
+    await loadLogEntries();
+  } catch (error) {
+    setStatus("Upload failed.");
   }
 }
 

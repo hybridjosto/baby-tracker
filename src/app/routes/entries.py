@@ -5,6 +5,7 @@ from src.app.services.entries import (
     EntryNotFoundError,
     create_entry,
     delete_entry,
+    import_entries_csv,
     list_entries,
     update_entry,
 )
@@ -75,6 +76,16 @@ def create_user_entry_route(user_slug: str):
         return jsonify(entry), 201
     except DuplicateEntryError as exc:
         return jsonify({"error": "duplicate", "entry": exc.entry}), 409
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+
+@entries_api.post("/users/<user_slug>/entries/import")
+def import_user_entries_route(user_slug: str):
+    file_storage = request.files.get("file")
+    try:
+        result = import_entries_csv(_db_path(), user_slug, file_storage)
+        return jsonify(result), 201
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
 
