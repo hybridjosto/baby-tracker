@@ -703,6 +703,12 @@ function renderLogEntries(entries) {
     left.appendChild(typeEl);
     left.appendChild(timeEl);
     left.appendChild(byEl);
+    if (entry.notes) {
+      const notesEl = document.createElement("div");
+      notesEl.className = "entry-meta";
+      notesEl.textContent = entry.notes;
+      left.appendChild(notesEl);
+    }
     if (entry.feed_duration_min !== null && entry.feed_duration_min !== undefined) {
       const durationEl = document.createElement("div");
       durationEl.className = "entry-meta";
@@ -901,6 +907,15 @@ async function addEntry(type) {
       payload.feed_duration_min = minutes;
     }
   }
+  const noteInput = window.prompt("Comment (optional)", "");
+  if (noteInput === null) {
+    setStatus("");
+    return;
+  }
+  const trimmedNote = noteInput.trim();
+  if (trimmedNote) {
+    payload.notes = trimmedNote;
+  }
   try {
     const response = await fetch(`/api/users/${activeUser}/entries`, {
       method: "POST",
@@ -973,6 +988,13 @@ async function editEntry(entry) {
   } else if (entry.feed_duration_min !== null && entry.feed_duration_min !== undefined) {
     payload.feed_duration_min = null;
   }
+  const currentNote = entry.notes ?? "";
+  const noteInput = window.prompt("Comment (optional)", String(currentNote));
+  if (noteInput === null) {
+    return;
+  }
+  const trimmedNote = noteInput.trim();
+  payload.notes = trimmedNote ? trimmedNote : null;
 
   const response = await fetch(`/api/entries/${entry.id}`, {
     method: "PATCH",
