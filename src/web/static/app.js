@@ -27,10 +27,26 @@ const miscMenu = document.getElementById("misc-menu");
 const miscBackdrop = document.getElementById("misc-backdrop");
 const logLinkEl = document.getElementById("log-link");
 const homeLinkEl = document.getElementById("home-link");
+const summaryLinkEl = document.getElementById("summary-link");
 const refreshBtn = document.getElementById("refresh-btn");
 const csvFormEl = document.getElementById("csv-upload-form");
 const csvFileEl = document.getElementById("csv-file");
 const csvUploadBtn = document.getElementById("csv-upload-btn");
+const summaryDateInputEl = document.getElementById("summary-date");
+const summaryDateLabelEl = document.getElementById("summary-date-label");
+const summaryPrevBtn = document.getElementById("summary-prev");
+const summaryNextBtn = document.getElementById("summary-next");
+const summaryTypeSelectEl = document.getElementById("summary-type");
+const summaryChartEl = document.getElementById("summary-chart");
+const summaryChartEmptyEl = document.getElementById("summary-chart-empty");
+const summaryTotalEl = document.getElementById("summary-total");
+const summaryTotalAvgEl = document.getElementById("summary-total-avg");
+const summaryFeedEl = document.getElementById("summary-feed");
+const summaryFeedAvgEl = document.getElementById("summary-feed-avg");
+const summaryWeeEl = document.getElementById("summary-wee");
+const summaryWeeAvgEl = document.getElementById("summary-wee-avg");
+const summaryPooEl = document.getElementById("summary-poo");
+const summaryPooAvgEl = document.getElementById("summary-poo-avg");
 
 const chartSvg = document.getElementById("history-chart");
 const chartEmptyEl = document.getElementById("chart-empty");
@@ -239,6 +255,7 @@ function renderMiscMenu() {
 function applyCustomEventTypes() {
   renderCustomTypeList();
   renderMiscMenu();
+  renderSummaryTypeOptions();
   if (miscBtn) {
     toggleDisabled(miscBtn, !userValid || customEventTypes.length === 0);
   }
@@ -273,8 +290,12 @@ function toggleDisabled(element, disabled) {
 let homeInitialized = false;
 let logInitialized = false;
 let settingsInitialized = false;
+let summaryInitialized = false;
 let nextFeedTimer = null;
 let refreshTimer = null;
+let summaryDate = null;
+let summaryEntries = [];
+let summaryType = "all";
 
 function initHomeHandlers() {
   if (homeInitialized || pageType !== "home") {
@@ -349,6 +370,61 @@ function initLogHandlers() {
   }
   startAutoRefresh(loadLogEntries);
   updateLogEmptyMessage();
+}
+
+function initSummaryHandlers() {
+  if (summaryInitialized || pageType !== "summary") {
+    return;
+  }
+  summaryInitialized = true;
+  renderSummaryTypeOptions();
+  if (!summaryDate) {
+    setSummaryDate(new Date());
+  }
+  if (summaryPrevBtn) {
+    summaryPrevBtn.addEventListener("click", () => {
+      const base = summaryDate ? new Date(summaryDate) : new Date();
+      base.setDate(base.getDate() - 1);
+      setSummaryDate(base);
+      if (userValid) {
+        void loadSummaryEntries();
+      }
+    });
+  }
+  if (summaryNextBtn) {
+    summaryNextBtn.addEventListener("click", () => {
+      const base = summaryDate ? new Date(summaryDate) : new Date();
+      base.setDate(base.getDate() + 1);
+      setSummaryDate(base);
+      if (userValid) {
+        void loadSummaryEntries();
+      }
+    });
+  }
+  if (summaryDateInputEl) {
+    summaryDateInputEl.addEventListener("change", () => {
+      const selected = parseDateInputValue(summaryDateInputEl.value);
+      if (selected) {
+        setSummaryDate(selected);
+        if (userValid) {
+          void loadSummaryEntries();
+        }
+      }
+    });
+  }
+  if (summaryTypeSelectEl) {
+    summaryTypeSelectEl.addEventListener("change", () => {
+      summaryType = summaryTypeSelectEl.value;
+      renderSummaryChart(summaryEntries, summaryType);
+    });
+  }
+  if (refreshBtn) {
+    refreshBtn.addEventListener("click", () => {
+      if (userValid) {
+        void loadSummaryEntries();
+      }
+    });
+  }
 }
 
 function initSettingsHandlers() {
@@ -450,6 +526,10 @@ function applyUserState() {
   if (pageType === "log") {
     initLogHandlers();
     loadLogEntries();
+  }
+  if (pageType === "summary") {
+    initSummaryHandlers();
+    loadSummaryEntries();
   }
 }
 
@@ -742,6 +822,223 @@ function computeWindow(hours) {
     sinceIso: since.toISOString(),
     untilIso: until.toISOString(),
   };
+}
+
+function formatDateInputValue(date) {
+  const pad = (value) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+function parseDateInputValue(value) {
+  if (!value) {
+    return null;
+  }
+  const parsed = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+  return parsed;
+}
+
+function isSameDay(a, b) {
+  return a.getFullYear() === b.getFullYear()
+    && a.getMonth() === b.getMonth()
+    && a.getDate() === b.getDate();
+}
+
+function formatSummaryDateLabel(date) {
+  const today = new Date();
+  if (isSameDay(date, today)) {
+    return "Today";
+  }
+  return date.toLocaleDateString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function setSummaryDate(date) {
+  summaryDate = date;
+  if (summaryDateInputEl) {
+    summaryDateInputEl.value = formatDateInputValue(date);
+  }
+  if (summaryDateLabelEl) {
+    summaryDateLabelEl.textContent = formatSummaryDateLabel(date);
+  }
+  if (summaryNextBtn) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const candidate = new Date(date);
+    candidate.setHours(0, 0, 0, 0);
+    summaryNextBtn.disabled = candidate >= today;
+  }
+}
+
+function getSummaryDayWindow(date) {
+  const start = new Date(date);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 1);
+  end.setMilliseconds(end.getMilliseconds() - 1);
+  return {
+    since: start,
+    until: end,
+    sinceIso: start.toISOString(),
+    untilIso: end.toISOString(),
+  };
+}
+
+function formatAverageInterval(total) {
+  if (!total) {
+    return "--";
+  }
+  const hours = 24 / total;
+  if (hours < 1) {
+    return `${Math.round(hours * 60)}m`;
+  }
+  return `${hours.toFixed(1)}h`;
+}
+
+function renderSummaryStats(entries) {
+  if (!summaryTotalEl || !summaryFeedEl || !summaryWeeEl || !summaryPooEl) {
+    return;
+  }
+  let total = 0;
+  let feed = 0;
+  let wee = 0;
+  let poo = 0;
+  entries.forEach((entry) => {
+    total += 1;
+    if (entry.type === "feed") {
+      feed += 1;
+    } else if (entry.type === "wee") {
+      wee += 1;
+    } else if (entry.type === "poo") {
+      poo += 1;
+    }
+  });
+  summaryTotalEl.textContent = String(total);
+  summaryFeedEl.textContent = String(feed);
+  summaryWeeEl.textContent = String(wee);
+  summaryPooEl.textContent = String(poo);
+  if (summaryTotalAvgEl) {
+    summaryTotalAvgEl.textContent = `Avg / 24h: ${formatAverageInterval(total)}`;
+  }
+  if (summaryFeedAvgEl) {
+    summaryFeedAvgEl.textContent = `Avg / 24h: ${formatAverageInterval(feed)}`;
+  }
+  if (summaryWeeAvgEl) {
+    summaryWeeAvgEl.textContent = `Avg / 24h: ${formatAverageInterval(wee)}`;
+  }
+  if (summaryPooAvgEl) {
+    summaryPooAvgEl.textContent = `Avg / 24h: ${formatAverageInterval(poo)}`;
+  }
+}
+
+function getSummaryTypeColor(type) {
+  if (type === "feed") {
+    return "#13ec5b";
+  }
+  if (type === "wee") {
+    return "#7dd3fc";
+  }
+  if (type === "poo") {
+    return "#fbbf24";
+  }
+  if (type === "all") {
+    return "#16a34a";
+  }
+  return "#60a5fa";
+}
+
+function renderSummaryTypeOptions() {
+  if (!summaryTypeSelectEl) {
+    return;
+  }
+  const current = summaryTypeSelectEl.value || summaryType || "all";
+  summaryTypeSelectEl.innerHTML = "";
+  const baseOptions = ["all", "feed", "wee", "poo"];
+  const options = [...baseOptions, ...customEventTypes];
+  options.forEach((value) => {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = value === "all" ? "All events" : value;
+    summaryTypeSelectEl.appendChild(option);
+  });
+  summaryTypeSelectEl.value = options.includes(current) ? current : "all";
+  summaryType = summaryTypeSelectEl.value;
+}
+
+function renderSummaryChart(entries, selectedType) {
+  if (!summaryChartEl || !summaryChartEmptyEl) {
+    return;
+  }
+  summaryChartEl.innerHTML = "";
+  const filtered = selectedType === "all"
+    ? entries
+    : entries.filter((entry) => entry.type === selectedType);
+  if (!filtered.length) {
+    summaryChartEmptyEl.style.display = "flex";
+    return;
+  }
+  summaryChartEmptyEl.style.display = "none";
+
+  const svgNS = "http://www.w3.org/2000/svg";
+  const width = 360;
+  const height = 180;
+  const paddingX = 20;
+  const paddingTop = 18;
+  const paddingBottom = 28;
+  const axisY = height - paddingBottom;
+  const barSlot = (width - paddingX * 2) / 24;
+  const barWidth = barSlot * 0.7;
+
+  const counts = new Array(24).fill(0);
+  filtered.forEach((entry) => {
+    const ts = new Date(entry.timestamp_utc);
+    if (Number.isNaN(ts.getTime())) {
+      return;
+    }
+    counts[ts.getHours()] += 1;
+  });
+  const maxCount = Math.max(...counts, 1);
+
+  const axis = document.createElementNS(svgNS, "line");
+  axis.setAttribute("x1", paddingX);
+  axis.setAttribute("x2", width - paddingX);
+  axis.setAttribute("y1", axisY);
+  axis.setAttribute("y2", axisY);
+  axis.setAttribute("stroke", "#d6ded8");
+  axis.setAttribute("stroke-width", "2");
+  summaryChartEl.appendChild(axis);
+
+  counts.forEach((count, hour) => {
+    const ratio = count / maxCount;
+    const barHeight = ratio * (axisY - paddingTop);
+    const x = paddingX + hour * barSlot + (barSlot - barWidth) / 2;
+    const y = axisY - barHeight;
+    const rect = document.createElementNS(svgNS, "rect");
+    rect.setAttribute("x", x);
+    rect.setAttribute("y", y);
+    rect.setAttribute("width", barWidth);
+    rect.setAttribute("height", barHeight);
+    rect.setAttribute("rx", "3");
+    rect.setAttribute("fill", getSummaryTypeColor(selectedType));
+    summaryChartEl.appendChild(rect);
+  });
+
+  [0, 6, 12, 18, 23].forEach((hour) => {
+    const x = paddingX + hour * barSlot + barSlot / 2;
+    const tick = document.createElementNS(svgNS, "text");
+    tick.setAttribute("x", x);
+    tick.setAttribute("y", height - 8);
+    tick.setAttribute("text-anchor", "middle");
+    tick.setAttribute("fill", "#7d7f7b");
+    tick.setAttribute("font-size", "10");
+    tick.textContent = String(hour);
+    summaryChartEl.appendChild(tick);
+  });
 }
 
 function updateLogEmptyMessage() {
@@ -1318,6 +1615,28 @@ async function loadHomeEntries() {
   }
 }
 
+async function loadSummaryEntries() {
+  if (!userValid) {
+    return;
+  }
+  try {
+    if (!summaryDate) {
+      setSummaryDate(new Date());
+    }
+    const dayWindow = getSummaryDayWindow(summaryDate);
+    const entries = await fetchEntries({
+      limit: 400,
+      since: dayWindow.sinceIso,
+      until: dayWindow.untilIso,
+    });
+    summaryEntries = entries;
+    renderSummaryStats(entries);
+    renderSummaryChart(entries, summaryType);
+  } catch (err) {
+    setStatus(`Failed to load entries: ${err.message || "unknown error"}`);
+  }
+}
+
 async function loadLogEntries() {
   if (!userValid) {
     return;
@@ -1347,6 +1666,10 @@ function initLinks() {
   if (homeLinkEl) {
     homeLinkEl.classList.toggle("disabled", !userValid);
     homeLinkEl.href = userValid ? "/" : "#";
+  }
+  if (summaryLinkEl) {
+    summaryLinkEl.classList.toggle("disabled", !userValid);
+    summaryLinkEl.href = userValid ? "/summary" : "#";
   }
 }
 
