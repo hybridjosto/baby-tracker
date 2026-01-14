@@ -1,0 +1,426 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Baby Tracker Summary</title>
+    <link rel="manifest" href="/static/manifest.json">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@400,0"
+      rel="stylesheet"
+    >
+    <script>
+      (() => {
+        const stored = localStorage.getItem("baby-tracker-theme");
+        const prefersDark = window.matchMedia
+          && window.matchMedia("(prefers-color-scheme: dark)").matches;
+        const theme = stored || (prefersDark ? "dark" : "light");
+        if (theme === "dark") {
+          document.documentElement.classList.add("dark");
+        }
+      })();
+    </script>
+    <style>
+      html {
+        color-scheme: light;
+      }
+      html.dark {
+        color-scheme: dark;
+      }
+      body {
+        font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+        background: #f7f4ef;
+        color: #1f1f1f;
+        min-height: 100vh;
+      }
+      html.dark body {
+        background: #102216;
+        color: #ffffff;
+      }
+      .page {
+        padding: 16px;
+      }
+      .card {
+        background: #ffffff;
+        border-radius: 16px;
+        padding: 16px;
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+        max-width: 520px;
+        margin: 0 auto;
+      }
+      html.dark .card {
+        background: #1a2c20;
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+      }
+      h1 {
+        margin: 0;
+        font-size: 22px;
+      }
+      .user-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 10px;
+        background: #f0ede7;
+        border-radius: 999px;
+        font-size: 12px;
+        color: #4a453f;
+        margin-top: 8px;
+      }
+      html.dark .user-chip {
+        background: rgba(255, 255, 255, 0.08);
+        color: #d3e4d7;
+      }
+      .nav-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 12px;
+        margin-bottom: 16px;
+        font-size: 14px;
+        color: #444;
+      }
+      html.dark .nav-row {
+        color: #d3e4d7;
+      }
+      .nav-actions {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+      }
+      .nav-row a {
+        color: #4a453f;
+        text-decoration: none;
+        font-weight: 600;
+      }
+      html.dark .nav-row a {
+        color: #d3e4d7;
+      }
+      .theme-toggle,
+      .icon-btn {
+        width: 32px;
+        height: 32px;
+        border-radius: 999px;
+        border: 1px solid #e5e1da;
+        background: #f9f6f1;
+        display: grid;
+        place-items: center;
+        cursor: pointer;
+        color: inherit;
+      }
+      html.dark .theme-toggle,
+      html.dark .icon-btn {
+        border-color: rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.08);
+        color: #d3e4d7;
+      }
+      .date-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 16px;
+        padding: 10px;
+        border-radius: 14px;
+        background: #f4efe9;
+      }
+      html.dark .date-row {
+        background: rgba(255, 255, 255, 0.08);
+      }
+      .date-center {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        flex: 1;
+      }
+      .date-label {
+        font-size: 14px;
+        font-weight: 700;
+      }
+      .date-input {
+        border-radius: 10px;
+        border: 1px solid #e5e1da;
+        padding: 6px 10px;
+        font-size: 13px;
+        background: #ffffff;
+      }
+      html.dark .date-input {
+        background: rgba(26, 44, 32, 0.9);
+        border-color: rgba(255, 255, 255, 0.12);
+        color: #ffffff;
+      }
+      .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+      .summary-card {
+        border-radius: 14px;
+        padding: 12px;
+        border: 1px solid #e5e1da;
+        background: #faf7f2;
+      }
+      html.dark .summary-card {
+        border-color: rgba(255, 255, 255, 0.08);
+        background: rgba(26, 44, 32, 0.9);
+      }
+      .summary-label {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: #6a6259;
+      }
+      html.dark .summary-label {
+        color: #9db9a6;
+      }
+      .summary-value {
+        font-size: 20px;
+        font-weight: 700;
+        margin-top: 6px;
+      }
+      .summary-sub {
+        font-size: 12px;
+        color: #6a6259;
+        margin-top: 4px;
+      }
+      html.dark .summary-sub {
+        color: #9db9a6;
+      }
+      .chart-card {
+        border-radius: 16px;
+        padding: 14px;
+        border: 1px solid #e5e1da;
+        background: #ffffff;
+      }
+      html.dark .chart-card {
+        border-color: rgba(255, 255, 255, 0.08);
+        background: rgba(26, 44, 32, 0.9);
+      }
+      .chart-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 10px;
+      }
+      .chart-header h2 {
+        margin: 0;
+        font-size: 16px;
+      }
+      .chart-controls {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        color: #6a6259;
+      }
+      html.dark .chart-controls {
+        color: #9db9a6;
+      }
+      .chart-controls select {
+        border-radius: 10px;
+        border: 1px solid #e5e1da;
+        padding: 4px 8px;
+        font-size: 12px;
+        background: #ffffff;
+      }
+      html.dark .chart-controls select {
+        background: rgba(26, 44, 32, 0.9);
+        border-color: rgba(255, 255, 255, 0.12);
+        color: #ffffff;
+      }
+      .chart-wrap {
+        position: relative;
+        background: #f6f2ec;
+        border-radius: 12px;
+        padding: 8px;
+      }
+      html.dark .chart-wrap {
+        background: rgba(255, 255, 255, 0.06);
+      }
+      #summary-chart {
+        width: 100%;
+        height: 180px;
+        display: block;
+      }
+      .chart-empty {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 13px;
+        color: #8b857e;
+      }
+      html.dark .chart-empty {
+        color: #9db9a6;
+      }
+      .status {
+        font-size: 12px;
+        color: #666;
+        margin-top: 10px;
+      }
+      html.dark .status {
+        color: #9db9a6;
+      }
+      .user-setup {
+        margin-top: 12px;
+        padding: 12px;
+        border-radius: 14px;
+        border: 1px dashed #e5e1da;
+        background: #f9f6f1;
+      }
+      html.dark .user-setup {
+        border-color: rgba(255, 255, 255, 0.08);
+        background: rgba(26, 44, 32, 0.9);
+      }
+      .user-setup label {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: #6a6259;
+      }
+      html.dark .user-setup label {
+        color: #9db9a6;
+      }
+      .user-row {
+        display: flex;
+        gap: 8px;
+        margin-top: 8px;
+      }
+      .user-input {
+        flex: 1;
+        border-radius: 10px;
+        border: 1px solid #e5e1da;
+        padding: 10px 12px;
+        font-size: 14px;
+      }
+      html.dark .user-input {
+        background: rgba(26, 44, 32, 0.9);
+        border-color: rgba(255, 255, 255, 0.12);
+        color: #ffffff;
+      }
+      .user-btn {
+        border-radius: 10px;
+        border: none;
+        padding: 0 16px;
+        background: #f6c453;
+        color: #1f1f1f;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      html.dark .user-btn {
+        background: #f0b428;
+        color: #1f1f1f;
+      }
+      .disabled {
+        opacity: 0.5;
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body data-user="{{ user_slug }}" data-user-valid="{{ 'true' if user_valid else 'false' }}" data-page="{{ page }}">
+    <div class="page">
+      <div class="card">
+        <div class="nav-row">
+          <div>
+            <h1>Summary</h1>
+            <div class="user-chip" id="user-message">{{ user_message }}</div>
+          </div>
+          <div class="nav-actions">
+            <a id="home-link" href="#">Back to chart</a>
+            <a id="log-link" href="#">Event log</a>
+            <button class="icon-btn" id="refresh-btn" type="button" aria-label="Refresh summary" title="Refresh summary">
+              <span class="material-symbols-outlined">refresh</span>
+            </button>
+            <a href="/settings">Settings</a>
+            <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Switch to light mode">
+              <span class="material-symbols-outlined">dark_mode</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="date-row">
+          <button class="icon-btn" id="summary-prev" type="button" aria-label="Previous day">
+            <span class="material-symbols-outlined">chevron_left</span>
+          </button>
+          <div class="date-center">
+            <div class="date-label" id="summary-date-label">Today</div>
+            <input class="date-input" id="summary-date" type="date">
+          </div>
+          <button class="icon-btn" id="summary-next" type="button" aria-label="Next day">
+            <span class="material-symbols-outlined">chevron_right</span>
+          </button>
+        </div>
+
+        <section class="summary-grid">
+          <div class="summary-card">
+            <div class="summary-label">All events</div>
+            <div class="summary-value" id="summary-total">0</div>
+            <div class="summary-sub" id="summary-total-avg">Avg / 24h: --</div>
+          </div>
+          <div class="summary-card">
+            <div class="summary-label">Feeds</div>
+            <div class="summary-value" id="summary-feed">0</div>
+            <div class="summary-sub" id="summary-feed-avg">Avg / 24h: --</div>
+          </div>
+          <div class="summary-card">
+            <div class="summary-label">Wet</div>
+            <div class="summary-value" id="summary-wee">0</div>
+            <div class="summary-sub" id="summary-wee-avg">Avg / 24h: --</div>
+          </div>
+          <div class="summary-card">
+            <div class="summary-label">Soiled</div>
+            <div class="summary-value" id="summary-poo">0</div>
+            <div class="summary-sub" id="summary-poo-avg">Avg / 24h: --</div>
+          </div>
+        </section>
+
+        <section class="chart-card">
+          <div class="chart-header">
+            <h2>Time of day</h2>
+            <div class="chart-controls">
+              <label for="summary-type">Event type</label>
+              <select id="summary-type">
+                <option value="all">All events</option>
+                <option value="feed">feed</option>
+                <option value="wee">wee</option>
+                <option value="poo">poo</option>
+              </select>
+            </div>
+          </div>
+          <div class="chart-wrap">
+            <svg id="summary-chart" viewBox="0 0 360 180" preserveAspectRatio="none"></svg>
+            <div class="chart-empty" id="summary-chart-empty">No events for this day.</div>
+          </div>
+        </section>
+
+        <div class="status" id="status"></div>
+
+        <form class="user-setup" id="user-form" hidden>
+          <label for="user-input">User</label>
+          <div class="user-row">
+            <input
+              class="user-input"
+              id="user-input"
+              type="text"
+              inputmode="latin-prose"
+              autocapitalize="none"
+              autocomplete="off"
+              placeholder="Name (e.g. josh)"
+            >
+            <button class="user-btn" id="user-save" type="submit">Use</button>
+          </div>
+        </form>
+      </div>
+    </div>
+    <script src="/static/app.js"></script>
+  </body>
+</html>

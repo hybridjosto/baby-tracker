@@ -100,6 +100,31 @@ def create_app() -> Flask:
     def settings():
         return render_template("settings.html", page="settings")
 
+    def render_summary_page(
+        user_slug: str,
+        user_valid: bool,
+        user_message: str,
+        status_code: int = 200,
+    ):
+        return (
+            render_template(
+                "summary.html",
+                user_slug=user_slug,
+                user_valid=user_valid,
+                user_message=user_message,
+                page="summary",
+            ),
+            status_code,
+        )
+
+    @app.get("/summary")
+    def summary():
+        return render_summary_page(
+            user_slug="",
+            user_valid=False,
+            user_message="Choose a user below (example: josh).",
+        )
+
     @app.get("/<user_slug>")
     def user_home(user_slug: str):
         try:
@@ -121,6 +146,23 @@ def create_app() -> Flask:
             user_valid=True,
             user_message=f"Logging as {normalized}",
             page="home",
+        )
+
+    @app.get("/<user_slug>/summary")
+    def user_summary(user_slug: str):
+        try:
+            normalized = normalize_user_slug(user_slug)
+        except ValueError as exc:
+            return render_summary_page(
+                user_slug="",
+                user_valid=False,
+                user_message=str(exc),
+                status_code=400,
+            )
+        return render_summary_page(
+            user_slug=normalized,
+            user_valid=True,
+            user_message=f"Logging as {normalized}",
         )
 
     @app.get("/<user_slug>/log")
