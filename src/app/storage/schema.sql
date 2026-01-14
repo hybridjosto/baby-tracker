@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS entries (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_slug TEXT NOT NULL,
-    type TEXT NOT NULL CHECK (type IN ('feed', 'poo', 'wee')),
+    type TEXT NOT NULL,
     timestamp_utc TEXT NOT NULL,
     client_event_id TEXT NOT NULL UNIQUE,
     notes TEXT,
@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS baby_settings (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     dob TEXT,
     feed_interval_min INTEGER,
+    custom_event_types TEXT,
     updated_at_utc TEXT NOT NULL DEFAULT (datetime('now'))
 );
 

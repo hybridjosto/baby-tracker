@@ -9,14 +9,14 @@ def test_create_user_entry_allows_wee(client):
     assert payload["user_slug"] == "suz"
 
 
-def test_create_user_entry_rejects_unknown_type(client):
+def test_create_user_entry_rejects_invalid_type(client):
     response = client.post(
         "/api/users/suz/entries",
-        json={"type": "sleep", "client_event_id": "evt-2"},
+        json={"type": "temp!*", "client_event_id": "evt-2"},
     )
     assert response.status_code == 400
     payload = response.get_json()
-    assert payload["error"] == "type must be feed, poo, or wee"
+    assert payload["error"] == "type must use letters, numbers, spaces, / or -"
 
 
 def test_list_entries_returns_all_users(client):

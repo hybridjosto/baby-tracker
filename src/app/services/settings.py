@@ -1,4 +1,6 @@
 from datetime import date, datetime, timezone
+import re
+import json
 
 from src.app.storage.db import get_connection
 from src.app.storage.settings import get_settings as repo_get_settings
@@ -34,6 +36,30 @@ def _normalize_feed_interval(value: object) -> int | None:
     return value
 
 
+_CUSTOM_TYPE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 /-]{0,31}$")
+
+
+def _normalize_custom_event_types(value: object) -> str:
+    if value is None:
+        return json.dumps([])
+    if not isinstance(value, list):
+        raise ValueError("custom_event_types must be a list of names")
+    cleaned: list[str] = []
+    seen: set[str] = set()
+    for raw in value:
+        if not isinstance(raw, str):
+            raise ValueError("custom_event_types must be a list of names")
+        trimmed = raw.strip()
+        if not trimmed or not _CUSTOM_TYPE_RE.match(trimmed):
+            raise ValueError("custom_event_types must use letters, numbers, spaces, / or -")
+        key = trimmed.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        cleaned.append(trimmed)
+    return json.dumps(cleaned)
+
+
 def get_settings(db_path: str) -> dict:
     with get_connection(db_path) as conn:
         return repo_get_settings(conn)
@@ -46,6 +72,10 @@ def update_settings(db_path: str, payload: dict) -> dict:
     if "feed_interval_min" in payload:
         fields["feed_interval_min"] = _normalize_feed_interval(
             payload["feed_interval_min"]
+        )
+    if "custom_event_types" in payload:
+        fields["custom_event_types"] = _normalize_custom_event_types(
+            payload["custom_event_types"]
         )
     if fields:
         fields["updated_at_utc"] = _now_utc_iso()

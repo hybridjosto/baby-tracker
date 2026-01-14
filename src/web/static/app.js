@@ -22,6 +22,9 @@ const pooBtn = document.getElementById("log-poo");
 const weeBtn = document.getElementById("log-wee");
 const nappyMenu = document.getElementById("nappy-menu");
 const nappyBackdrop = document.getElementById("nappy-backdrop");
+const miscBtn = document.getElementById("log-misc");
+const miscMenu = document.getElementById("misc-menu");
+const miscBackdrop = document.getElementById("misc-backdrop");
 const logLinkEl = document.getElementById("log-link");
 const homeLinkEl = document.getElementById("home-link");
 const refreshBtn = document.getElementById("refresh-btn");
@@ -45,9 +48,17 @@ const settingsFormEl = document.getElementById("settings-form");
 const dobInputEl = document.getElementById("dob-input");
 const ageOutputEl = document.getElementById("age-output");
 const intervalInputEl = document.getElementById("interval-input");
+const customTypeInputEl = document.getElementById("custom-type-input");
+const customTypeAddBtn = document.getElementById("custom-type-add");
+const customTypeListEl = document.getElementById("custom-type-list");
+const customTypeHintEl = document.getElementById("custom-type-hint");
+const customTypeEmptyEl = document.getElementById("custom-type-empty");
 
 let babyDob = null;
 let feedIntervalMinutes = null;
+let customEventTypes = [];
+
+const CUSTOM_TYPE_RE = /^[A-Za-z0-9][A-Za-z0-9 /-]{0,31}$/;
 
 const CHART_CONFIG = {
   width: 360,
@@ -147,6 +158,92 @@ function updateAgeDisplay() {
   ageOutputEl.textContent = formatAge(dob);
 }
 
+function setCustomTypeHint(message) {
+  if (!customTypeHintEl) {
+    return;
+  }
+  customTypeHintEl.textContent = message;
+}
+
+function normalizeCustomTypeInput(value) {
+  if (!value) {
+    return null;
+  }
+  const trimmed = value.trim();
+  if (!trimmed || !CUSTOM_TYPE_RE.test(trimmed)) {
+    return null;
+  }
+  return trimmed;
+}
+
+function renderCustomTypeList() {
+  if (!customTypeListEl) {
+    return;
+  }
+  customTypeListEl.innerHTML = "";
+  if (!customEventTypes.length) {
+    if (customTypeEmptyEl) {
+      customTypeEmptyEl.style.display = "block";
+    }
+    return;
+  }
+  if (customTypeEmptyEl) {
+    customTypeEmptyEl.style.display = "none";
+  }
+  customEventTypes.forEach((type) => {
+    const item = document.createElement("li");
+    item.className = "pill-item";
+    const label = document.createElement("span");
+    label.textContent = type;
+    const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.className = "pill-remove";
+    removeBtn.textContent = "Remove";
+    removeBtn.addEventListener("click", () => {
+      const next = customEventTypes.filter((entry) => entry !== type);
+      customEventTypes = next;
+      renderCustomTypeList();
+      renderMiscMenu();
+      void saveBabySettings({ custom_event_types: customEventTypes });
+    });
+    item.appendChild(label);
+    item.appendChild(removeBtn);
+    customTypeListEl.appendChild(item);
+  });
+}
+
+function renderMiscMenu() {
+  if (!miscMenu) {
+    return;
+  }
+  miscMenu.innerHTML = "";
+  customEventTypes.forEach((type) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "nappy-option misc-option";
+    button.textContent = type;
+    button.addEventListener("click", () => {
+      closeMiscMenu();
+      addEntry(type);
+    });
+    miscMenu.appendChild(button);
+  });
+  if (!customEventTypes.length) {
+    miscMenu.setAttribute("aria-hidden", "true");
+  }
+}
+
+function applyCustomEventTypes() {
+  renderCustomTypeList();
+  renderMiscMenu();
+  if (miscBtn) {
+    toggleDisabled(miscBtn, !userValid || customEventTypes.length === 0);
+  }
+  if (!customEventTypes.length) {
+    closeMiscMenu();
+  }
+}
+
 function updateUserDisplay() {
   if (userMessageEl) {
     userMessageEl.textContent = userValid
@@ -198,6 +295,9 @@ function initHomeHandlers() {
   if (nappyBtn) {
     nappyBtn.addEventListener("click", toggleNappyMenu);
   }
+  if (miscBtn) {
+    miscBtn.addEventListener("click", toggleMiscMenu);
+  }
   if (pooBtn) {
     pooBtn.addEventListener("click", () => {
       closeNappyMenu();
@@ -213,9 +313,13 @@ function initHomeHandlers() {
   if (nappyBackdrop) {
     nappyBackdrop.addEventListener("click", closeNappyMenu);
   }
+  if (miscBackdrop) {
+    miscBackdrop.addEventListener("click", closeMiscMenu);
+  }
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
       closeNappyMenu();
+      closeMiscMenu();
     }
   });
   if (!nextFeedTimer) {
@@ -265,6 +369,36 @@ function initSettingsHandlers() {
       }
     });
   }
+  if (customTypeAddBtn && customTypeInputEl) {
+    const handleAdd = () => {
+      const normalized = normalizeCustomTypeInput(customTypeInputEl.value);
+      if (!normalized) {
+        setCustomTypeHint("Use letters, numbers, spaces, / or - (max 32 chars).");
+        customTypeInputEl.focus();
+        return;
+      }
+      const exists = customEventTypes.some(
+        (entry) => entry.toLowerCase() === normalized.toLowerCase(),
+      );
+      if (exists) {
+        setCustomTypeHint("That type already exists.");
+        return;
+      }
+      customEventTypes = [...customEventTypes, normalized];
+      customTypeInputEl.value = "";
+      setCustomTypeHint("Added.");
+      renderCustomTypeList();
+      renderMiscMenu();
+      void saveBabySettings({ custom_event_types: customEventTypes });
+    };
+    customTypeAddBtn.addEventListener("click", handleAdd);
+    customTypeInputEl.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        handleAdd();
+      }
+    });
+  }
   if (settingsFormEl) {
     settingsFormEl.addEventListener("submit", (event) => {
       event.preventDefault();
@@ -279,6 +413,7 @@ function applyUserState() {
   }
   toggleDisabled(feedBtn, !userValid);
   toggleDisabled(nappyBtn, !userValid);
+  toggleDisabled(miscBtn, !userValid || customEventTypes.length === 0);
   toggleDisabled(pooBtn, !userValid);
   toggleDisabled(weeBtn, !userValid);
   toggleDisabled(refreshBtn, !userValid);
@@ -390,7 +525,47 @@ function toggleNappyMenu() {
   if (nappyMenu.classList.contains("open")) {
     closeNappyMenu();
   } else {
+    closeMiscMenu();
     openNappyMenu();
+  }
+}
+
+function openMiscMenu() {
+  if (!miscMenu || !miscBtn) {
+    return;
+  }
+  if (!customEventTypes.length) {
+    return;
+  }
+  miscMenu.classList.add("open");
+  miscMenu.setAttribute("aria-hidden", "false");
+  miscBtn.setAttribute("aria-expanded", "true");
+  if (miscBackdrop) {
+    miscBackdrop.classList.add("open");
+  }
+}
+
+function closeMiscMenu() {
+  if (!miscMenu || !miscBtn) {
+    return;
+  }
+  miscMenu.classList.remove("open");
+  miscMenu.setAttribute("aria-hidden", "true");
+  miscBtn.setAttribute("aria-expanded", "false");
+  if (miscBackdrop) {
+    miscBackdrop.classList.remove("open");
+  }
+}
+
+function toggleMiscMenu() {
+  if (!miscMenu) {
+    return;
+  }
+  if (miscMenu.classList.contains("open")) {
+    closeMiscMenu();
+  } else {
+    closeNappyMenu();
+    openMiscMenu();
   }
 }
 
@@ -635,6 +810,9 @@ function renderChart(entries, windowBounds) {
   entries.forEach((entry) => {
     const timestamp = new Date(entry.timestamp_utc);
     if (Number.isNaN(timestamp.getTime())) {
+      return;
+    }
+    if (!["feed", "poo", "wee"].includes(entry.type)) {
       return;
     }
     const ratio = (timestamp.getTime() - startMs) / spanMs;
@@ -949,7 +1127,7 @@ async function addEntry(type) {
 }
 
 async function editEntry(entry) {
-  const rawType = window.prompt("Type (feed, poo, or wee)", entry.type);
+  const rawType = window.prompt("Type", entry.type);
   if (!rawType) {
     return;
   }
@@ -1135,6 +1313,9 @@ async function loadBabySettings() {
     feedIntervalMinutes = Number.isInteger(data.feed_interval_min)
       ? data.feed_interval_min
       : null;
+    customEventTypes = Array.isArray(data.custom_event_types)
+      ? data.custom_event_types
+      : [];
     if (dobInputEl) {
       dobInputEl.value = babyDob || "";
     }
@@ -1143,6 +1324,7 @@ async function loadBabySettings() {
         ? String(feedIntervalMinutes / 60)
         : "";
     }
+    applyCustomEventTypes();
     updateAgeDisplay();
     updateNextFeed();
   } catch (err) {
@@ -1165,6 +1347,10 @@ async function saveBabySettings(patch) {
     feedIntervalMinutes = Number.isInteger(data.feed_interval_min)
       ? data.feed_interval_min
       : null;
+    customEventTypes = Array.isArray(data.custom_event_types)
+      ? data.custom_event_types
+      : [];
+    applyCustomEventTypes();
     updateAgeDisplay();
     updateNextFeed();
   } catch (err) {
