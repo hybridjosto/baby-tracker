@@ -21,6 +21,7 @@ const feedBtn = document.getElementById("log-feed");
 const feedMenu = document.getElementById("feed-menu");
 const feedBackdrop = document.getElementById("feed-backdrop");
 const breastfeedBtn = document.getElementById("log-breastfeed");
+const manualFeedBtn = document.getElementById("log-feed-manual");
 const expressedInput = document.getElementById("expressed-ml");
 const expressedBtn = document.getElementById("log-expressed");
 const formulaInput = document.getElementById("formula-ml");
@@ -380,6 +381,12 @@ function initHomeHandlers() {
   }
   if (breastfeedBtn) {
     breastfeedBtn.addEventListener("click", handleBreastfeedToggle);
+  }
+  if (manualFeedBtn) {
+    manualFeedBtn.addEventListener("click", () => {
+      closeFeedMenu();
+      addEntry("feed");
+    });
   }
   if (expressedBtn) {
     expressedBtn.addEventListener("click", () => {
