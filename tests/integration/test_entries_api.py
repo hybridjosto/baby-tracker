@@ -180,7 +180,7 @@ def test_list_entries_accepts_plus_offset_in_query(client):
 def test_import_csv_entries(client):
     csv_data = (
         "timestamp,type,duration,comment\n"
-        "2024-01-01T01:00:00+00:00,feed,15,first feed\n"
+        "2024-01-01T01:00:00+00:00,feed,15.5,first feed\n"
         "2024-01-02T02:00:00+00:00,wee,,dry\n"
     )
     response = client.post(
@@ -195,7 +195,7 @@ def test_import_csv_entries(client):
     feed_response = client.get("/api/entries?type=feed")
     assert feed_response.status_code == 200
     feed_entries = feed_response.get_json()
-    assert feed_entries[0]["feed_duration_min"] == 15
+    assert feed_entries[0]["feed_duration_min"] == 15.5
     assert feed_entries[0]["notes"] == "first feed"
 
 
