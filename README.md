@@ -13,3 +13,16 @@ cd src
 pytest
 ruff check .
 ```
+
+## Backfill expressed/formula amounts
+If you previously logged expressed/formula amounts in notes, run the one-off script to
+populate `expressed_ml`/`formula_ml` columns (notes are left unchanged).
+
+```sh
+uv run python scripts/backfill_feed_amounts.py
+```
+
+Optional custom DB path:
+```sh
+BABY_TRACKER_DB_PATH=/path/to/db.sqlite uv run python scripts/backfill_feed_amounts.py
+```
