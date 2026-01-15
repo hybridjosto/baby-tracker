@@ -384,8 +384,38 @@ function initHomeHandlers() {
   }
   if (manualFeedBtn) {
     manualFeedBtn.addEventListener("click", () => {
+      if (!userValid) {
+        setStatus("Choose a user below to start logging.");
+        return;
+      }
+      const expressed = parseOptionalMlInput(expressedInput, "Expressed amount");
+      if (!expressed.valid) {
+        return;
+      }
+      const formula = parseOptionalMlInput(formulaInput, "Formula amount");
+      if (!formula.valid) {
+        return;
+      }
+      if (!expressed.hasValue && !formula.hasValue) {
+        closeFeedMenu();
+        addEntry("feed");
+        return;
+      }
+      const payload = buildEntryPayload("feed");
+      if (expressed.hasValue) {
+        payload.expressed_ml = expressed.value;
+      }
+      if (formula.hasValue) {
+        payload.formula_ml = formula.value;
+      }
+      if (expressedInput) {
+        expressedInput.value = "";
+      }
+      if (formulaInput) {
+        formulaInput.value = "";
+      }
       closeFeedMenu();
-      addEntry("feed");
+      void saveEntry(payload);
     });
   }
   if (expressedBtn) {
@@ -1658,6 +1688,22 @@ function parseMlInput(inputEl, label) {
   return ml;
 }
 
+function parseOptionalMlInput(inputEl, label) {
+  if (!inputEl) {
+    return { value: null, hasValue: false, valid: true };
+  }
+  const trimmed = inputEl.value.trim();
+  if (!trimmed) {
+    return { value: null, hasValue: false, valid: true };
+  }
+  const ml = Number.parseFloat(trimmed);
+  if (!Number.isFinite(ml) || ml < 0) {
+    setStatus(`${label} must be a non-negative number`);
+    inputEl.focus();
+    return { value: null, hasValue: true, valid: false };
+  }
+  return { value: ml, hasValue: true, valid: true };
+}
 async function handleBreastfeedToggle() {
   if (!userValid) {
     setStatus("Choose a user below to start logging.");
