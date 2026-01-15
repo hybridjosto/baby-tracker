@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+import math
 import csv
 import io
 import uuid
@@ -142,11 +143,11 @@ def import_entries_csv(db_path: str, user_slug: str, file_storage) -> dict:
             duration = None
             if duration_raw:
                 try:
-                    duration = int(duration_raw)
+                    duration = float(duration_raw)
                 except ValueError as exc:
-                    raise ValueError("duration must be an integer") from exc
-                if duration < 0:
-                    raise ValueError("duration must be a non-negative integer")
+                    raise ValueError("duration must be a number") from exc
+                if not math.isfinite(duration) or duration < 0:
+                    raise ValueError("duration must be a non-negative number")
             comment_raw = (row.get(field_map["comment"]) or "").strip()
             notes = comment_raw or None
         except ValueError as exc:
@@ -209,10 +210,12 @@ def update_entry(db_path: str, entry_id: int, payload: dict) -> dict:
         fields["formula_ml"] = payload["formula_ml"]
     if "feed_duration_min" in payload:
         if payload["feed_duration_min"] is not None and (
-            not isinstance(payload["feed_duration_min"], int)
+            not isinstance(payload["feed_duration_min"], (int, float))
+            or isinstance(payload["feed_duration_min"], bool)
+            or not math.isfinite(payload["feed_duration_min"])
             or payload["feed_duration_min"] < 0
         ):
-            raise ValueError("feed_duration_min must be a non-negative integer")
+            raise ValueError("feed_duration_min must be a non-negative number")
         fields["feed_duration_min"] = payload["feed_duration_min"]
     if "caregiver_id" in payload:
         fields["caregiver_id"] = payload["caregiver_id"]

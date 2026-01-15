@@ -54,7 +54,7 @@ def _ensure_entry_type_constraint(conn: sqlite3.Connection) -> None:
             amount_ml INTEGER,
             expressed_ml INTEGER,
             formula_ml INTEGER,
-            feed_duration_min INTEGER,
+            feed_duration_min REAL,
             caregiver_id INTEGER,
             created_at_utc TEXT NOT NULL,
             updated_at_utc TEXT NOT NULL
@@ -101,7 +101,7 @@ def _ensure_feed_duration_column(conn: sqlite3.Connection) -> None:
         row["name"] for row in conn.execute("PRAGMA table_info(entries)").fetchall()
     }
     if "feed_duration_min" not in columns:
-        conn.execute("ALTER TABLE entries ADD COLUMN feed_duration_min INTEGER")
+        conn.execute("ALTER TABLE entries ADD COLUMN feed_duration_min REAL")
 
 
 def _ensure_feed_amount_columns(conn: sqlite3.Connection) -> None:

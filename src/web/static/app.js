@@ -1379,14 +1379,15 @@ function renderLogEntries(entries) {
     const right = document.createElement("div");
     right.className = "log-actions";
 
-    const amountEl = document.createElement("span");
-    amountEl.className = "entry-meta";
+    const amounts = [];
     if (entry.expressed_ml !== null && entry.expressed_ml !== undefined) {
-      amountEl.textContent = `Expressed ${entry.expressed_ml} ml`;
-    } else if (entry.formula_ml !== null && entry.formula_ml !== undefined) {
-      amountEl.textContent = `Formula ${entry.formula_ml} ml`;
-    } else if (entry.amount_ml !== null && entry.amount_ml !== undefined) {
-      amountEl.textContent = `${entry.amount_ml} ml`;
+      amounts.push({ label: "Expressed", value: entry.expressed_ml });
+    }
+    if (entry.formula_ml !== null && entry.formula_ml !== undefined) {
+      amounts.push({ label: "Formula", value: entry.formula_ml });
+    }
+    if (entry.amount_ml !== null && entry.amount_ml !== undefined) {
+      amounts.push({ label: "Amount", value: entry.amount_ml });
     }
 
     const editBtn = document.createElement("button");
@@ -1401,9 +1402,12 @@ function renderLogEntries(entries) {
     delBtn.textContent = "Delete";
     delBtn.addEventListener("click", () => deleteEntry(entry));
 
-    if (amountEl.textContent) {
+    amounts.forEach(({ label, value }) => {
+      const amountEl = document.createElement("span");
+      amountEl.className = "entry-meta";
+      amountEl.textContent = `${label} ${value} ml`;
       right.appendChild(amountEl);
-    }
+    });
     right.appendChild(editBtn);
     right.appendChild(timeBtn);
     right.appendChild(delBtn);
@@ -1608,8 +1612,8 @@ async function addEntry(type) {
     }
     const trimmed = minutesInput.trim();
     if (trimmed !== "") {
-      const minutes = Number.parseInt(trimmed, 10);
-      if (Number.isNaN(minutes) || minutes < 0) {
+      const minutes = Number.parseFloat(trimmed);
+      if (!Number.isFinite(minutes) || minutes < 0) {
         setStatus("Duration must be a non-negative number");
         return;
       }
@@ -1725,8 +1729,8 @@ async function editEntry(entry) {
     if (trimmed === "") {
       payload.feed_duration_min = null;
     } else {
-      const minutes = Number.parseInt(trimmed, 10);
-      if (Number.isNaN(minutes) || minutes < 0) {
+      const minutes = Number.parseFloat(trimmed);
+      if (!Number.isFinite(minutes) || minutes < 0) {
         setStatus("Duration must be a non-negative number");
         return;
       }

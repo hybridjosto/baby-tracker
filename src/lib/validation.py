@@ -1,7 +1,17 @@
+import math
 import re
 
 USER_SLUG_RE = re.compile(r"^[a-z0-9-]{1,24}$")
 ENTRY_TYPE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 /-]{0,31}$")
+
+
+def _is_non_negative_number(value: object) -> bool:
+    return (
+        isinstance(value, (int, float))
+        and not isinstance(value, bool)
+        and math.isfinite(value)
+        and value >= 0
+    )
 
 
 def validate_entry_type(value: str) -> None:
@@ -35,11 +45,8 @@ def validate_entry_payload(payload: dict, require_client_event: bool = False) ->
             raise ValueError("formula_ml must be a non-negative integer")
 
     if "feed_duration_min" in payload and payload["feed_duration_min"] is not None:
-        if (
-            not isinstance(payload["feed_duration_min"], int)
-            or payload["feed_duration_min"] < 0
-        ):
-            raise ValueError("feed_duration_min must be a non-negative integer")
+        if not _is_non_negative_number(payload["feed_duration_min"]):
+            raise ValueError("feed_duration_min must be a non-negative number")
 
     if "notes" in payload and payload["notes"] is not None:
         if not isinstance(payload["notes"], str):
