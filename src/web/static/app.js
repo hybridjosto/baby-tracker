@@ -1642,8 +1642,8 @@ function parseMlInput(inputEl, label) {
     inputEl.focus();
     return null;
   }
-  const ml = Number.parseInt(trimmed, 10);
-  if (Number.isNaN(ml) || ml < 0) {
+  const ml = Number.parseFloat(trimmed);
+  if (!Number.isFinite(ml) || ml < 0) {
     setStatus("Amount must be a non-negative number");
     inputEl.focus();
     return null;
@@ -1748,8 +1748,8 @@ async function editEntry(entry) {
     if (trimmedExpressed === "") {
       payload.expressed_ml = null;
     } else {
-      const amount = Number.parseInt(trimmedExpressed, 10);
-      if (Number.isNaN(amount) || amount < 0) {
+      const amount = Number.parseFloat(trimmedExpressed);
+      if (!Number.isFinite(amount) || amount < 0) {
         setStatus("Amount must be a non-negative number");
         return;
       }
@@ -1767,8 +1767,8 @@ async function editEntry(entry) {
     if (trimmedFormula === "") {
       payload.formula_ml = null;
     } else {
-      const amount = Number.parseInt(trimmedFormula, 10);
-      if (Number.isNaN(amount) || amount < 0) {
+      const amount = Number.parseFloat(trimmedFormula);
+      if (!Number.isFinite(amount) || amount < 0) {
         setStatus("Amount must be a non-negative number");
         return;
       }
