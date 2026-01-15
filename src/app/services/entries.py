@@ -193,20 +193,31 @@ def update_entry(db_path: str, entry_id: int, payload: dict) -> dict:
     if "notes" in payload:
         fields["notes"] = payload["notes"]
     if "amount_ml" in payload:
+        if payload["amount_ml"] is not None and (
+            not isinstance(payload["amount_ml"], (int, float))
+            or isinstance(payload["amount_ml"], bool)
+            or not math.isfinite(payload["amount_ml"])
+            or payload["amount_ml"] < 0
+        ):
+            raise ValueError("amount_ml must be a non-negative number")
         fields["amount_ml"] = payload["amount_ml"]
     if "expressed_ml" in payload:
         if payload["expressed_ml"] is not None and (
-            not isinstance(payload["expressed_ml"], int)
+            not isinstance(payload["expressed_ml"], (int, float))
+            or isinstance(payload["expressed_ml"], bool)
+            or not math.isfinite(payload["expressed_ml"])
             or payload["expressed_ml"] < 0
         ):
-            raise ValueError("expressed_ml must be a non-negative integer")
+            raise ValueError("expressed_ml must be a non-negative number")
         fields["expressed_ml"] = payload["expressed_ml"]
     if "formula_ml" in payload:
         if payload["formula_ml"] is not None and (
-            not isinstance(payload["formula_ml"], int)
+            not isinstance(payload["formula_ml"], (int, float))
+            or isinstance(payload["formula_ml"], bool)
+            or not math.isfinite(payload["formula_ml"])
             or payload["formula_ml"] < 0
         ):
-            raise ValueError("formula_ml must be a non-negative integer")
+            raise ValueError("formula_ml must be a non-negative number")
         fields["formula_ml"] = payload["formula_ml"]
     if "feed_duration_min" in payload:
         if payload["feed_duration_min"] is not None and (

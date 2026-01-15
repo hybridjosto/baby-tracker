@@ -51,9 +51,9 @@ def _ensure_entry_type_constraint(conn: sqlite3.Connection) -> None:
             timestamp_utc TEXT NOT NULL,
             client_event_id TEXT NOT NULL UNIQUE,
             notes TEXT,
-            amount_ml INTEGER,
-            expressed_ml INTEGER,
-            formula_ml INTEGER,
+            amount_ml REAL,
+            expressed_ml REAL,
+            formula_ml REAL,
             feed_duration_min REAL,
             caregiver_id INTEGER,
             created_at_utc TEXT NOT NULL,
@@ -109,9 +109,9 @@ def _ensure_feed_amount_columns(conn: sqlite3.Connection) -> None:
         row["name"] for row in conn.execute("PRAGMA table_info(entries)").fetchall()
     }
     if "expressed_ml" not in columns:
-        conn.execute("ALTER TABLE entries ADD COLUMN expressed_ml INTEGER")
+        conn.execute("ALTER TABLE entries ADD COLUMN expressed_ml REAL")
     if "formula_ml" not in columns:
-        conn.execute("ALTER TABLE entries ADD COLUMN formula_ml INTEGER")
+        conn.execute("ALTER TABLE entries ADD COLUMN formula_ml REAL")
 
 
 def _ensure_settings_table(conn: sqlite3.Connection) -> None:
