@@ -1382,7 +1382,11 @@ function renderLogEntries(entries) {
 
   entries.forEach((entry) => {
     const item = document.createElement("li");
+    item.className = "log-entry";
     const left = document.createElement("div");
+    left.className = "entry-main";
+    const header = document.createElement("div");
+    header.className = "entry-header";
     const typeEl = document.createElement("div");
     typeEl.className = "entry-type";
     typeEl.textContent = entry.type;
@@ -1397,35 +1401,47 @@ function renderLogEntries(entries) {
       ? `Logged by ${entry.user_slug}`
       : "Logged by --";
 
-    left.appendChild(typeEl);
-    left.appendChild(timeEl);
-    left.appendChild(byEl);
-    if (entry.notes) {
-      const notesEl = document.createElement("div");
-      notesEl.className = "entry-meta";
-      notesEl.textContent = entry.notes;
-      left.appendChild(notesEl);
+    header.appendChild(typeEl);
+    header.appendChild(timeEl);
+    header.appendChild(byEl);
+    left.appendChild(header);
+
+    const details = document.createElement("div");
+    details.className = "entry-details";
+    const addDetail = (label, value, suffix) => {
+      const detailEl = document.createElement("span");
+      detailEl.className = "entry-meta";
+      detailEl.textContent = `${label} ${value}${suffix}`;
+      details.appendChild(detailEl);
+    };
+    if (entry.type === "feed") {
+      addDetail(
+        "Duration",
+        entry.feed_duration_min ?? 0,
+        " min",
+      );
+      addDetail(
+        "Expressed",
+        entry.expressed_ml ?? 0,
+        " ml",
+      );
+      addDetail(
+        "Formula",
+        entry.formula_ml ?? 0,
+        " ml",
+      );
+      if (entry.amount_ml !== null && entry.amount_ml !== undefined) {
+        addDetail("Amount", entry.amount_ml, " ml");
+      }
+    } else if (entry.amount_ml !== null && entry.amount_ml !== undefined) {
+      addDetail("Amount", entry.amount_ml, " ml");
     }
-    if (entry.feed_duration_min !== null && entry.feed_duration_min !== undefined) {
-      const durationEl = document.createElement("div");
-      durationEl.className = "entry-meta";
-      durationEl.textContent = `Duration ${entry.feed_duration_min} min`;
-      left.appendChild(durationEl);
+    if (details.children.length) {
+      left.appendChild(details);
     }
 
     const right = document.createElement("div");
     right.className = "log-actions";
-
-    const amounts = [];
-    if (entry.expressed_ml !== null && entry.expressed_ml !== undefined) {
-      amounts.push({ label: "Expressed", value: entry.expressed_ml });
-    }
-    if (entry.formula_ml !== null && entry.formula_ml !== undefined) {
-      amounts.push({ label: "Formula", value: entry.formula_ml });
-    }
-    if (entry.amount_ml !== null && entry.amount_ml !== undefined) {
-      amounts.push({ label: "Amount", value: entry.amount_ml });
-    }
 
     const editBtn = document.createElement("button");
     editBtn.textContent = "Edit";
@@ -1439,17 +1455,17 @@ function renderLogEntries(entries) {
     delBtn.textContent = "Delete";
     delBtn.addEventListener("click", () => deleteEntry(entry));
 
-    amounts.forEach(({ label, value }) => {
-      const amountEl = document.createElement("span");
-      amountEl.className = "entry-meta";
-      amountEl.textContent = `${label} ${value} ml`;
-      right.appendChild(amountEl);
-    });
     right.appendChild(editBtn);
     right.appendChild(timeBtn);
     right.appendChild(delBtn);
     item.appendChild(left);
     item.appendChild(right);
+    if (entry.notes) {
+      const notesEl = document.createElement("div");
+      notesEl.className = "entry-notes";
+      notesEl.textContent = entry.notes;
+      item.appendChild(notesEl);
+    }
     logListEl.appendChild(item);
   });
 }
