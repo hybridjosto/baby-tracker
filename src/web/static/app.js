@@ -8,6 +8,7 @@ const logWindowHours = Number.parseInt(bodyEl.dataset.logWindowHours || "", 10);
 
 const THEME_KEY = "baby-tracker-theme";
 const USER_KEY = "baby-tracker-user";
+const BREASTFEED_TIMER_KEY = "baby-tracker-breastfeed-start";
 const USER_RE = /^[a-z0-9-]{1,24}$/;
 const themeToggleBtn = document.getElementById("theme-toggle");
 const userFormEl = document.getElementById("user-form");
@@ -17,6 +18,13 @@ const userMessageEl = document.getElementById("today-label")
 const userChipEl = document.getElementById("user-chip");
 
 const feedBtn = document.getElementById("log-feed");
+const feedMenu = document.getElementById("feed-menu");
+const feedBackdrop = document.getElementById("feed-backdrop");
+const breastfeedBtn = document.getElementById("log-breastfeed");
+const expressedInput = document.getElementById("expressed-ml");
+const expressedBtn = document.getElementById("log-expressed");
+const formulaInput = document.getElementById("formula-ml");
+const formulaBtn = document.getElementById("log-formula");
 const nappyBtn = document.getElementById("log-nappy");
 const pooBtn = document.getElementById("log-poo");
 const weeBtn = document.getElementById("log-wee");
@@ -138,6 +146,60 @@ function normalizeUserSlug(value) {
 
 function getFeedIntervalMinutes() {
   return feedIntervalMinutes;
+}
+
+function getBreastfeedStorageKey() {
+  if (!activeUser) {
+    return null;
+  }
+  return `${BREASTFEED_TIMER_KEY}:${activeUser}`;
+}
+
+function getBreastfeedStart() {
+  const key = getBreastfeedStorageKey();
+  if (!key) {
+    return null;
+  }
+  const raw = window.localStorage.getItem(key);
+  if (!raw) {
+    return null;
+  }
+  const start = new Date(raw);
+  if (Number.isNaN(start.getTime())) {
+    window.localStorage.removeItem(key);
+    return null;
+  }
+  return start;
+}
+
+function setBreastfeedStart(start) {
+  const key = getBreastfeedStorageKey();
+  if (!key) {
+    return;
+  }
+  window.localStorage.setItem(key, start.toISOString());
+}
+
+function clearBreastfeedStart() {
+  const key = getBreastfeedStorageKey();
+  if (!key) {
+    return;
+  }
+  window.localStorage.removeItem(key);
+}
+
+function updateBreastfeedButton() {
+  if (!breastfeedBtn) {
+    return;
+  }
+  const start = getBreastfeedStart();
+  if (start) {
+    breastfeedBtn.textContent = "End breastfed";
+    breastfeedBtn.title = `Started ${formatTimestamp(start.toISOString())}`;
+  } else {
+    breastfeedBtn.textContent = "Start breastfed";
+    breastfeedBtn.removeAttribute("title");
+  }
 }
 
 function parseDob(value) {
@@ -314,7 +376,36 @@ function initHomeHandlers() {
   bindTimestampPopup(lastWeeEl);
   bindTimestampPopup(lastPooEl);
   if (feedBtn) {
-    feedBtn.addEventListener("click", () => addEntry("feed"));
+    feedBtn.addEventListener("click", toggleFeedMenu);
+  }
+  if (breastfeedBtn) {
+    breastfeedBtn.addEventListener("click", handleBreastfeedToggle);
+  }
+  if (expressedBtn) {
+    expressedBtn.addEventListener("click", () => {
+      void handleMlEntry(expressedInput, "Expressed");
+    });
+  }
+  if (formulaBtn) {
+    formulaBtn.addEventListener("click", () => {
+      void handleMlEntry(formulaInput, "Formula");
+    });
+  }
+  if (expressedInput) {
+    expressedInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        void handleMlEntry(expressedInput, "Expressed");
+      }
+    });
+  }
+  if (formulaInput) {
+    formulaInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        void handleMlEntry(formulaInput, "Formula");
+      }
+    });
   }
   if (nappyBtn) {
     nappyBtn.addEventListener("click", toggleNappyMenu);
@@ -340,10 +431,14 @@ function initHomeHandlers() {
   if (miscBackdrop) {
     miscBackdrop.addEventListener("click", closeMiscMenu);
   }
+  if (feedBackdrop) {
+    feedBackdrop.addEventListener("click", closeFeedMenu);
+  }
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
       closeNappyMenu();
       closeMiscMenu();
+      closeFeedMenu();
     }
   });
   if (!nextFeedTimer) {
@@ -511,10 +606,12 @@ function applyUserState() {
   });
   initLinks();
   updateUserDisplay();
+  updateBreastfeedButton();
   if (userFormEl) {
     userFormEl.hidden = userValid;
   }
   if (!userValid) {
+    closeFeedMenu();
     setStatus("Choose a user below to start logging.");
     return;
   }
@@ -617,6 +714,7 @@ function toggleNappyMenu() {
   if (nappyMenu.classList.contains("open")) {
     closeNappyMenu();
   } else {
+    closeFeedMenu();
     closeMiscMenu();
     openNappyMenu();
   }
@@ -656,8 +754,47 @@ function toggleMiscMenu() {
   if (miscMenu.classList.contains("open")) {
     closeMiscMenu();
   } else {
+    closeFeedMenu();
     closeNappyMenu();
     openMiscMenu();
+  }
+}
+
+function openFeedMenu() {
+  if (!feedMenu || !feedBtn || !userValid) {
+    return;
+  }
+  feedMenu.classList.add("open");
+  feedMenu.setAttribute("aria-hidden", "false");
+  feedBtn.setAttribute("aria-expanded", "true");
+  if (feedBackdrop) {
+    feedBackdrop.classList.add("open");
+  }
+  updateBreastfeedButton();
+}
+
+function closeFeedMenu() {
+  if (!feedMenu || !feedBtn) {
+    return;
+  }
+  feedMenu.classList.remove("open");
+  feedMenu.setAttribute("aria-hidden", "true");
+  feedBtn.setAttribute("aria-expanded", "false");
+  if (feedBackdrop) {
+    feedBackdrop.classList.remove("open");
+  }
+}
+
+function toggleFeedMenu() {
+  if (!feedMenu) {
+    return;
+  }
+  if (feedMenu.classList.contains("open")) {
+    closeFeedMenu();
+  } else {
+    closeNappyMenu();
+    closeMiscMenu();
+    openFeedMenu();
   }
 }
 
@@ -1244,7 +1381,11 @@ function renderLogEntries(entries) {
 
     const amountEl = document.createElement("span");
     amountEl.className = "entry-meta";
-    if (entry.amount_ml) {
+    if (entry.expressed_ml !== null && entry.expressed_ml !== undefined) {
+      amountEl.textContent = `Expressed ${entry.expressed_ml} ml`;
+    } else if (entry.formula_ml !== null && entry.formula_ml !== undefined) {
+      amountEl.textContent = `Formula ${entry.formula_ml} ml`;
+    } else if (entry.amount_ml !== null && entry.amount_ml !== undefined) {
       amountEl.textContent = `${entry.amount_ml} ml`;
     }
 
@@ -1407,13 +1548,58 @@ function bindStatCardNavigation() {
   });
 }
 
-async function addEntry(type) {
-  setStatus("Saving...");
-  const payload = {
+function buildEntryPayload(type) {
+  return {
     type,
     timestamp_utc: new Date().toISOString(),
     client_event_id: generateId(),
   };
+}
+
+async function saveEntry(payload) {
+  setStatus("Saving...");
+  try {
+    const response = await fetch(`/api/users/${activeUser}/entries`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    if (response.status === 409) {
+      setStatus("Already saved (duplicate tap)");
+      if (pageType === "log") {
+        await loadLogEntries();
+      } else {
+        await loadHomeEntries();
+      }
+      return;
+    }
+
+    if (!response.ok) {
+      let detail = "";
+      try {
+        const err = await response.json();
+        detail = err.error || JSON.stringify(err);
+      } catch (parseError) {
+        detail = await response.text();
+      }
+      setStatus(`Error: ${detail || response.status}`);
+      return;
+    }
+
+    setStatus("Saved");
+    if (pageType === "log") {
+      await loadLogEntries();
+    } else {
+      await loadHomeEntries();
+    }
+  } catch (err) {
+    setStatus("Error: network issue saving entry");
+  }
+}
+
+async function addEntry(type) {
+  const payload = buildEntryPayload(type);
   if (type === "feed") {
     const minutesInput = window.prompt("Feed duration (minutes)", "");
     if (minutesInput === null) {
@@ -1439,36 +1625,74 @@ async function addEntry(type) {
   if (trimmedNote) {
     payload.notes = trimmedNote;
   }
-  try {
-    const response = await fetch(`/api/users/${activeUser}/entries`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+  await saveEntry(payload);
+}
 
-    if (response.status === 409) {
-      setStatus("Already saved (duplicate tap)");
-      await loadHomeEntries();
-      return;
-    }
-
-    if (!response.ok) {
-      let detail = "";
-      try {
-        const err = await response.json();
-        detail = err.error || JSON.stringify(err);
-      } catch (parseError) {
-        detail = await response.text();
-      }
-      setStatus(`Error: ${detail || response.status}`);
-      return;
-    }
-
-    setStatus("Saved");
-    await loadHomeEntries();
-  } catch (err) {
-    setStatus("Error: network issue saving entry");
+function parseMlInput(inputEl, label) {
+  if (!inputEl) {
+    return null;
   }
+  const trimmed = inputEl.value.trim();
+  if (!trimmed) {
+    setStatus(`Enter ${label} amount.`);
+    inputEl.focus();
+    return null;
+  }
+  const ml = Number.parseInt(trimmed, 10);
+  if (Number.isNaN(ml) || ml < 0) {
+    setStatus("Amount must be a non-negative number");
+    inputEl.focus();
+    return null;
+  }
+  return ml;
+}
+
+async function handleBreastfeedToggle() {
+  if (!userValid) {
+    setStatus("Choose a user below to start logging.");
+    return;
+  }
+  const start = getBreastfeedStart();
+  if (!start) {
+    setBreastfeedStart(new Date());
+    updateBreastfeedButton();
+    closeFeedMenu();
+    setStatus("Breastfeed started");
+    return;
+  }
+  const now = new Date();
+  const durationMinutes = Math.max(0, Math.round((now - start) / 60000));
+  clearBreastfeedStart();
+  updateBreastfeedButton();
+  closeFeedMenu();
+  const payload = buildEntryPayload("feed");
+  payload.feed_duration_min = durationMinutes;
+  payload.notes = "Breastfed";
+  await saveEntry(payload);
+}
+
+async function handleMlEntry(inputEl, label) {
+  if (!userValid) {
+    setStatus("Choose a user below to start logging.");
+    return;
+  }
+  const ml = parseMlInput(inputEl, label);
+  if (ml === null) {
+    return;
+  }
+  const payload = buildEntryPayload("feed");
+  if (label === "Expressed") {
+    payload.expressed_ml = ml;
+  } else if (label === "Formula") {
+    payload.formula_ml = ml;
+  } else {
+    payload.amount_ml = ml;
+  }
+  if (inputEl) {
+    inputEl.value = "";
+  }
+  closeFeedMenu();
+  await saveEntry(payload);
 }
 
 async function editEntry(entry) {
@@ -1508,8 +1732,54 @@ async function editEntry(entry) {
       }
       payload.feed_duration_min = minutes;
     }
+    const currentExpressed =
+      entry.expressed_ml !== null && entry.expressed_ml !== undefined
+        ? String(entry.expressed_ml)
+        : "";
+    const expressedInput = window.prompt("Expressed amount (ml)", currentExpressed);
+    if (expressedInput === null) {
+      return;
+    }
+    const trimmedExpressed = expressedInput.trim();
+    if (trimmedExpressed === "") {
+      payload.expressed_ml = null;
+    } else {
+      const amount = Number.parseInt(trimmedExpressed, 10);
+      if (Number.isNaN(amount) || amount < 0) {
+        setStatus("Amount must be a non-negative number");
+        return;
+      }
+      payload.expressed_ml = amount;
+    }
+    const currentFormula =
+      entry.formula_ml !== null && entry.formula_ml !== undefined
+        ? String(entry.formula_ml)
+        : "";
+    const formulaInput = window.prompt("Formula amount (ml)", currentFormula);
+    if (formulaInput === null) {
+      return;
+    }
+    const trimmedFormula = formulaInput.trim();
+    if (trimmedFormula === "") {
+      payload.formula_ml = null;
+    } else {
+      const amount = Number.parseInt(trimmedFormula, 10);
+      if (Number.isNaN(amount) || amount < 0) {
+        setStatus("Amount must be a non-negative number");
+        return;
+      }
+      payload.formula_ml = amount;
+    }
   } else if (entry.feed_duration_min !== null && entry.feed_duration_min !== undefined) {
     payload.feed_duration_min = null;
+  }
+  if (nextType !== "feed") {
+    if (entry.expressed_ml !== null && entry.expressed_ml !== undefined) {
+      payload.expressed_ml = null;
+    }
+    if (entry.formula_ml !== null && entry.formula_ml !== undefined) {
+      payload.formula_ml = null;
+    }
   }
   const currentNote = entry.notes ?? "";
   const noteInput = window.prompt("Comment (optional)", String(currentNote));

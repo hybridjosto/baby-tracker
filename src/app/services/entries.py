@@ -193,6 +193,20 @@ def update_entry(db_path: str, entry_id: int, payload: dict) -> dict:
         fields["notes"] = payload["notes"]
     if "amount_ml" in payload:
         fields["amount_ml"] = payload["amount_ml"]
+    if "expressed_ml" in payload:
+        if payload["expressed_ml"] is not None and (
+            not isinstance(payload["expressed_ml"], int)
+            or payload["expressed_ml"] < 0
+        ):
+            raise ValueError("expressed_ml must be a non-negative integer")
+        fields["expressed_ml"] = payload["expressed_ml"]
+    if "formula_ml" in payload:
+        if payload["formula_ml"] is not None and (
+            not isinstance(payload["formula_ml"], int)
+            or payload["formula_ml"] < 0
+        ):
+            raise ValueError("formula_ml must be a non-negative integer")
+        fields["formula_ml"] = payload["formula_ml"]
     if "feed_duration_min" in payload:
         if payload["feed_duration_min"] is not None and (
             not isinstance(payload["feed_duration_min"], int)

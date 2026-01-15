@@ -26,6 +26,14 @@ def validate_entry_payload(payload: dict, require_client_event: bool = False) ->
         if not isinstance(payload["amount_ml"], int) or payload["amount_ml"] < 0:
             raise ValueError("amount_ml must be a non-negative integer")
 
+    if "expressed_ml" in payload and payload["expressed_ml"] is not None:
+        if not isinstance(payload["expressed_ml"], int) or payload["expressed_ml"] < 0:
+            raise ValueError("expressed_ml must be a non-negative integer")
+
+    if "formula_ml" in payload and payload["formula_ml"] is not None:
+        if not isinstance(payload["formula_ml"], int) or payload["formula_ml"] < 0:
+            raise ValueError("formula_ml must be a non-negative integer")
+
     if "feed_duration_min" in payload and payload["feed_duration_min"] is not None:
         if (
             not isinstance(payload["feed_duration_min"], int)

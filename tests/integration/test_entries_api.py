@@ -119,13 +119,21 @@ def test_update_entry_success(client):
 
     response = client.patch(
         f"/api/entries/{created['id']}",
-        json={"type": "poo", "notes": "Changed", "amount_ml": 120},
+        json={
+            "type": "poo",
+            "notes": "Changed",
+            "amount_ml": 120,
+            "expressed_ml": 80,
+            "formula_ml": 60,
+        },
     )
     assert response.status_code == 200
     payload = response.get_json()
     assert payload["type"] == "poo"
     assert payload["notes"] == "Changed"
     assert payload["amount_ml"] == 120
+    assert payload["expressed_ml"] == 80
+    assert payload["formula_ml"] == 60
 
 
 def test_update_entry_missing_returns_404(client):
