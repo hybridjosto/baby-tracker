@@ -13,11 +13,13 @@ def create_entry(conn: sqlite3.Connection, payload: dict) -> tuple[dict, bool]:
                 client_event_id,
                 notes,
                 amount_ml,
+                expressed_ml,
+                formula_ml,
                 feed_duration_min,
                 caregiver_id,
                 created_at_utc,
                 updated_at_utc
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 payload["user_slug"],
@@ -26,6 +28,8 @@ def create_entry(conn: sqlite3.Connection, payload: dict) -> tuple[dict, bool]:
                 payload["client_event_id"],
                 payload.get("notes"),
                 payload.get("amount_ml"),
+                payload.get("expressed_ml"),
+                payload.get("formula_ml"),
                 payload.get("feed_duration_min"),
                 payload.get("caregiver_id"),
                 payload["created_at_utc"],
@@ -67,7 +71,8 @@ def list_entries(
     cursor = conn.execute(
         f"""
         SELECT id, user_slug, type, timestamp_utc, client_event_id, notes, amount_ml,
-               feed_duration_min, caregiver_id, created_at_utc, updated_at_utc
+               expressed_ml, formula_ml, feed_duration_min, caregiver_id,
+               created_at_utc, updated_at_utc
         FROM entries
         {where}
         ORDER BY timestamp_utc DESC
@@ -82,7 +87,8 @@ def get_entry(conn: sqlite3.Connection, entry_id: int) -> Optional[dict]:
     cursor = conn.execute(
         """
         SELECT id, user_slug, type, timestamp_utc, client_event_id, notes, amount_ml,
-               feed_duration_min, caregiver_id, created_at_utc, updated_at_utc
+               expressed_ml, formula_ml, feed_duration_min, caregiver_id,
+               created_at_utc, updated_at_utc
         FROM entries
         WHERE id = ?
         """,
@@ -98,7 +104,8 @@ def get_entry_by_client_event_id(
     cursor = conn.execute(
         """
         SELECT id, user_slug, type, timestamp_utc, client_event_id, notes, amount_ml,
-               feed_duration_min, caregiver_id, created_at_utc, updated_at_utc
+               expressed_ml, formula_ml, feed_duration_min, caregiver_id,
+               created_at_utc, updated_at_utc
         FROM entries
         WHERE client_event_id = ?
         """,
@@ -116,6 +123,8 @@ def update_entry(conn: sqlite3.Connection, entry_id: int, fields: dict) -> Optio
         "timestamp_utc",
         "notes",
         "amount_ml",
+        "expressed_ml",
+        "formula_ml",
         "feed_duration_min",
         "caregiver_id",
         "updated_at_utc",

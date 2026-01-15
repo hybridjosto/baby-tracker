@@ -412,10 +412,18 @@
         width: 100%;
         height: 100%;
       }
+      .feed-wrap {
+        position: relative;
+        width: 100%;
+        height: 100%;
+      }
       .nappy-wrap .action-btn {
         width: 100%;
       }
       .misc-wrap .action-btn {
+        width: 100%;
+      }
+      .feed-wrap .action-btn {
         width: 100%;
       }
       .nappy-backdrop {
@@ -441,6 +449,19 @@
         z-index: 9;
       }
       .misc-backdrop.open {
+        opacity: 1;
+        pointer-events: auto;
+      }
+      .feed-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(10, 20, 12, 0.15);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.2s ease;
+        z-index: 9;
+      }
+      .feed-backdrop.open {
         opacity: 1;
         pointer-events: auto;
       }
@@ -489,6 +510,78 @@
       }
       .misc-menu.open {
         display: grid;
+      }
+      .feed-menu {
+        position: absolute;
+        bottom: calc(var(--action-height) + 12px);
+        left: 50%;
+        transform: translateX(-50%);
+        display: none;
+        grid-template-columns: 1fr;
+        gap: 10px;
+        padding: 12px;
+        min-width: 220px;
+        background: #f2f6f3;
+        border: 1px solid #d6ded8;
+        border-radius: 18px;
+        box-shadow: 0 12px 24px rgba(0, 0, 0, 0.2);
+        z-index: 12;
+      }
+      html.dark .feed-menu {
+        background: #18231c;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      .feed-menu.open {
+        display: grid;
+      }
+      .feed-option {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        height: 44px;
+        border-radius: 14px;
+        border: 1px solid transparent;
+        background: rgba(230, 238, 232, 0.9);
+        color: #1b2b1f;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      html.dark .feed-option {
+        background: rgba(32, 46, 36, 0.9);
+        color: #d9eee0;
+      }
+      .feed-input {
+        display: grid;
+        gap: 6px;
+      }
+      .feed-input label {
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: #3c5a43;
+      }
+      html.dark .feed-input label {
+        color: #9fc3a7;
+      }
+      .feed-input-row {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 8px;
+        align-items: center;
+      }
+      .feed-input-field {
+        height: 40px;
+        padding: 0 12px;
+        border-radius: 12px;
+        border: 1px solid #c9d6cd;
+        background: rgba(255, 255, 255, 0.9);
+        color: #1b2b1f;
+        font-weight: 600;
+      }
+      html.dark .feed-input-field {
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: rgba(16, 26, 20, 0.9);
+        color: #d9eee0;
       }
       .nappy-option {
         display: flex;
@@ -626,6 +719,7 @@
 
       <div class="nappy-backdrop" id="nappy-backdrop" aria-hidden="true"></div>
       <div class="misc-backdrop" id="misc-backdrop" aria-hidden="true"></div>
+      <div class="feed-backdrop" id="feed-backdrop" aria-hidden="true"></div>
       <div class="bottom-bar">
         <div class="last-activity">
           <span class="material-symbols-outlined" style="font-size: 16px;">schedule</span>
@@ -655,10 +749,45 @@
             </button>
             <div class="misc-menu" id="misc-menu" aria-hidden="true"></div>
           </div>
-          <button class="action-btn primary" id="log-feed" type="button">
-            <span class="material-symbols-outlined" style="color: var(--primary); font-size: 30px;">water_drop</span>
-            Feed
-          </button>
+          <div class="feed-wrap">
+            <button class="action-btn primary" id="log-feed" type="button" aria-expanded="false">
+              <span class="material-symbols-outlined" style="color: var(--primary); font-size: 30px;">water_drop</span>
+              Feed
+            </button>
+            <div class="feed-menu" id="feed-menu" aria-hidden="true">
+              <button class="feed-option" id="log-breastfeed" type="button">Start breastfed</button>
+              <div class="feed-input">
+                <label for="expressed-ml">Expressed (ml)</label>
+                <div class="feed-input-row">
+                  <input
+                    class="feed-input-field"
+                    id="expressed-ml"
+                    type="number"
+                    min="0"
+                    step="5"
+                    inputmode="numeric"
+                    placeholder="0"
+                  >
+                  <button class="feed-option" id="log-expressed" type="button">Log</button>
+                </div>
+              </div>
+              <div class="feed-input">
+                <label for="formula-ml">Formula (ml)</label>
+                <div class="feed-input-row">
+                  <input
+                    class="feed-input-field"
+                    id="formula-ml"
+                    type="number"
+                    min="0"
+                    step="5"
+                    inputmode="numeric"
+                    placeholder="0"
+                  >
+                  <button class="feed-option" id="log-formula" type="button">Log</button>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

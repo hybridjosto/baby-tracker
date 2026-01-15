@@ -23,6 +23,7 @@ def init_db(db_path: str) -> None:
         _ensure_entry_type_constraint(conn)
         _ensure_user_slug_column(conn)
         _ensure_feed_duration_column(conn)
+        _ensure_feed_amount_columns(conn)
         _ensure_settings_table(conn)
         _ensure_reminders_table(conn)
         _ensure_default_reminders(conn)
@@ -51,6 +52,8 @@ def _ensure_entry_type_constraint(conn: sqlite3.Connection) -> None:
             client_event_id TEXT NOT NULL UNIQUE,
             notes TEXT,
             amount_ml INTEGER,
+            expressed_ml INTEGER,
+            formula_ml INTEGER,
             feed_duration_min INTEGER,
             caregiver_id INTEGER,
             created_at_utc TEXT NOT NULL,
@@ -99,6 +102,16 @@ def _ensure_feed_duration_column(conn: sqlite3.Connection) -> None:
     }
     if "feed_duration_min" not in columns:
         conn.execute("ALTER TABLE entries ADD COLUMN feed_duration_min INTEGER")
+
+
+def _ensure_feed_amount_columns(conn: sqlite3.Connection) -> None:
+    columns = {
+        row["name"] for row in conn.execute("PRAGMA table_info(entries)").fetchall()
+    }
+    if "expressed_ml" not in columns:
+        conn.execute("ALTER TABLE entries ADD COLUMN expressed_ml INTEGER")
+    if "formula_ml" not in columns:
+        conn.execute("ALTER TABLE entries ADD COLUMN formula_ml INTEGER")
 
 
 def _ensure_settings_table(conn: sqlite3.Connection) -> None:
