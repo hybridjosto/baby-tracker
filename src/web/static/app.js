@@ -85,6 +85,7 @@ const customTypeEmptyEl = document.getElementById("custom-type-empty");
 let babyDob = null;
 let feedIntervalMinutes = null;
 let customEventTypes = [];
+let breastfeedTickerId = null;
 
 const CUSTOM_TYPE_RE = /^[A-Za-z0-9][A-Za-z0-9 /-]{0,31}$/;
 
@@ -189,17 +190,38 @@ function clearBreastfeedStart() {
   window.localStorage.removeItem(key);
 }
 
+function stopBreastfeedTicker() {
+  if (breastfeedTickerId === null) {
+    return;
+  }
+  window.clearInterval(breastfeedTickerId);
+  breastfeedTickerId = null;
+}
+
+function startBreastfeedTicker() {
+  if (breastfeedTickerId !== null) {
+    return;
+  }
+  breastfeedTickerId = window.setInterval(updateBreastfeedButton, 30000);
+}
+
 function updateBreastfeedButton() {
   if (!breastfeedBtn) {
     return;
   }
   const start = getBreastfeedStart();
   if (start) {
-    breastfeedBtn.textContent = "End breastfed";
-    breastfeedBtn.title = `Started ${formatTimestamp(start.toISOString())}`;
+    const durationMinutes = Math.max(
+      0,
+      Math.round((Date.now() - start.getTime()) / 60000),
+    );
+    breastfeedBtn.textContent = `End breastfed (${durationMinutes} min)`;
+    breastfeedBtn.title = `Started ${formatTimestamp(start.toISOString())} (${durationMinutes} min)`;
+    startBreastfeedTicker();
   } else {
     breastfeedBtn.textContent = "Start breastfed";
     breastfeedBtn.removeAttribute("title");
+    stopBreastfeedTicker();
   }
 }
 
