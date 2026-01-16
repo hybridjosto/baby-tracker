@@ -262,14 +262,33 @@
         font-weight: 600;
         color: #2d3b31;
         cursor: pointer;
-        text-decoration: none;
       }
       .last-time[href] {
         text-decoration: underline;
         text-decoration-style: dotted;
         text-underline-offset: 2px;
       }
+      .last-actions {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .shortcut-link {
+        font-weight: 600;
+        color: #2d3b31;
+        text-decoration: underline;
+        text-decoration-style: dotted;
+        text-underline-offset: 2px;
+      }
+      .shortcut-link.is-disabled {
+        opacity: 0.5;
+        pointer-events: none;
+        text-decoration: none;
+      }
       html.dark .last-time {
+        color: #dce8df;
+      }
+      html.dark .shortcut-link {
         color: #dce8df;
       }
       .log-link {
@@ -690,7 +709,10 @@
             <div class="last-row">
               <span class="legend-dot" style="background: #f6c453;"></span>
               <span>Next feed</span>
-              <a class="last-time" id="next-feed">--</a>
+              <span class="last-actions">
+                <span class="last-time" id="next-feed">--</span>
+                <a class="shortcut-link is-disabled" id="next-feed-shortcut" aria-label="Run feed reminder shortcut">Shortcut</a>
+              </span>
             </div>
             <div class="last-row">
               <span class="legend-dot" style="background: #7dd3fc;"></span>
