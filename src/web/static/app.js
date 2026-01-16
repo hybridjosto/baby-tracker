@@ -68,6 +68,7 @@ const statWindowEl = document.getElementById("stat-window");
 const lastActivityEl = document.getElementById("last-activity");
 const lastFeedEl = document.getElementById("last-feed");
 const nextFeedEl = document.getElementById("next-feed");
+const nextFeedShortcutEl = document.getElementById("next-feed-shortcut");
 const lastWeeEl = document.getElementById("last-wee");
 const lastPooEl = document.getElementById("last-poo");
 const statCardEls = document.querySelectorAll(".stat-card[data-log-type]");
@@ -395,6 +396,7 @@ function initHomeHandlers() {
     });
   }
   bindTimestampPopup(lastFeedEl);
+  bindTimestampPopup(nextFeedEl);
   bindTimestampPopup(lastWeeEl);
   bindTimestampPopup(lastPooEl);
   if (feedBtn) {
@@ -983,6 +985,20 @@ function buildFeedShortcutUrl(target) {
   return `shortcuts://run-shortcut?name=feedreminderpwa&input=${encoded}`;
 }
 
+function setNextFeedShortcut(enabled, href) {
+  if (!nextFeedShortcutEl) {
+    return;
+  }
+  nextFeedShortcutEl.classList.toggle("is-disabled", !enabled);
+  if (enabled && href) {
+    nextFeedShortcutEl.href = href;
+    nextFeedShortcutEl.removeAttribute("aria-disabled");
+  } else {
+    nextFeedShortcutEl.removeAttribute("href");
+    nextFeedShortcutEl.setAttribute("aria-disabled", "true");
+  }
+}
+
 function updateNextFeed() {
   if (!nextFeedEl) {
     return;
@@ -992,23 +1008,21 @@ function updateNextFeed() {
   if (!intervalMinutes || !lastTimestamp) {
     nextFeedEl.textContent = "--";
     nextFeedEl.removeAttribute("data-timestamp");
-    nextFeedEl.removeAttribute("href");
-    nextFeedEl.setAttribute("aria-disabled", "true");
+    setNextFeedShortcut(false, "");
     return;
   }
   const lastDate = new Date(lastTimestamp);
   if (Number.isNaN(lastDate.getTime())) {
     nextFeedEl.textContent = "--";
     nextFeedEl.removeAttribute("data-timestamp");
-    nextFeedEl.removeAttribute("href");
-    nextFeedEl.setAttribute("aria-disabled", "true");
+    setNextFeedShortcut(false, "");
     return;
   }
   const nextDate = new Date(lastDate.getTime() + intervalMinutes * 60000);
   nextFeedEl.textContent = formatTimeUntil(nextDate);
   nextFeedEl.dataset.timestamp = nextDate.toISOString();
-  nextFeedEl.href = buildFeedShortcutUrl(nextDate);
-  nextFeedEl.removeAttribute("aria-disabled");
+  const shortcutUrl = buildFeedShortcutUrl(nextDate);
+  setNextFeedShortcut(Boolean(shortcutUrl), shortcutUrl);
 }
 
 function bindTimestampPopup(element) {
