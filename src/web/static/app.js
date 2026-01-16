@@ -1433,6 +1433,7 @@ function renderLogEntries(entries) {
   entries.forEach((entry) => {
     const item = document.createElement("li");
     const left = document.createElement("div");
+    left.className = "entry-details";
     const typeEl = document.createElement("div");
     typeEl.className = "entry-type";
     typeEl.textContent = entry.type;
@@ -1466,6 +1467,12 @@ function renderLogEntries(entries) {
     const right = document.createElement("div");
     right.className = "log-actions";
 
+    const amountsWrap = document.createElement("div");
+    amountsWrap.className = "log-amounts";
+
+    const buttonsWrap = document.createElement("div");
+    buttonsWrap.className = "log-buttons";
+
     const amounts = [];
     if (entry.expressed_ml !== null && entry.expressed_ml !== undefined) {
       amounts.push({ label: "Expressed", value: entry.expressed_ml });
@@ -1477,27 +1484,44 @@ function renderLogEntries(entries) {
       amounts.push({ label: "Amount", value: entry.amount_ml });
     }
 
-    const editBtn = document.createElement("button");
-    editBtn.textContent = "Edit";
-    editBtn.addEventListener("click", () => editEntry(entry));
+    const buildIconButton = (label, icon, onClick) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "icon-button";
+      btn.setAttribute("aria-label", label);
+      btn.title = label;
 
-    const timeBtn = document.createElement("button");
-    timeBtn.textContent = "Edit time";
-    timeBtn.addEventListener("click", () => editEntryTime(entry));
+      const iconEl = document.createElement("span");
+      iconEl.className = "material-symbols-outlined";
+      iconEl.setAttribute("aria-hidden", "true");
+      iconEl.textContent = icon;
 
-    const delBtn = document.createElement("button");
-    delBtn.textContent = "Delete";
-    delBtn.addEventListener("click", () => deleteEntry(entry));
+      const labelEl = document.createElement("span");
+      labelEl.className = "button-label";
+      labelEl.textContent = label;
+
+      btn.append(iconEl, labelEl);
+      btn.addEventListener("click", onClick);
+      return btn;
+    };
+
+    const editBtn = buildIconButton("Edit", "edit", () => editEntry(entry));
+    const timeBtn = buildIconButton("Edit time", "schedule", () => editEntryTime(entry));
+    const delBtn = buildIconButton("Delete", "delete", () => deleteEntry(entry));
 
     amounts.forEach(({ label, value }) => {
       const amountEl = document.createElement("span");
       amountEl.className = "entry-meta";
       amountEl.textContent = `${label} ${value} ml`;
-      right.appendChild(amountEl);
+      amountsWrap.appendChild(amountEl);
     });
-    right.appendChild(editBtn);
-    right.appendChild(timeBtn);
-    right.appendChild(delBtn);
+    if (amounts.length) {
+      right.appendChild(amountsWrap);
+    }
+    buttonsWrap.appendChild(editBtn);
+    buttonsWrap.appendChild(timeBtn);
+    buttonsWrap.appendChild(delBtn);
+    right.appendChild(buttonsWrap);
     item.appendChild(left);
     item.appendChild(right);
     logListEl.appendChild(item);
