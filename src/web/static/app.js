@@ -395,7 +395,6 @@ function initHomeHandlers() {
     });
   }
   bindTimestampPopup(lastFeedEl);
-  bindTimestampPopup(nextFeedEl);
   bindTimestampPopup(lastWeeEl);
   bindTimestampPopup(lastPooEl);
   if (feedBtn) {
@@ -975,6 +974,15 @@ function formatTimeUntil(target) {
   return `in ${hours}h ${minutes}m`;
 }
 
+function buildFeedShortcutUrl(target) {
+  const inputValue = toLocalDateTimeValue(target);
+  if (!inputValue) {
+    return "";
+  }
+  const encoded = encodeURIComponent(inputValue);
+  return `shortcuts://run-shortcut?name=feedreminderpwa&input=${encoded}`;
+}
+
 function updateNextFeed() {
   if (!nextFeedEl) {
     return;
@@ -984,17 +992,23 @@ function updateNextFeed() {
   if (!intervalMinutes || !lastTimestamp) {
     nextFeedEl.textContent = "--";
     nextFeedEl.removeAttribute("data-timestamp");
+    nextFeedEl.removeAttribute("href");
+    nextFeedEl.setAttribute("aria-disabled", "true");
     return;
   }
   const lastDate = new Date(lastTimestamp);
   if (Number.isNaN(lastDate.getTime())) {
     nextFeedEl.textContent = "--";
     nextFeedEl.removeAttribute("data-timestamp");
+    nextFeedEl.removeAttribute("href");
+    nextFeedEl.setAttribute("aria-disabled", "true");
     return;
   }
   const nextDate = new Date(lastDate.getTime() + intervalMinutes * 60000);
   nextFeedEl.textContent = formatTimeUntil(nextDate);
   nextFeedEl.dataset.timestamp = nextDate.toISOString();
+  nextFeedEl.href = buildFeedShortcutUrl(nextDate);
+  nextFeedEl.removeAttribute("aria-disabled");
 }
 
 function bindTimestampPopup(element) {

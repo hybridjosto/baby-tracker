@@ -262,6 +262,12 @@
         font-weight: 600;
         color: #2d3b31;
         cursor: pointer;
+        text-decoration: none;
+      }
+      .last-time[href] {
+        text-decoration: underline;
+        text-decoration-style: dotted;
+        text-underline-offset: 2px;
       }
       html.dark .last-time {
         color: #dce8df;
@@ -684,7 +690,7 @@
             <div class="last-row">
               <span class="legend-dot" style="background: #f6c453;"></span>
               <span>Next feed</span>
-              <span class="last-time" id="next-feed">--</span>
+              <a class="last-time" id="next-feed">--</a>
             </div>
             <div class="last-row">
               <span class="legend-dot" style="background: #7dd3fc;"></span>
