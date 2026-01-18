@@ -48,14 +48,16 @@ const summaryNextBtn = document.getElementById("summary-next");
 const summaryTypeSelectEl = document.getElementById("summary-type");
 const summaryChartEl = document.getElementById("summary-chart");
 const summaryChartEmptyEl = document.getElementById("summary-chart-empty");
-const summaryTotalEl = document.getElementById("summary-total");
-const summaryTotalAvgEl = document.getElementById("summary-total-avg");
-const summaryFeedEl = document.getElementById("summary-feed");
-const summaryFeedAvgEl = document.getElementById("summary-feed-avg");
-const summaryWeeEl = document.getElementById("summary-wee");
-const summaryWeeAvgEl = document.getElementById("summary-wee-avg");
-const summaryPooEl = document.getElementById("summary-poo");
-const summaryPooAvgEl = document.getElementById("summary-poo-avg");
+const summaryFeedDurationEl = document.getElementById("summary-feed-duration");
+const summaryFeedDurationAvgEl = document.getElementById("summary-feed-duration-avg");
+const summaryExpressedEl = document.getElementById("summary-expressed-amount");
+const summaryExpressedAvgEl = document.getElementById("summary-expressed-avg");
+const summaryFormulaEl = document.getElementById("summary-formula-amount");
+const summaryFormulaAvgEl = document.getElementById("summary-formula-avg");
+const milkExpressCountEl = document.getElementById("milk-express-count");
+const milkExpressTotalsEl = document.getElementById("milk-express-totals");
+const milkExpressListEl = document.getElementById("milk-express-list");
+const milkExpressEmptyEl = document.getElementById("milk-express-empty");
 
 const chartSvg = document.getElementById("history-chart");
 const chartEmptyEl = document.getElementById("chart-empty");
@@ -89,6 +91,7 @@ let customEventTypes = [];
 let breastfeedTickerId = null;
 
 const CUSTOM_TYPE_RE = /^[A-Za-z0-9][A-Za-z0-9 /-]{0,31}$/;
+const MILK_EXPRESS_TYPE = "milk express";
 
 const CHART_CONFIG = {
   width: 360,
@@ -381,7 +384,7 @@ let nextFeedTimer = null;
 let refreshTimer = null;
 let summaryDate = null;
 let summaryEntries = [];
-let summaryType = "all";
+let summaryType = "feed";
 
 function initHomeHandlers() {
   if (homeInitialized || pageType !== "home") {
@@ -926,6 +929,14 @@ function formatTimestamp(value) {
   return date.toLocaleString();
 }
 
+function formatSummaryTime(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
+
 function toLocalDateTimeValue(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
@@ -1113,51 +1124,175 @@ function getSummaryDayWindow(date) {
   };
 }
 
-function formatAverageInterval(total) {
-  if (!total) {
+function formatDurationMinutes(totalMinutes) {
+  if (!Number.isFinite(totalMinutes) || totalMinutes <= 0) {
+    return "0 min";
+  }
+  const rounded = Math.round(totalMinutes);
+  const hours = Math.floor(rounded / 60);
+  const minutes = rounded % 60;
+  if (!hours) {
+    return `${minutes} min`;
+  }
+  if (!minutes) {
+    return `${hours}h`;
+  }
+  return `${hours}h ${minutes}m`;
+}
+
+function formatMl(value) {
+  if (!Number.isFinite(value) || value <= 0) {
+    return "0 ml";
+  }
+  const rounded = Math.round(value * 10) / 10;
+  return Number.isInteger(rounded) ? `${rounded} ml` : `${rounded.toFixed(1)} ml`;
+}
+
+function formatAverageDuration(totalMinutes, feedCount) {
+  if (!feedCount) {
     return "--";
   }
-  const hours = 24 / total;
-  if (hours < 1) {
-    return `${Math.round(hours * 60)}m`;
+  return formatDurationMinutes(totalMinutes / feedCount);
+}
+
+function formatAverageMl(totalMl, feedCount) {
+  if (!feedCount) {
+    return "--";
   }
-  return `${hours.toFixed(1)}h`;
+  return formatMl(totalMl / feedCount);
+}
+
+function normalizeEntryType(value) {
+  if (typeof value !== "string") {
+    return "";
+  }
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[-_]+/g, " ")
+    .replace(/\s+/g, " ");
+}
+
+function parseMilkExpressNotes(value) {
+  if (typeof value !== "string") {
+    return { ml: 0, minutes: 0 };
+  }
+  let ml = 0;
+  let minutes = 0;
+  const pattern = /(\d+(?:\.\d+)?)(?:\s*(ml|milliliter|milliliters|min|mins|minute|minutes))?/gi;
+  let match = pattern.exec(value);
+  while (match) {
+    const amount = Number.parseFloat(match[1]);
+    if (Number.isFinite(amount)) {
+      const unit = (match[2] || "").toLowerCase();
+      if (unit.startsWith("min")) {
+        minutes += amount;
+      } else {
+        ml += amount;
+      }
+    }
+    match = pattern.exec(value);
+  }
+  return { ml, minutes };
 }
 
 function renderSummaryStats(entries) {
-  if (!summaryTotalEl || !summaryFeedEl || !summaryWeeEl || !summaryPooEl) {
+  if (
+    !summaryFeedDurationEl
+    || !summaryExpressedEl
+    || !summaryFormulaEl
+  ) {
     return;
   }
-  let total = 0;
-  let feed = 0;
-  let wee = 0;
-  let poo = 0;
+  let feedCount = 0;
+  let durationTotal = 0;
+  let expressedTotal = 0;
+  let formulaTotal = 0;
   entries.forEach((entry) => {
-    total += 1;
     if (entry.type === "feed") {
-      feed += 1;
-    } else if (entry.type === "wee") {
-      wee += 1;
-    } else if (entry.type === "poo") {
-      poo += 1;
+      feedCount += 1;
+      const duration = Number.parseFloat(entry.feed_duration_min);
+      if (Number.isFinite(duration)) {
+        durationTotal += duration;
+      }
+      const expressed = Number.parseFloat(entry.expressed_ml);
+      if (Number.isFinite(expressed)) {
+        expressedTotal += expressed;
+      }
+      const formula = Number.parseFloat(entry.formula_ml);
+      if (Number.isFinite(formula)) {
+        formulaTotal += formula;
+      }
     }
   });
-  summaryTotalEl.textContent = String(total);
-  summaryFeedEl.textContent = String(feed);
-  summaryWeeEl.textContent = String(wee);
-  summaryPooEl.textContent = String(poo);
-  if (summaryTotalAvgEl) {
-    summaryTotalAvgEl.textContent = `Avg / 24h: ${formatAverageInterval(total)}`;
+  summaryFeedDurationEl.textContent = formatDurationMinutes(durationTotal);
+  summaryExpressedEl.textContent = formatMl(expressedTotal);
+  summaryFormulaEl.textContent = formatMl(formulaTotal);
+  if (summaryFeedDurationAvgEl) {
+    summaryFeedDurationAvgEl.textContent = `Avg / feed: ${formatAverageDuration(
+      durationTotal,
+      feedCount,
+    )}`;
   }
-  if (summaryFeedAvgEl) {
-    summaryFeedAvgEl.textContent = `Avg / 24h: ${formatAverageInterval(feed)}`;
+  if (summaryExpressedAvgEl) {
+    summaryExpressedAvgEl.textContent = `Avg / feed: ${formatAverageMl(
+      expressedTotal,
+      feedCount,
+    )}`;
   }
-  if (summaryWeeAvgEl) {
-    summaryWeeAvgEl.textContent = `Avg / 24h: ${formatAverageInterval(wee)}`;
+  if (summaryFormulaAvgEl) {
+    summaryFormulaAvgEl.textContent = `Avg / feed: ${formatAverageMl(
+      formulaTotal,
+      feedCount,
+    )}`;
   }
-  if (summaryPooAvgEl) {
-    summaryPooAvgEl.textContent = `Avg / 24h: ${formatAverageInterval(poo)}`;
+}
+
+function renderMilkExpressSummary(entries) {
+  if (!milkExpressCountEl || !milkExpressListEl || !milkExpressEmptyEl) {
+    return;
   }
+  const matches = entries.filter((entry) => {
+    return normalizeEntryType(entry.type) === MILK_EXPRESS_TYPE;
+  });
+  milkExpressListEl.innerHTML = "";
+  let totalMl = 0;
+  let totalMinutes = 0;
+  matches.forEach((entry) => {
+    const { ml, minutes } = parseMilkExpressNotes(entry.notes);
+    totalMl += ml;
+    totalMinutes += minutes;
+  });
+  if (milkExpressTotalsEl) {
+    milkExpressTotalsEl.textContent = `${formatMl(totalMl)} • ${formatDurationMinutes(totalMinutes)}`;
+  }
+  if (!matches.length) {
+    milkExpressCountEl.textContent = "0 events";
+    milkExpressEmptyEl.style.display = "block";
+    return;
+  }
+  milkExpressEmptyEl.style.display = "none";
+  milkExpressCountEl.textContent = `${matches.length} ${matches.length === 1 ? "event" : "events"}`;
+  const sorted = [...matches].sort((a, b) => {
+    return new Date(a.timestamp_utc) - new Date(b.timestamp_utc);
+  });
+  sorted.forEach((entry) => {
+    const item = document.createElement("div");
+    item.className = "milk-item";
+
+    const time = document.createElement("div");
+    time.className = "milk-time";
+    time.textContent = formatSummaryTime(entry.timestamp_utc);
+    item.appendChild(time);
+
+    if (entry.notes) {
+      const notes = document.createElement("div");
+      notes.className = "milk-notes";
+      notes.textContent = entry.notes;
+      item.appendChild(notes);
+    }
+    milkExpressListEl.appendChild(item);
+  });
 }
 
 function getSummaryTypeColor(type) {
@@ -2032,7 +2167,7 @@ async function loadSummaryEntries() {
     });
     summaryEntries = entries;
     renderSummaryStats(entries);
-    renderSummaryChart(entries, summaryType);
+    renderMilkExpressSummary(entries);
   } catch (err) {
     setStatus(`Failed to load entries: ${err.message || "unknown error"}`);
   }
