@@ -58,6 +58,10 @@ const milkExpressCountEl = document.getElementById("milk-express-count");
 const milkExpressTotalsEl = document.getElementById("milk-express-totals");
 const milkExpressListEl = document.getElementById("milk-express-list");
 const milkExpressEmptyEl = document.getElementById("milk-express-empty");
+const milkExpressSparklineWrapEl = document.getElementById("milk-express-sparkline-wrap");
+const milkExpressSparklineEl = document.getElementById("milk-express-sparkline");
+const milkExpressSparklineDateEl = document.getElementById("milk-express-sparkline-date");
+const milkExpressSparklineTotalEl = document.getElementById("milk-express-sparkline-total");
 
 const chartSvg = document.getElementById("history-chart");
 const chartEmptyEl = document.getElementById("chart-empty");
@@ -1266,6 +1270,7 @@ function renderMilkExpressSummary(entries) {
   if (milkExpressTotalsEl) {
     milkExpressTotalsEl.textContent = `${formatMl(totalMl)} • ${formatDurationMinutes(totalMinutes)}`;
   }
+  renderMilkExpressSparkline(matches, totalMl);
   if (!matches.length) {
     milkExpressCountEl.textContent = "0 events";
     milkExpressEmptyEl.style.display = "block";
@@ -1293,6 +1298,91 @@ function renderMilkExpressSummary(entries) {
     }
     milkExpressListEl.appendChild(item);
   });
+}
+
+function renderMilkExpressSparkline(matches, totalMl) {
+  if (!milkExpressSparklineWrapEl || !milkExpressSparklineEl) {
+    return;
+  }
+  if (!matches.length) {
+    milkExpressSparklineWrapEl.style.display = "none";
+    return;
+  }
+  milkExpressSparklineWrapEl.style.display = "block";
+  milkExpressSparklineEl.innerHTML = "";
+
+  if (milkExpressSparklineDateEl && summaryDate) {
+    milkExpressSparklineDateEl.textContent = formatSummaryDateLabel(summaryDate);
+  }
+  if (milkExpressSparklineTotalEl) {
+    milkExpressSparklineTotalEl.textContent = formatMl(totalMl);
+  }
+
+  const svgNS = "http://www.w3.org/2000/svg";
+  const width = 320;
+  const height = 64;
+  const padding = 6;
+  const plotWidth = width - padding * 2;
+  const plotHeight = height - padding * 2;
+
+  const dayBase = summaryDate ? new Date(summaryDate) : new Date();
+  const dayStart = new Date(dayBase.getFullYear(), dayBase.getMonth(), dayBase.getDate());
+  const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
+
+  const track = document.createElementNS(svgNS, "line");
+  track.setAttribute("x1", padding);
+  track.setAttribute("x2", width - padding);
+  track.setAttribute("y1", height - padding);
+  track.setAttribute("y2", height - padding);
+  track.setAttribute("class", "milk-sparkline-track");
+  milkExpressSparklineEl.appendChild(track);
+
+  const sorted = [...matches].sort((a, b) => {
+    return new Date(a.timestamp_utc) - new Date(b.timestamp_utc);
+  });
+  let cumulative = 0;
+  const points = [{ x: padding, y: height - padding }];
+  sorted.forEach((entry) => {
+    const { ml } = parseMilkExpressNotes(entry.notes);
+    if (!Number.isFinite(ml) || ml <= 0) {
+      return;
+    }
+    const ts = new Date(entry.timestamp_utc);
+    if (Number.isNaN(ts.getTime())) {
+      return;
+    }
+    cumulative += ml;
+    const ratio = (ts.getTime() - dayStart.getTime()) / (dayEnd.getTime() - dayStart.getTime());
+    const clamped = Math.min(Math.max(ratio, 0), 1);
+    const x = padding + clamped * plotWidth;
+    const yRatio = totalMl > 0 ? cumulative / totalMl : 0;
+    const y = height - padding - yRatio * plotHeight;
+    points.push({ x, y });
+  });
+  const finalYRatio = totalMl > 0 ? cumulative / totalMl : 0;
+  points.push({
+    x: width - padding,
+    y: height - padding - finalYRatio * plotHeight,
+  });
+
+  const path = document.createElementNS(svgNS, "path");
+  const d = points
+    .map((point, index) => {
+      const cmd = index === 0 ? "M" : "L";
+      return `${cmd}${point.x.toFixed(1)} ${point.y.toFixed(1)}`;
+    })
+    .join(" ");
+  path.setAttribute("d", d);
+  path.setAttribute("class", "milk-sparkline-path");
+  milkExpressSparklineEl.appendChild(path);
+
+  const lastPoint = points[points.length - 1];
+  const dot = document.createElementNS(svgNS, "circle");
+  dot.setAttribute("cx", lastPoint.x.toFixed(1));
+  dot.setAttribute("cy", lastPoint.y.toFixed(1));
+  dot.setAttribute("r", "3.2");
+  dot.setAttribute("class", "milk-sparkline-dot");
+  milkExpressSparklineEl.appendChild(dot);
 }
 
 function getSummaryTypeColor(type) {
