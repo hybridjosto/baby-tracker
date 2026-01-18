@@ -60,8 +60,11 @@ const milkExpressListEl = document.getElementById("milk-express-list");
 const milkExpressEmptyEl = document.getElementById("milk-express-empty");
 const milkExpressSparklineWrapEl = document.getElementById("milk-express-sparkline-wrap");
 const milkExpressSparklineEl = document.getElementById("milk-express-sparkline");
-const milkExpressSparklineDateEl = document.getElementById("milk-express-sparkline-date");
+const milkExpressSparklineRangeEl = document.getElementById("milk-express-sparkline-range");
 const milkExpressSparklineTotalEl = document.getElementById("milk-express-sparkline-total");
+const milkExpressSparklineToggleEls = document.querySelectorAll(
+  "[data-milk-sparkline-mode]",
+);
 
 const chartSvg = document.getElementById("history-chart");
 const chartEmptyEl = document.getElementById("chart-empty");
@@ -389,6 +392,9 @@ let refreshTimer = null;
 let summaryDate = null;
 let summaryEntries = [];
 let summaryType = "feed";
+let milkExpressSparklineMode = "all";
+let milkExpressAllEntries = [];
+let milkExpressAllLoading = null;
 
 function initHomeHandlers() {
   if (homeInitialized || pageType !== "home") {
@@ -585,6 +591,25 @@ function initSummaryHandlers() {
       if (userValid) {
         void loadSummaryEntries();
       }
+    });
+  }
+  if (milkExpressSparklineToggleEls.length) {
+    milkExpressSparklineToggleEls.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const mode = btn.dataset.milkSparklineMode;
+        if (!mode || mode === milkExpressSparklineMode) {
+          return;
+        }
+        milkExpressSparklineMode = mode;
+        milkExpressSparklineToggleEls.forEach((toggle) => {
+          toggle.classList.toggle("is-active", toggle.dataset.milkSparklineMode === mode);
+        });
+        renderMilkExpressSparkline(
+          summaryEntries.filter((entry) => {
+            return normalizeEntryType(entry.type) === MILK_EXPRESS_TYPE;
+          }),
+        );
+      });
     });
   }
 }
@@ -1270,7 +1295,7 @@ function renderMilkExpressSummary(entries) {
   if (milkExpressTotalsEl) {
     milkExpressTotalsEl.textContent = `${formatMl(totalMl)} • ${formatDurationMinutes(totalMinutes)}`;
   }
-  renderMilkExpressSparkline(matches, totalMl);
+  renderMilkExpressSparkline(matches);
   if (!matches.length) {
     milkExpressCountEl.textContent = "0 events";
     milkExpressEmptyEl.style.display = "block";
@@ -1300,22 +1325,29 @@ function renderMilkExpressSummary(entries) {
   });
 }
 
-function renderMilkExpressSparkline(matches, totalMl) {
+function renderMilkExpressSparkline(dayMatches) {
   if (!milkExpressSparklineWrapEl || !milkExpressSparklineEl) {
     return;
   }
-  if (!matches.length) {
+  const useAll = milkExpressSparklineMode === "all";
+  const sourceEntries = useAll ? milkExpressAllEntries : dayMatches;
+  if (!sourceEntries.length) {
     milkExpressSparklineWrapEl.style.display = "none";
     return;
   }
   milkExpressSparklineWrapEl.style.display = "block";
   milkExpressSparklineEl.innerHTML = "";
 
-  if (milkExpressSparklineDateEl && summaryDate) {
-    milkExpressSparklineDateEl.textContent = formatSummaryDateLabel(summaryDate);
+  if (milkExpressSparklineRangeEl) {
+    milkExpressSparklineRangeEl.textContent = formatMilkExpressSparklineRange(
+      sourceEntries,
+      useAll,
+    );
   }
   if (milkExpressSparklineTotalEl) {
-    milkExpressSparklineTotalEl.textContent = formatMl(totalMl);
+    milkExpressSparklineTotalEl.textContent = formatMl(
+      sumMilkExpressMl(sourceEntries),
+    );
   }
 
   const svgNS = "http://www.w3.org/2000/svg";
@@ -1325,10 +1357,6 @@ function renderMilkExpressSparkline(matches, totalMl) {
   const plotWidth = width - padding * 2;
   const plotHeight = height - padding * 2;
 
-  const dayBase = summaryDate ? new Date(summaryDate) : new Date();
-  const dayStart = new Date(dayBase.getFullYear(), dayBase.getMonth(), dayBase.getDate());
-  const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
-
   const track = document.createElementNS(svgNS, "line");
   track.setAttribute("x1", padding);
   track.setAttribute("x2", width - padding);
@@ -1337,7 +1365,86 @@ function renderMilkExpressSparkline(matches, totalMl) {
   track.setAttribute("class", "milk-sparkline-track");
   milkExpressSparklineEl.appendChild(track);
 
-  const sorted = [...matches].sort((a, b) => {
+  const points = useAll
+    ? buildAllTimeSparklinePoints(sourceEntries, {
+      width,
+      height,
+      padding,
+      plotWidth,
+      plotHeight,
+    })
+    : buildTodaySparklinePoints(sourceEntries, {
+      width,
+      height,
+      padding,
+      plotWidth,
+      plotHeight,
+    });
+
+  if (!points.length) {
+    return;
+  }
+  const path = document.createElementNS(svgNS, "path");
+  const d = points
+    .map((point, index) => {
+      const cmd = index === 0 ? "M" : "L";
+      return `${cmd}${point.x.toFixed(1)} ${point.y.toFixed(1)}`;
+    })
+    .join(" ");
+  path.setAttribute("d", d);
+  path.setAttribute("class", "milk-sparkline-path");
+  milkExpressSparklineEl.appendChild(path);
+
+  const lastPoint = points[points.length - 1];
+  const dot = document.createElementNS(svgNS, "circle");
+  dot.setAttribute("cx", lastPoint.x.toFixed(1));
+  dot.setAttribute("cy", lastPoint.y.toFixed(1));
+  dot.setAttribute("r", "3.2");
+  dot.setAttribute("class", "milk-sparkline-dot");
+  milkExpressSparklineEl.appendChild(dot);
+}
+
+function sumMilkExpressMl(entries) {
+  return entries.reduce((total, entry) => {
+    const { ml } = parseMilkExpressNotes(entry.notes);
+    return total + (Number.isFinite(ml) ? ml : 0);
+  }, 0);
+}
+
+function formatMilkExpressSparklineRange(entries, isAllTime) {
+  if (!isAllTime) {
+    const base = summaryDate ? new Date(summaryDate) : new Date();
+    return formatSummaryDateLabel(base);
+  }
+  if (!entries.length) {
+    return "All time";
+  }
+  const sorted = [...entries].sort((a, b) => {
+    return new Date(a.timestamp_utc) - new Date(b.timestamp_utc);
+  });
+  const start = new Date(sorted[0].timestamp_utc);
+  const end = new Date(sorted[sorted.length - 1].timestamp_utc);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return "All time";
+  }
+  if (isSameDay(start, end)) {
+    return formatSummaryDateLabel(start);
+  }
+  const formatShortDate = (date) => date.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  });
+  return `${formatShortDate(start)} - ${formatShortDate(end)}`;
+}
+
+function buildTodaySparklinePoints(entries, config) {
+  const { width, height, padding, plotWidth, plotHeight } = config;
+  const dayBase = summaryDate ? new Date(summaryDate) : new Date();
+  const dayStart = new Date(dayBase.getFullYear(), dayBase.getMonth(), dayBase.getDate());
+  const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
+  const totalMl = sumMilkExpressMl(entries);
+
+  const sorted = [...entries].sort((a, b) => {
     return new Date(a.timestamp_utc) - new Date(b.timestamp_utc);
   });
   let cumulative = 0;
@@ -1364,25 +1471,43 @@ function renderMilkExpressSparkline(matches, totalMl) {
     x: width - padding,
     y: height - padding - finalYRatio * plotHeight,
   });
+  return points;
+}
 
-  const path = document.createElementNS(svgNS, "path");
-  const d = points
-    .map((point, index) => {
-      const cmd = index === 0 ? "M" : "L";
-      return `${cmd}${point.x.toFixed(1)} ${point.y.toFixed(1)}`;
-    })
-    .join(" ");
-  path.setAttribute("d", d);
-  path.setAttribute("class", "milk-sparkline-path");
-  milkExpressSparklineEl.appendChild(path);
+function buildAllTimeSparklinePoints(entries, config) {
+  const { width, height, padding, plotWidth, plotHeight } = config;
+  const dailyTotals = new Map();
+  entries.forEach((entry) => {
+    const ts = new Date(entry.timestamp_utc);
+    if (Number.isNaN(ts.getTime())) {
+      return;
+    }
+    const key = formatDateInputValue(ts);
+    const { ml } = parseMilkExpressNotes(entry.notes);
+    if (!Number.isFinite(ml) || ml <= 0) {
+      return;
+    }
+    dailyTotals.set(key, (dailyTotals.get(key) || 0) + ml);
+  });
+  const days = [...dailyTotals.entries()]
+    .map(([key, total]) => ({ key, total }))
+    .sort((a, b) => new Date(`${a.key}T00:00:00`) - new Date(`${b.key}T00:00:00`));
 
-  const lastPoint = points[points.length - 1];
-  const dot = document.createElementNS(svgNS, "circle");
-  dot.setAttribute("cx", lastPoint.x.toFixed(1));
-  dot.setAttribute("cy", lastPoint.y.toFixed(1));
-  dot.setAttribute("r", "3.2");
-  dot.setAttribute("class", "milk-sparkline-dot");
-  milkExpressSparklineEl.appendChild(dot);
+  if (!days.length) {
+    return [];
+  }
+  const maxMl = Math.max(...days.map((day) => day.total), 1);
+  const start = new Date(`${days[0].key}T00:00:00`);
+  const end = new Date(`${days[days.length - 1].key}T00:00:00`);
+  const spanMs = Math.max(end.getTime() - start.getTime(), 1);
+
+  return days.map((day) => {
+    const dayDate = new Date(`${day.key}T00:00:00`);
+    const ratio = (dayDate.getTime() - start.getTime()) / spanMs;
+    const x = padding + ratio * plotWidth;
+    const y = height - padding - (day.total / maxMl) * plotHeight;
+    return { x, y };
+  });
 }
 
 function getSummaryTypeColor(type) {
@@ -2250,17 +2375,46 @@ async function loadSummaryEntries() {
       setSummaryDate(new Date());
     }
     const dayWindow = getSummaryDayWindow(summaryDate);
-    const entries = await fetchEntries({
-      limit: 400,
-      since: dayWindow.sinceIso,
-      until: dayWindow.untilIso,
-    });
+    const [entries] = await Promise.all([
+      fetchEntries({
+        limit: 200,
+        since: dayWindow.sinceIso,
+        until: dayWindow.untilIso,
+      }),
+      ensureMilkExpressAllEntries(),
+    ]);
     summaryEntries = entries;
     renderSummaryStats(entries);
     renderMilkExpressSummary(entries);
   } catch (err) {
     setStatus(`Failed to load entries: ${err.message || "unknown error"}`);
   }
+}
+
+async function ensureMilkExpressAllEntries() {
+  if (milkExpressAllEntries.length) {
+    return milkExpressAllEntries;
+  }
+  if (milkExpressAllLoading) {
+    return milkExpressAllLoading;
+  }
+  milkExpressAllLoading = fetchEntries({
+    limit: 200,
+    type: MILK_EXPRESS_TYPE,
+  })
+    .then((entries) => {
+      milkExpressAllEntries = entries;
+      return entries;
+    })
+    .catch((err) => {
+      setStatus(`Failed to load milk express history: ${err.message || "unknown error"}`);
+      milkExpressAllEntries = [];
+      return [];
+    })
+    .finally(() => {
+      milkExpressAllLoading = null;
+    });
+  return milkExpressAllLoading;
 }
 
 async function loadLogEntries() {

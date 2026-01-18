@@ -259,6 +259,37 @@
       html.dark .milk-sparkline-header {
         color: #9db9a6;
       }
+      .milk-sparkline-toggle {
+        display: inline-flex;
+        gap: 4px;
+        padding: 2px;
+        border-radius: 999px;
+        border: 1px solid #e5e1da;
+        background: #ffffff;
+      }
+      html.dark .milk-sparkline-toggle {
+        border-color: rgba(255, 255, 255, 0.12);
+        background: rgba(255, 255, 255, 0.04);
+      }
+      .sparkline-toggle-btn {
+        border: none;
+        background: transparent;
+        color: inherit;
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        padding: 2px 8px;
+        border-radius: 999px;
+        cursor: pointer;
+      }
+      .sparkline-toggle-btn.is-active {
+        background: #f6c453;
+        color: #1f1f1f;
+      }
+      html.dark .sparkline-toggle-btn.is-active {
+        background: #f0b428;
+        color: #1f1f1f;
+      }
       .milk-sparkline svg {
         display: block;
         width: 100%;
@@ -451,7 +482,11 @@
           </div>
           <div class="milk-sparkline" id="milk-express-sparkline-wrap">
             <div class="milk-sparkline-header">
-              <div id="milk-express-sparkline-date">Today</div>
+              <div id="milk-express-sparkline-range">All time</div>
+              <div class="milk-sparkline-toggle" role="tablist" aria-label="Milk express range">
+                <button class="sparkline-toggle-btn is-active" type="button" data-milk-sparkline-mode="all">All time</button>
+                <button class="sparkline-toggle-btn" type="button" data-milk-sparkline-mode="today">Today</button>
+              </div>
               <div id="milk-express-sparkline-total">0 ml</div>
             </div>
             <svg id="milk-express-sparkline" viewBox="0 0 320 64" role="img" aria-label="Milk express progress"></svg>
