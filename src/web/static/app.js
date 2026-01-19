@@ -2563,11 +2563,11 @@ async function ensureMilkExpressAllEntries() {
   }
   milkExpressAllLoading = fetchEntries({
     limit: 200,
-    type: MILK_EXPRESS_TYPE,
   })
     .then((entries) => {
-      milkExpressAllEntries = entries;
-      return entries;
+      const filtered = entries.filter((entry) => isMilkExpressType(entry.type));
+      milkExpressAllEntries = filtered;
+      return filtered;
     })
     .catch((err) => {
       setStatus(`Failed to load milk express history: ${err.message || "unknown error"}`);
