@@ -1218,6 +1218,10 @@ function normalizeEntryType(value) {
     .replace(/\s+/g, " ");
 }
 
+function isMilkExpressType(value) {
+  return normalizeEntryType(value) === MILK_EXPRESS_TYPE;
+}
+
 function parseMilkExpressNotes(value) {
   if (typeof value !== "string") {
     return { ml: 0, minutes: 0 };
@@ -1239,6 +1243,32 @@ function parseMilkExpressNotes(value) {
     match = pattern.exec(value);
   }
   return { ml, minutes };
+}
+
+function getMilkExpressAmounts(entry) {
+  const expressed = Number.parseFloat(entry.expressed_ml);
+  const minutes = Number.parseFloat(entry.feed_duration_min);
+  const hasExpressed = Number.isFinite(expressed);
+  const hasMinutes = Number.isFinite(minutes);
+  if (hasExpressed || hasMinutes) {
+    return {
+      ml: hasExpressed ? expressed : 0,
+      minutes: hasMinutes ? minutes : 0,
+    };
+  }
+  return parseMilkExpressNotes(entry.notes);
+}
+
+function formatMilkExpressDetails(entry) {
+  const { ml, minutes } = getMilkExpressAmounts(entry);
+  const parts = [];
+  if (Number.isFinite(ml) && ml > 0) {
+    parts.push(formatMl(ml));
+  }
+  if (Number.isFinite(minutes) && minutes > 0) {
+    parts.push(formatDurationMinutes(minutes));
+  }
+  return parts.join(" • ");
 }
 
 function renderSummaryStats(entries) {
@@ -1298,13 +1328,13 @@ function renderMilkExpressSummary(entries) {
     return;
   }
   const matches = entries.filter((entry) => {
-    return normalizeEntryType(entry.type) === MILK_EXPRESS_TYPE;
+    return isMilkExpressType(entry.type);
   });
   milkExpressListEl.innerHTML = "";
   let totalMl = 0;
   let totalMinutes = 0;
   matches.forEach((entry) => {
-    const { ml, minutes } = parseMilkExpressNotes(entry.notes);
+    const { ml, minutes } = getMilkExpressAmounts(entry);
     totalMl += ml;
     totalMinutes += minutes;
   });
@@ -1330,6 +1360,14 @@ function renderMilkExpressSummary(entries) {
     time.className = "milk-time";
     time.textContent = formatSummaryTime(entry.timestamp_utc);
     item.appendChild(time);
+
+    const detailsText = formatMilkExpressDetails(entry);
+    if (detailsText) {
+      const details = document.createElement("div");
+      details.className = "milk-meta";
+      details.textContent = detailsText;
+      item.appendChild(details);
+    }
 
     if (entry.notes) {
       const notes = document.createElement("div");
@@ -1422,7 +1460,7 @@ function renderMilkExpressSparkline(dayMatches) {
 
 function sumMilkExpressMl(entries) {
   return entries.reduce((total, entry) => {
-    const { ml } = parseMilkExpressNotes(entry.notes);
+    const { ml } = getMilkExpressAmounts(entry);
     return total + (Number.isFinite(ml) ? ml : 0);
   }, 0);
 }
@@ -1466,7 +1504,7 @@ function buildTodaySparklinePoints(entries, config) {
   let cumulative = 0;
   const points = [{ x: padding, y: height - padding }];
   sorted.forEach((entry) => {
-    const { ml } = parseMilkExpressNotes(entry.notes);
+    const { ml } = getMilkExpressAmounts(entry);
     if (!Number.isFinite(ml) || ml <= 0) {
       return;
     }
@@ -1499,7 +1537,7 @@ function buildAllTimeSparklinePoints(entries, config) {
       return;
     }
     const key = formatDateInputValue(ts);
-    const { ml } = parseMilkExpressNotes(entry.notes);
+    const { ml } = getMilkExpressAmounts(entry);
     if (!Number.isFinite(ml) || ml <= 0) {
       return;
     }
@@ -2110,6 +2148,35 @@ async function addEntry(type) {
       }
       payload.feed_duration_min = minutes;
     }
+  } else if (isMilkExpressType(type)) {
+    const expressedInput = window.prompt("Expressed amount (ml)", "");
+    if (expressedInput === null) {
+      setStatus("");
+      return;
+    }
+    const trimmedExpressed = expressedInput.trim();
+    if (trimmedExpressed !== "") {
+      const amount = Number.parseFloat(trimmedExpressed);
+      if (!Number.isFinite(amount) || amount < 0) {
+        setStatus("Amount must be a non-negative number");
+        return;
+      }
+      payload.expressed_ml = amount;
+    }
+    const durationInput = window.prompt("Duration (minutes)", "");
+    if (durationInput === null) {
+      setStatus("");
+      return;
+    }
+    const trimmedDuration = durationInput.trim();
+    if (trimmedDuration !== "") {
+      const minutes = Number.parseFloat(trimmedDuration);
+      if (!Number.isFinite(minutes) || minutes < 0) {
+        setStatus("Duration must be a non-negative number");
+        return;
+      }
+      payload.feed_duration_min = minutes;
+    }
   }
   const noteInput = window.prompt("Comment (optional)", "");
   if (noteInput === null) {
@@ -2281,10 +2348,58 @@ async function editEntry(entry) {
       }
       payload.formula_ml = amount;
     }
+  } else if (isMilkExpressType(nextType)) {
+    const fallback = getMilkExpressAmounts(entry);
+    const currentExpressed =
+      entry.expressed_ml !== null && entry.expressed_ml !== undefined
+        ? String(entry.expressed_ml)
+        : (Number.isFinite(fallback.ml) && fallback.ml > 0 ? String(fallback.ml) : "");
+    const expressedInput = window.prompt("Expressed amount (ml)", currentExpressed);
+    if (expressedInput === null) {
+      return;
+    }
+    const trimmedExpressed = expressedInput.trim();
+    if (trimmedExpressed === "") {
+      payload.expressed_ml = null;
+    } else {
+      const amount = Number.parseFloat(trimmedExpressed);
+      if (!Number.isFinite(amount) || amount < 0) {
+        setStatus("Amount must be a non-negative number");
+        return;
+      }
+      payload.expressed_ml = amount;
+    }
+    const currentDuration =
+      entry.feed_duration_min !== null && entry.feed_duration_min !== undefined
+        ? String(entry.feed_duration_min)
+        : (Number.isFinite(fallback.minutes) && fallback.minutes > 0
+          ? String(fallback.minutes)
+          : "");
+    const durationInput = window.prompt("Duration (minutes)", currentDuration);
+    if (durationInput === null) {
+      return;
+    }
+    const trimmedDuration = durationInput.trim();
+    if (trimmedDuration === "") {
+      payload.feed_duration_min = null;
+    } else {
+      const minutes = Number.parseFloat(trimmedDuration);
+      if (!Number.isFinite(minutes) || minutes < 0) {
+        setStatus("Duration must be a non-negative number");
+        return;
+      }
+      payload.feed_duration_min = minutes;
+    }
+    if (entry.formula_ml !== null && entry.formula_ml !== undefined) {
+      payload.formula_ml = null;
+    }
+    if (entry.amount_ml !== null && entry.amount_ml !== undefined) {
+      payload.amount_ml = null;
+    }
   } else if (entry.feed_duration_min !== null && entry.feed_duration_min !== undefined) {
     payload.feed_duration_min = null;
   }
-  if (nextType !== "feed") {
+  if (nextType !== "feed" && !isMilkExpressType(nextType)) {
     if (entry.expressed_ml !== null && entry.expressed_ml !== undefined) {
       payload.expressed_ml = null;
     }
