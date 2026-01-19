@@ -22,6 +22,14 @@
       })();
     </script>
     <style>
+      :root {
+        --skeleton-base: #e5e1da;
+        --skeleton-glow: #f4f1eb;
+      }
+      html.dark {
+        --skeleton-base: #203328;
+        --skeleton-glow: #2b4234;
+      }
       html {
         color-scheme: light;
       }
@@ -317,6 +325,56 @@
         opacity: 0.5;
         pointer-events: none;
       }
+      .skeleton-text {
+        position: relative;
+        display: inline-block;
+        min-width: 4ch;
+        border-radius: 999px;
+      }
+      .skeleton-text.skeleton-mid {
+        min-width: 8ch;
+      }
+      .skeleton-text.skeleton-wide {
+        min-width: 14ch;
+      }
+      .skeleton-text::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(
+          90deg,
+          var(--skeleton-base) 0%,
+          var(--skeleton-glow) 45%,
+          var(--skeleton-base) 100%
+        );
+        background-size: 200% 100%;
+        opacity: 0;
+      }
+      .is-loading .skeleton-text {
+        color: transparent;
+      }
+      .is-loading .skeleton-text::after {
+        opacity: 1;
+        animation: skeleton-shimmer 1.2s ease-in-out infinite;
+      }
+      .log-skeleton {
+        display: none;
+      }
+      .is-loading .log-skeleton {
+        display: block;
+      }
+      .is-loading #log-entries,
+      .is-loading #log-empty {
+        display: none;
+      }
+      @keyframes skeleton-shimmer {
+        0% {
+          background-position: 200% 0;
+        }
+        100% {
+          background-position: -200% 0;
+        }
+      }
       @media (max-width: 720px) {
         .card {
           padding: 14px;
@@ -364,6 +422,53 @@
         </div>
         <div class="log-wrap">
           <ul id="log-entries"></ul>
+          <ul class="log-skeleton" aria-hidden="true">
+            <li>
+              <div class="entry-details">
+                <div class="entry-type skeleton-text skeleton-mid">Feed</div>
+                <div class="entry-meta skeleton-text skeleton-wide">--</div>
+                <div class="entry-meta skeleton-text skeleton-mid">--</div>
+              </div>
+              <div class="log-actions">
+                <div class="log-amounts">
+                  <span class="entry-meta skeleton-text skeleton-mid">--</span>
+                </div>
+                <div class="log-buttons">
+                  <span class="skeleton-text skeleton-mid">--</span>
+                </div>
+              </div>
+            </li>
+            <li>
+              <div class="entry-details">
+                <div class="entry-type skeleton-text skeleton-mid">Wee</div>
+                <div class="entry-meta skeleton-text skeleton-wide">--</div>
+                <div class="entry-meta skeleton-text skeleton-mid">--</div>
+              </div>
+              <div class="log-actions">
+                <div class="log-amounts">
+                  <span class="entry-meta skeleton-text skeleton-mid">--</span>
+                </div>
+                <div class="log-buttons">
+                  <span class="skeleton-text skeleton-mid">--</span>
+                </div>
+              </div>
+            </li>
+            <li>
+              <div class="entry-details">
+                <div class="entry-type skeleton-text skeleton-mid">Poo</div>
+                <div class="entry-meta skeleton-text skeleton-wide">--</div>
+                <div class="entry-meta skeleton-text skeleton-mid">--</div>
+              </div>
+              <div class="log-actions">
+                <div class="log-amounts">
+                  <span class="entry-meta skeleton-text skeleton-mid">--</span>
+                </div>
+                <div class="log-buttons">
+                  <span class="skeleton-text skeleton-mid">--</span>
+                </div>
+              </div>
+            </li>
+          </ul>
           <div class="log-empty" id="log-empty">No entries yet.</div>
         </div>
         <div class="status" id="status"></div>
