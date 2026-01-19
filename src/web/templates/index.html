@@ -33,6 +33,12 @@
         --card-dark: #1a2c20;
         --text-secondary: #9db9a6;
         --action-height: 80px;
+        --skeleton-base: #e4ebe6;
+        --skeleton-glow: #f6faf4;
+      }
+      html.dark {
+        --skeleton-base: #203328;
+        --skeleton-glow: #2b4234;
       }
       html {
         color-scheme: light;
@@ -635,6 +641,65 @@
         opacity: 0.5;
         pointer-events: none;
       }
+      .skeleton-text {
+        position: relative;
+        display: inline-block;
+        min-width: 3ch;
+        border-radius: 999px;
+      }
+      .skeleton-text.skeleton-mid {
+        min-width: 7ch;
+      }
+      .skeleton-text.skeleton-wide {
+        min-width: 12ch;
+      }
+      .skeleton-block {
+        position: relative;
+        border-radius: 14px;
+        overflow: hidden;
+      }
+      .skeleton-text::after,
+      .skeleton-block::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(
+          90deg,
+          var(--skeleton-base) 0%,
+          var(--skeleton-glow) 45%,
+          var(--skeleton-base) 100%
+        );
+        background-size: 200% 100%;
+        opacity: 0;
+      }
+      .is-loading .skeleton-text {
+        color: transparent;
+      }
+      .is-loading .skeleton-text::after,
+      .is-loading .skeleton-block::after {
+        opacity: 1;
+        animation: skeleton-shimmer 1.2s ease-in-out infinite;
+      }
+      .chart-skeleton {
+        display: none;
+        height: 150px;
+        margin: 8px 0 12px;
+      }
+      .is-loading .chart-skeleton {
+        display: block;
+      }
+      .is-loading #history-chart,
+      .is-loading #chart-empty {
+        opacity: 0;
+      }
+      @keyframes skeleton-shimmer {
+        0% {
+          background-position: 200% 0;
+        }
+        100% {
+          background-position: -200% 0;
+        }
+      }
     </style>
   </head>
   <body data-user="{{ user_slug }}" data-user-valid="{{ 'true' if user_valid else 'false' }}" data-page="{{ page }}">
@@ -667,31 +732,31 @@
               <span class="material-symbols-outlined" style="font-size: 18px; color: var(--primary);">local_drink</span>
               Feed total (24h)
             </div>
-            <div class="stat-value" id="stat-feed-ml">0 ml</div>
+            <div class="stat-value skeleton-text skeleton-mid" id="stat-feed-ml">0 ml</div>
           </div>
           <div class="stat-card" data-log-type="feed" role="button" tabindex="0" aria-label="View feed events">
             <div class="stat-label">
               <span class="material-symbols-outlined" style="font-size: 18px; color: var(--primary);">water_drop</span>
               Feeds
             </div>
-            <div class="stat-value" id="stat-feed">0</div>
+            <div class="stat-value skeleton-text" id="stat-feed">0</div>
           </div>
           <div class="stat-card" data-log-type="wee" role="button" tabindex="0" aria-label="View wee events">
             <div class="stat-label">
               <span class="material-symbols-outlined" style="font-size: 16px; color: #7dd3fc;">rainy</span>
               Wet
             </div>
-            <div class="stat-value" id="stat-wee">0</div>
+            <div class="stat-value skeleton-text" id="stat-wee">0</div>
           </div>
           <div class="stat-card" data-log-type="poo" role="button" tabindex="0" aria-label="View poo events">
             <div class="stat-label">
               <span class="material-symbols-outlined" style="font-size: 16px; color: #fbbf24;">spa</span>
               Soiled
             </div>
-            <div class="stat-value" id="stat-poo">0</div>
+            <div class="stat-value skeleton-text" id="stat-poo">0</div>
           </div>
         </section>
-        <div class="stats-range" id="stat-window">Rolling 24h: --</div>
+        <div class="stats-range skeleton-text skeleton-wide" id="stat-window">Rolling 24h: --</div>
 
         <section class="chart-card">
           <div class="chart-header">
@@ -704,6 +769,7 @@
             <span class="legend-item"><span class="legend-dot" style="background: #fbbf24;"></span>Soiled</span>
           </div>
           <div class="chart-wrap">
+            <div class="chart-skeleton skeleton-block" aria-hidden="true"></div>
             <svg id="history-chart" viewBox="0 0 360 170" preserveAspectRatio="none"></svg>
             <div class="chart-empty" id="chart-empty">No events in the last 24 hours.</div>
           </div>
@@ -711,25 +777,25 @@
             <div class="last-row">
               <span class="legend-dot" style="background: var(--primary);"></span>
               <span>Last feed</span>
-              <span class="last-time" id="last-feed">--</span>
+              <span class="last-time skeleton-text" id="last-feed">--</span>
             </div>
             <div class="last-row">
               <span class="legend-dot" style="background: #f6c453;"></span>
               <span>Next feed</span>
               <span class="last-actions">
-                <span class="last-time" id="next-feed">--</span>
+                <span class="last-time skeleton-text" id="next-feed">--</span>
                 <a class="shortcut-link is-disabled" id="next-feed-shortcut" aria-label="Run feed reminder shortcut">+ Reminder</a>
               </span>
             </div>
             <div class="last-row">
               <span class="legend-dot" style="background: #7dd3fc;"></span>
               <span>Last wee</span>
-              <span class="last-time" id="last-wee">--</span>
+              <span class="last-time skeleton-text" id="last-wee">--</span>
             </div>
             <div class="last-row">
               <span class="legend-dot" style="background: #fbbf24;"></span>
               <span>Last poo</span>
-              <span class="last-time" id="last-poo">--</span>
+              <span class="last-time skeleton-text" id="last-poo">--</span>
             </div>
           </div>
           <div class="status" id="status"></div>
@@ -758,7 +824,7 @@
       <div class="bottom-bar">
         <div class="last-activity">
           <span class="material-symbols-outlined" style="font-size: 16px;">schedule</span>
-          <span id="last-activity">Last activity: --</span>
+          <span class="skeleton-text skeleton-wide" id="last-activity">Last activity: --</span>
         </div>
         <div class="action-grid action-grid--three">
           <div class="nappy-wrap">

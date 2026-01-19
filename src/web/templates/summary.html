@@ -22,6 +22,14 @@
       })();
     </script>
     <style>
+      :root {
+        --skeleton-base: #e5e1da;
+        --skeleton-glow: #f6f2ec;
+      }
+      html.dark {
+        --skeleton-base: #203328;
+        --skeleton-glow: #2b4234;
+      }
       html {
         color-scheme: light;
       }
@@ -236,7 +244,47 @@
       html.dark .summary-panel-meta {
         color: #9db9a6;
       }
+      .skeleton-text {
+        position: relative;
+        display: inline-block;
+        min-width: 4ch;
+        border-radius: 999px;
+      }
+      .skeleton-text.skeleton-mid {
+        min-width: 8ch;
+      }
+      .skeleton-text.skeleton-wide {
+        min-width: 14ch;
+      }
+      .skeleton-block {
+        position: relative;
+        border-radius: 12px;
+        overflow: hidden;
+      }
+      .skeleton-text::after,
+      .skeleton-block::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(
+          90deg,
+          var(--skeleton-base) 0%,
+          var(--skeleton-glow) 45%,
+          var(--skeleton-base) 100%
+        );
+        background-size: 200% 100%;
+        opacity: 0;
+      }
+      .is-loading .skeleton-text {
+        color: transparent;
+      }
+      .is-loading .skeleton-text::after,
+      .is-loading .skeleton-block::after {
+        opacity: 1;
+        animation: skeleton-shimmer 1.2s ease-in-out infinite;
+      }
       .milk-sparkline {
+        position: relative;
         margin: 10px 0 12px;
         padding: 10px 12px;
         border-radius: 12px;
@@ -344,6 +392,40 @@
       }
       html.dark .milk-notes {
         color: #9db9a6;
+      }
+      .milk-sparkline-skeleton {
+        display: none;
+        position: absolute;
+        inset: 10px 12px;
+      }
+      .milk-skeleton {
+        display: none;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .milk-skeleton-item {
+        height: 38px;
+      }
+      .is-loading .milk-sparkline-skeleton {
+        display: block;
+      }
+      .is-loading #milk-express-sparkline {
+        opacity: 0;
+      }
+      .is-loading #milk-express-list,
+      .is-loading #milk-express-empty {
+        display: none;
+      }
+      .is-loading .milk-skeleton {
+        display: flex;
+      }
+      @keyframes skeleton-shimmer {
+        0% {
+          background-position: 200% 0;
+        }
+        100% {
+          background-position: -200% 0;
+        }
       }
       .summary-empty {
         display: none;
@@ -457,18 +539,18 @@
         <section class="summary-grid">
           <div class="summary-card">
             <div class="summary-label">Total feed duration</div>
-            <div class="summary-value" id="summary-feed-duration">0 min</div>
-            <div class="summary-sub" id="summary-feed-duration-avg">Avg / feed: --</div>
+            <div class="summary-value skeleton-text skeleton-mid" id="summary-feed-duration">0 min</div>
+            <div class="summary-sub skeleton-text skeleton-wide" id="summary-feed-duration-avg">Avg / feed: --</div>
           </div>
           <div class="summary-card">
             <div class="summary-label">Expressed total</div>
-            <div class="summary-value" id="summary-expressed-amount">0 ml</div>
-            <div class="summary-sub" id="summary-expressed-avg">Avg / feed: --</div>
+            <div class="summary-value skeleton-text skeleton-mid" id="summary-expressed-amount">0 ml</div>
+            <div class="summary-sub skeleton-text skeleton-wide" id="summary-expressed-avg">Avg / feed: --</div>
           </div>
           <div class="summary-card">
             <div class="summary-label">Formula total</div>
-            <div class="summary-value" id="summary-formula-amount">0 ml</div>
-            <div class="summary-sub" id="summary-formula-avg">Avg / feed: --</div>
+            <div class="summary-value skeleton-text skeleton-mid" id="summary-formula-amount">0 ml</div>
+            <div class="summary-sub skeleton-text skeleton-wide" id="summary-formula-avg">Avg / feed: --</div>
           </div>
         </section>
 
@@ -476,22 +558,28 @@
           <div class="summary-panel-header">
             <h2>Milk express</h2>
             <div class="summary-panel-meta">
-              <div id="milk-express-count">0 events</div>
-              <div id="milk-express-totals">0 ml • 0 min</div>
+              <div class="skeleton-text skeleton-mid" id="milk-express-count">0 events</div>
+              <div class="skeleton-text skeleton-mid" id="milk-express-totals">0 ml • 0 min</div>
             </div>
           </div>
           <div class="milk-sparkline" id="milk-express-sparkline-wrap">
+            <div class="milk-sparkline-skeleton skeleton-block" aria-hidden="true"></div>
             <div class="milk-sparkline-header">
-              <div id="milk-express-sparkline-range">All time</div>
+              <div class="skeleton-text skeleton-mid" id="milk-express-sparkline-range">All time</div>
               <div class="milk-sparkline-toggle" role="tablist" aria-label="Milk express range">
                 <button class="sparkline-toggle-btn is-active" type="button" data-milk-sparkline-mode="all">All time</button>
                 <button class="sparkline-toggle-btn" type="button" data-milk-sparkline-mode="today">Today</button>
               </div>
-              <div id="milk-express-sparkline-total">0 ml</div>
+              <div class="skeleton-text skeleton-mid" id="milk-express-sparkline-total">0 ml</div>
             </div>
             <svg id="milk-express-sparkline" viewBox="0 0 320 64" role="img" aria-label="Milk express progress"></svg>
           </div>
           <div class="milk-list" id="milk-express-list"></div>
+          <div class="milk-skeleton" aria-hidden="true">
+            <div class="milk-skeleton-item skeleton-block"></div>
+            <div class="milk-skeleton-item skeleton-block"></div>
+            <div class="milk-skeleton-item skeleton-block"></div>
+          </div>
           <div class="summary-empty" id="milk-express-empty">No milk express events for this day.</div>
         </section>
 

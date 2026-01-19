@@ -97,6 +97,9 @@ let babyDob = null;
 let feedIntervalMinutes = null;
 let customEventTypes = [];
 let breastfeedTickerId = null;
+let hasLoadedHomeEntries = false;
+let hasLoadedLogEntries = false;
+let hasLoadedSummaryEntries = false;
 
 const CUSTOM_TYPE_RE = /^[A-Za-z0-9][A-Za-z0-9 /-]{0,31}$/;
 const MILK_EXPRESS_TYPE = "milk express";
@@ -894,6 +897,18 @@ function toggleFeedMenu() {
 function setStatus(message) {
   if (statusEl) {
     statusEl.textContent = message || "";
+  }
+}
+
+function setLoadingState(isLoading) {
+  if (!bodyEl) {
+    return;
+  }
+  bodyEl.classList.toggle("is-loading", isLoading);
+  if (isLoading) {
+    bodyEl.setAttribute("aria-busy", "true");
+  } else {
+    bodyEl.removeAttribute("aria-busy");
   }
 }
 
@@ -2359,6 +2374,10 @@ async function loadHomeEntries() {
   if (!userValid) {
     return;
   }
+  const shouldShowLoading = !hasLoadedHomeEntries;
+  if (shouldShowLoading) {
+    setLoadingState(true);
+  }
   try {
     const statsWindow = computeWindow(24);
     const chartWindow = computeWindow(6);
@@ -2378,12 +2397,21 @@ async function loadHomeEntries() {
     renderLastByType(entries);
   } catch (err) {
     setStatus(`Failed to load entries: ${err.message || "unknown error"}`);
+  } finally {
+    if (shouldShowLoading) {
+      setLoadingState(false);
+    }
+    hasLoadedHomeEntries = true;
   }
 }
 
 async function loadSummaryEntries() {
   if (!userValid) {
     return;
+  }
+  const shouldShowLoading = !hasLoadedSummaryEntries;
+  if (shouldShowLoading) {
+    setLoadingState(true);
   }
   try {
     if (!summaryDate) {
@@ -2403,6 +2431,11 @@ async function loadSummaryEntries() {
     renderMilkExpressSummary(entries);
   } catch (err) {
     setStatus(`Failed to load entries: ${err.message || "unknown error"}`);
+  } finally {
+    if (shouldShowLoading) {
+      setLoadingState(false);
+    }
+    hasLoadedSummaryEntries = true;
   }
 }
 
@@ -2436,6 +2469,10 @@ async function loadLogEntries() {
   if (!userValid) {
     return;
   }
+  const shouldShowLoading = !hasLoadedLogEntries;
+  if (shouldShowLoading) {
+    setLoadingState(true);
+  }
   try {
     const params = { limit: 200 };
     if (Number.isFinite(logWindowHours)) {
@@ -2450,6 +2487,11 @@ async function loadLogEntries() {
     renderLogEntries(entries);
   } catch (err) {
     setStatus(`Failed to load entries: ${err.message || "unknown error"}`);
+  } finally {
+    if (shouldShowLoading) {
+      setLoadingState(false);
+    }
+    hasLoadedLogEntries = true;
   }
 }
 
