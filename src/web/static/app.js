@@ -73,6 +73,7 @@ const logEmptyEl = document.getElementById("log-empty");
 const statFeedEl = document.getElementById("stat-feed");
 const statWeeEl = document.getElementById("stat-wee");
 const statPooEl = document.getElementById("stat-poo");
+const statFeedMlEl = document.getElementById("stat-feed-ml");
 const statWindowEl = document.getElementById("stat-window");
 const lastActivityEl = document.getElementById("last-activity");
 const lastFeedEl = document.getElementById("last-feed");
@@ -1885,9 +1886,18 @@ function renderStats(entries) {
   let feedCount = 0;
   let weeCount = 0;
   let pooCount = 0;
+  let feedTotalMl = 0;
+  const addMl = (value) => {
+    if (typeof value === "number" && Number.isFinite(value)) {
+      feedTotalMl += value;
+    }
+  };
   entries.forEach((entry) => {
     if (entry.type === "feed") {
       feedCount += 1;
+      addMl(entry.amount_ml);
+      addMl(entry.expressed_ml);
+      addMl(entry.formula_ml);
     } else if (entry.type === "wee") {
       weeCount += 1;
     } else if (entry.type === "poo") {
@@ -1897,6 +1907,11 @@ function renderStats(entries) {
   statFeedEl.textContent = String(feedCount);
   statWeeEl.textContent = String(weeCount);
   statPooEl.textContent = String(pooCount);
+  if (statFeedMlEl) {
+    const rounded = Math.round(feedTotalMl * 10) / 10;
+    const display = Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+    statFeedMlEl.textContent = `${display} ml`;
+  }
 }
 
 function formatRangeLabel(since, until) {
