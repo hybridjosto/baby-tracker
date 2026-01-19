@@ -22,6 +22,25 @@ def test_create_user_entry_rejects_invalid_type(client):
     assert payload["error"] == "type must use letters, numbers, spaces, / or -"
 
 
+def test_create_milk_express_entry_accepts_metrics(client):
+    response = client.post(
+        "/api/users/suz/entries",
+        json={
+            "type": "milk express",
+            "client_event_id": "evt-milk-1",
+            "expressed_ml": 120.5,
+            "feed_duration_min": 15,
+            "notes": "first pump",
+        },
+    )
+    assert response.status_code == 201
+    payload = response.get_json()
+    assert payload["type"] == "milk express"
+    assert payload["expressed_ml"] == 120.5
+    assert payload["feed_duration_min"] == 15
+    assert payload["notes"] == "first pump"
+
+
 def test_list_entries_returns_all_users(client):
     first = client.post(
         "/api/users/suz/entries",
