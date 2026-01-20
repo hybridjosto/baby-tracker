@@ -7,13 +7,14 @@
     <link rel="manifest" href="/static/manifest.json">
     <link rel="apple-touch-icon" href="/apple-touch-icon.png">
     <link
-      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Space+Grotesk:wght@400;500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700&display=swap"
       rel="stylesheet"
     >
     <link
       href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@400,0"
       rel="stylesheet"
     >
+    <link rel="stylesheet" href="/static/styles.css">
     <script>
       (() => {
         const stored = localStorage.getItem("baby-tracker-theme");
@@ -26,51 +27,6 @@
       })();
     </script>
     <style>
-      :root {
-        --ink: #1f1a17;
-        --muted: #655b52;
-        --accent: #f08a24;
-        --accent-2: #2f9f83;
-        --panel: #ffffff;
-        --line: #eadfd2;
-        --shadow: rgba(22, 16, 12, 0.12);
-        --glow: rgba(240, 138, 36, 0.2);
-      }
-      html.dark {
-        --ink: #f5f0e8;
-        --muted: #b0a59b;
-        --accent: #f5b14a;
-        --accent-2: #6fd8bb;
-        --panel: #1e1a18;
-        --line: rgba(255, 255, 255, 0.08);
-        --shadow: rgba(0, 0, 0, 0.4);
-        --glow: rgba(111, 216, 187, 0.15);
-      }
-      html {
-        color-scheme: light;
-      }
-      html.dark {
-        color-scheme: dark;
-      }
-      * {
-        box-sizing: border-box;
-      }
-      body {
-        margin: 0;
-        min-height: 100vh;
-        font-family: "Space Grotesk", "Helvetica Neue", Arial, sans-serif;
-        color: var(--ink);
-        background:
-          radial-gradient(circle at 20% 20%, rgba(240, 138, 36, 0.12), transparent 45%),
-          radial-gradient(circle at 80% 0%, rgba(47, 159, 131, 0.16), transparent 55%),
-          linear-gradient(160deg, #f7f0e7 0%, #f4f6f2 55%, #edf4f0 100%);
-      }
-      html.dark body {
-        background:
-          radial-gradient(circle at 20% 20%, rgba(245, 177, 74, 0.2), transparent 48%),
-          radial-gradient(circle at 80% 0%, rgba(111, 216, 187, 0.18), transparent 55%),
-          linear-gradient(160deg, #151211 0%, #141816 55%, #0f1512 100%);
-      }
       .page {
         max-width: 1100px;
         margin: 0 auto;
@@ -91,46 +47,28 @@
         letter-spacing: 0.3em;
         font-size: 10px;
         font-weight: 600;
-        color: var(--muted);
+        color: var(--text-secondary);
       }
       h1 {
         margin: 4px 0 6px;
-        font-family: "Fraunces", "Times New Roman", serif;
-        font-size: clamp(28px, 4vw, 40px);
-      }
-      .user-chip {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        padding: 6px 12px;
-        border-radius: 999px;
-        border: 1px solid var(--line);
-        background: var(--panel);
-        font-size: 12px;
-        color: var(--muted);
-        box-shadow: 0 6px 16px var(--shadow);
+        font-size: 24px;
       }
       .nav-actions {
-        display: inline-flex;
-        align-items: center;
         gap: 10px;
-        flex-wrap: wrap;
       }
       .nav-actions a,
       .nav-actions button {
-        font-family: "Space Grotesk", "Helvetica Neue", Arial, sans-serif;
         font-size: 12px;
         font-weight: 600;
-        color: var(--ink);
+        color: var(--text-primary);
         text-decoration: none;
-        border: 1px solid var(--line);
-        background: var(--panel);
+        border: 1px solid var(--border-light);
+        background: var(--surface-soft);
         padding: 6px 10px;
         border-radius: 999px;
         display: inline-flex;
         align-items: center;
         gap: 6px;
-        box-shadow: 0 4px 12px var(--shadow);
       }
       .nav-actions button {
         cursor: pointer;
@@ -138,15 +76,30 @@
       .nav-actions .material-symbols-outlined {
         font-size: 16px;
       }
+      html.dark .nav-actions a,
+      html.dark .nav-actions button {
+        border-color: var(--border-dark);
+        background: rgba(255, 255, 255, 0.08);
+        color: #d3e4d7;
+      }
+      .nav-icon {
+        width: 40px;
+        height: 40px;
+      }
       .timeline-wrap {
         position: relative;
-        background: var(--panel);
+        background: var(--card-light);
         border-radius: 28px;
         padding: 22px 22px 14px;
-        border: 1px solid var(--line);
-        box-shadow: 0 18px 40px var(--shadow);
+        border: 1px solid var(--border-light);
+        box-shadow: var(--shadow-soft);
         max-height: 72vh;
         overflow-y: auto;
+      }
+      html.dark .timeline-wrap {
+        background: var(--card-dark);
+        border-color: var(--border-dark);
+        box-shadow: 0 18px 40px rgba(0, 0, 0, 0.3);
       }
       .timeline-track {
         position: relative;
@@ -162,7 +115,7 @@
         top: 0;
         bottom: 0;
         width: 2px;
-        background: linear-gradient(180deg, var(--accent), transparent 60%);
+        background: linear-gradient(180deg, var(--primary), transparent 60%);
       }
       .timeline-day {
         display: flex;
@@ -178,15 +131,17 @@
         position: sticky;
         top: 0;
         z-index: 2;
-        background: linear-gradient(180deg, var(--panel) 70%, rgba(0, 0, 0, 0));
+        background: linear-gradient(180deg, var(--card-light) 70%, rgba(0, 0, 0, 0));
         padding-top: 10px;
         padding-bottom: 10px;
         margin-left: -12px;
         margin-right: -12px;
         padding-right: 12px;
       }
+      html.dark .timeline-day-header {
+        background: linear-gradient(180deg, var(--card-dark) 70%, rgba(0, 0, 0, 0));
+      }
       .timeline-day-label {
-        font-family: "Fraunces", "Times New Roman", serif;
         font-size: 20px;
         font-weight: 700;
       }
@@ -194,7 +149,7 @@
         font-size: 11px;
         letter-spacing: 0.14em;
         text-transform: uppercase;
-        color: var(--muted);
+        color: var(--text-secondary);
       }
       .timeline-day-hours {
         display: flex;
@@ -211,7 +166,7 @@
         font-size: 12px;
         text-transform: uppercase;
         letter-spacing: 0.2em;
-        color: var(--muted);
+        color: var(--text-secondary);
         padding-top: 8px;
         text-align: right;
       }
@@ -224,14 +179,19 @@
         position: relative;
         border-radius: 20px;
         padding: 14px 16px 16px;
-        border: 1px solid var(--line);
-        background: var(--panel);
-        box-shadow: 0 10px 24px var(--shadow);
+        border: 1px solid var(--border-light);
+        background: var(--card-light);
+        box-shadow: var(--shadow-soft);
         display: grid;
         grid-template-columns: 48px minmax(0, 1fr);
         gap: 12px;
         animation: floatIn 0.6s ease both;
         animation-delay: var(--stagger, 0s);
+      }
+      html.dark .timeline-card {
+        border-color: var(--border-dark);
+        background: var(--card-dark);
+        box-shadow: 0 10px 24px rgba(0, 0, 0, 0.3);
       }
       .timeline-card::before {
         content: "";
@@ -240,7 +200,7 @@
         top: 14px;
         bottom: 14px;
         width: 4px;
-        background: var(--event-color, var(--accent));
+        background: var(--event-color, var(--primary));
         border-radius: 999px;
       }
       .timeline-card.has-duration {
@@ -252,9 +212,9 @@
         border-radius: 14px;
         display: grid;
         place-items: center;
-        background: var(--event-color, var(--accent));
+        background: var(--event-color, var(--primary));
         color: #ffffff;
-        box-shadow: 0 12px 30px var(--event-glow, var(--glow));
+        box-shadow: 0 12px 30px var(--event-glow, rgba(19, 236, 91, 0.25));
       }
       .timeline-title {
         font-weight: 600;
@@ -263,7 +223,7 @@
       }
       .timeline-meta {
         font-size: 12px;
-        color: var(--muted);
+        color: var(--text-secondary);
         margin-top: 4px;
       }
       .timeline-details {
@@ -276,20 +236,23 @@
         font-size: 11px;
         padding: 4px 8px;
         border-radius: 999px;
-        border: 1px dashed var(--line);
-        color: var(--muted);
+        border: 1px dashed var(--border-light);
+        color: var(--text-secondary);
+      }
+      html.dark .timeline-chip {
+        border-color: var(--border-dark);
       }
       .timeline-notes {
         margin-top: 10px;
         font-size: 12px;
-        color: var(--muted);
+        color: var(--text-secondary);
       }
       .timeline-byline {
         margin-top: 8px;
         font-size: 11px;
         text-transform: uppercase;
         letter-spacing: 0.1em;
-        color: var(--muted);
+        color: var(--text-secondary);
       }
       .timeline-loading {
         margin: 14px auto 0;
@@ -298,14 +261,14 @@
         justify-content: center;
         gap: 8px;
         font-size: 12px;
-        color: var(--muted);
+        color: var(--text-secondary);
       }
       .timeline-loading::before {
         content: "";
         width: 8px;
         height: 8px;
         border-radius: 999px;
-        background: var(--accent-2);
+        background: var(--primary);
         animation: pulse 1s ease-in-out infinite;
       }
       .timeline-empty {
@@ -314,30 +277,31 @@
         justify-content: center;
         padding: 20px 12px 12px;
         font-size: 13px;
-        color: var(--muted);
+        color: var(--text-secondary);
       }
       .timeline-sentinel {
         height: 1px;
       }
       .status {
         font-size: 12px;
-        color: var(--muted);
+        color: var(--text-secondary);
       }
       .user-setup {
         margin-top: 12px;
         padding: 12px;
         border-radius: 18px;
-        border: 1px dashed var(--line);
-        background: rgba(255, 255, 255, 0.6);
+        border: 1px dashed var(--border-light);
+        background: var(--surface-soft);
       }
       html.dark .user-setup {
-        background: rgba(20, 20, 20, 0.7);
+        border-color: var(--border-dark);
+        background: rgba(26, 44, 32, 0.9);
       }
       .user-setup label {
         font-size: 11px;
         text-transform: uppercase;
         letter-spacing: 0.12em;
-        color: var(--muted);
+        color: var(--text-secondary);
       }
       .user-row {
         display: flex;
@@ -347,16 +311,22 @@
       .user-input {
         flex: 1;
         border-radius: 12px;
-        border: 1px solid var(--line);
+        border: 1px solid var(--border-light);
         padding: 8px 10px;
         font-size: 14px;
-        font-family: "Space Grotesk", "Helvetica Neue", Arial, sans-serif;
+        background: #ffffff;
+        color: var(--text-primary);
+      }
+      html.dark .user-input {
+        border-color: var(--border-dark);
+        background: rgba(16, 24, 18, 0.8);
+        color: #f3f6f4;
       }
       .user-btn {
         border-radius: 12px;
         border: none;
-        background: var(--accent);
-        color: #ffffff;
+        background: var(--primary);
+        color: #0f1a12;
         font-weight: 600;
         padding: 8px 14px;
         cursor: pointer;
@@ -364,7 +334,7 @@
       .user-hint {
         margin-top: 6px;
         font-size: 11px;
-        color: var(--muted);
+        color: var(--text-secondary);
       }
       .disabled {
         opacity: 0.5;
@@ -430,11 +400,11 @@
           <a id="home-link" href="#">Dashboard</a>
           <a id="log-link" href="#">Event log</a>
           <a id="summary-link" href="/summary">Summary</a>
-          <button id="refresh-btn" type="button" aria-label="Refresh timeline" title="Refresh timeline">
+          <button class="nav-icon" id="refresh-btn" type="button" aria-label="Refresh timeline" title="Refresh timeline">
             <span class="material-symbols-outlined">refresh</span>
           </button>
           <a href="/settings">Settings</a>
-          <button id="theme-toggle" type="button" aria-label="Switch to light mode">
+          <button class="nav-icon" id="theme-toggle" type="button" aria-label="Switch to light mode">
             <span class="material-symbols-outlined">dark_mode</span>
           </button>
         </div>

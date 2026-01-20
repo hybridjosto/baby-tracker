@@ -7,9 +7,14 @@
     <link rel="manifest" href="/static/manifest.json">
     <link rel="apple-touch-icon" href="/apple-touch-icon.png">
     <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    >
+    <link
       href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@400,0"
       rel="stylesheet"
     >
+    <link rel="stylesheet" href="/static/styles.css">
     <script>
       (() => {
         const stored = localStorage.getItem("baby-tracker-theme");
@@ -22,108 +27,51 @@
       })();
     </script>
     <style>
-      :root {
-        --skeleton-base: #e5e1da;
-        --skeleton-glow: #f6f2ec;
-      }
-      html.dark {
-        --skeleton-base: #203328;
-        --skeleton-glow: #2b4234;
-      }
-      html {
-        color-scheme: light;
-      }
-      html.dark {
-        color-scheme: dark;
-      }
-      body {
-        font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-        margin: 0;
-        padding: 0;
-        background: #f7f4ef;
-        color: #1f1f1f;
-        min-height: 100vh;
-      }
-      html.dark body {
-        background: #102216;
-        color: #ffffff;
-      }
-      .page {
-        padding: 16px;
-      }
       .card {
-        background: #ffffff;
-        border-radius: 16px;
-        padding: 16px;
-        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
         max-width: 520px;
         margin: 0 auto;
       }
-      html.dark .card {
-        background: #1a2c20;
-        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
-      }
       h1 {
         margin: 0;
-        font-size: 22px;
+        font-size: 24px;
       }
       .user-chip {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        padding: 6px 10px;
-        background: #f0ede7;
-        border-radius: 999px;
-        font-size: 12px;
-        color: #4a453f;
         margin-top: 8px;
       }
-      html.dark .user-chip {
-        background: rgba(255, 255, 255, 0.08);
-        color: #d3e4d7;
-      }
       .nav-row {
-        display: flex;
-        justify-content: space-between;
         align-items: flex-start;
-        gap: 12px;
         margin-bottom: 16px;
-        font-size: 14px;
-        color: #444;
-      }
-      html.dark .nav-row {
-        color: #d3e4d7;
       }
       .nav-actions {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        flex-wrap: wrap;
         justify-content: flex-end;
-      }
-      .nav-row a {
-        color: #4a453f;
-        text-decoration: none;
-        font-weight: 600;
-      }
-      html.dark .nav-row a {
-        color: #d3e4d7;
       }
       .theme-toggle,
       .icon-btn {
         width: 32px;
         height: 32px;
         border-radius: 999px;
-        border: 1px solid #e5e1da;
-        background: #f9f6f1;
+        border: 1px solid var(--border-light);
+        background: var(--surface-soft);
+        display: grid;
+        place-items: center;
+        cursor: pointer;
+        color: inherit;
+      }
+      .nav-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 999px;
+        border: 1px solid var(--border-light);
+        background: var(--surface-soft);
         display: grid;
         place-items: center;
         cursor: pointer;
         color: inherit;
       }
       html.dark .theme-toggle,
-      html.dark .icon-btn {
-        border-color: rgba(255, 255, 255, 0.08);
+      html.dark .icon-btn,
+      html.dark .nav-icon {
+        border-color: var(--border-dark);
         background: rgba(255, 255, 255, 0.08);
         color: #d3e4d7;
       }
@@ -135,7 +83,7 @@
         margin-bottom: 16px;
         padding: 10px;
         border-radius: 14px;
-        background: #f4efe9;
+        background: var(--surface-muted);
       }
       html.dark .date-row {
         background: rgba(255, 255, 255, 0.08);
@@ -153,14 +101,15 @@
       }
       .date-input {
         border-radius: 10px;
-        border: 1px solid #e5e1da;
+        border: 1px solid var(--border-light);
         padding: 6px 10px;
         font-size: 13px;
         background: #ffffff;
+        color: var(--text-primary);
       }
       html.dark .date-input {
         background: rgba(26, 44, 32, 0.9);
-        border-color: rgba(255, 255, 255, 0.12);
+        border-color: var(--border-dark);
         color: #ffffff;
       }
       .summary-grid {
@@ -174,29 +123,23 @@
         font-size: 12px;
         text-transform: uppercase;
         letter-spacing: 0.18em;
-        color: #6a6259;
-      }
-      html.dark .summary-section-title {
-        color: #9db9a6;
+        color: var(--text-secondary);
       }
       .summary-card {
         border-radius: 14px;
         padding: 12px;
-        border: 1px solid #e5e1da;
-        background: #faf7f2;
+        border: 1px solid var(--border-light);
+        background: #ffffff;
       }
       html.dark .summary-card {
-        border-color: rgba(255, 255, 255, 0.08);
-        background: rgba(26, 44, 32, 0.9);
+        border-color: var(--border-dark);
+        background: var(--card-dark);
       }
       .summary-label {
         font-size: 11px;
         text-transform: uppercase;
         letter-spacing: 0.12em;
-        color: #6a6259;
-      }
-      html.dark .summary-label {
-        color: #9db9a6;
+        color: var(--text-secondary);
       }
       .summary-value {
         font-size: 20px;
@@ -205,21 +148,18 @@
       }
       .summary-sub {
         font-size: 12px;
-        color: #6a6259;
+        color: var(--text-secondary);
         margin-top: 4px;
-      }
-      html.dark .summary-sub {
-        color: #9db9a6;
       }
       .summary-panel {
         border-radius: 16px;
         padding: 14px;
-        border: 1px solid #e5e1da;
+        border: 1px solid var(--border-light);
         background: #ffffff;
       }
       html.dark .summary-panel {
-        border-color: rgba(255, 255, 255, 0.08);
-        background: rgba(26, 44, 32, 0.9);
+        border-color: var(--border-dark);
+        background: var(--card-dark);
       }
       .summary-panel-header {
         display: flex;
@@ -238,11 +178,8 @@
         align-items: flex-end;
         gap: 2px;
         font-size: 12px;
-        color: #6a6259;
+        color: var(--text-secondary);
         text-align: right;
-      }
-      html.dark .summary-panel-meta {
-        color: #9db9a6;
       }
       .skeleton-text {
         position: relative;
@@ -288,11 +225,11 @@
         margin: 10px 0 12px;
         padding: 10px 12px;
         border-radius: 12px;
-        border: 1px dashed #e5e1da;
-        background: #f9f6f1;
+        border: 1px dashed var(--border-light);
+        background: var(--surface-soft);
       }
       html.dark .milk-sparkline {
-        border-color: rgba(255, 255, 255, 0.12);
+        border-color: var(--border-dark);
         background: rgba(26, 44, 32, 0.75);
       }
       .milk-sparkline-header {
@@ -302,21 +239,18 @@
         font-size: 11px;
         letter-spacing: 0.08em;
         text-transform: uppercase;
-        color: #6a6259;
-      }
-      html.dark .milk-sparkline-header {
-        color: #9db9a6;
+        color: var(--text-secondary);
       }
       .milk-sparkline-toggle {
         display: inline-flex;
         gap: 4px;
         padding: 2px;
         border-radius: 999px;
-        border: 1px solid #e5e1da;
+        border: 1px solid var(--border-light);
         background: #ffffff;
       }
       html.dark .milk-sparkline-toggle {
-        border-color: rgba(255, 255, 255, 0.12);
+        border-color: var(--border-dark);
         background: rgba(255, 255, 255, 0.04);
       }
       .sparkline-toggle-btn {
@@ -331,12 +265,8 @@
         cursor: pointer;
       }
       .sparkline-toggle-btn.is-active {
-        background: #f6c453;
-        color: #1f1f1f;
-      }
-      html.dark .sparkline-toggle-btn.is-active {
-        background: #f0b428;
-        color: #1f1f1f;
+        background: var(--primary);
+        color: #0f1a12;
       }
       .milk-sparkline svg {
         display: block;
@@ -345,25 +275,19 @@
         margin-top: 8px;
       }
       .milk-sparkline-track {
-        stroke: #e5e1da;
+        stroke: var(--border-light);
         stroke-width: 2;
       }
       html.dark .milk-sparkline-track {
-        stroke: rgba(255, 255, 255, 0.12);
+        stroke: var(--border-dark);
       }
       .milk-sparkline-path {
-        stroke: #16a34a;
+        stroke: var(--primary);
         stroke-width: 2.5;
         fill: none;
       }
-      html.dark .milk-sparkline-path {
-        stroke: #63f4a8;
-      }
       .milk-sparkline-dot {
-        fill: #16a34a;
-      }
-      html.dark .milk-sparkline-dot {
-        fill: #63f4a8;
+        fill: var(--primary);
       }
       .milk-list {
         display: flex;
@@ -376,7 +300,7 @@
         gap: 12px;
         padding: 8px 10px;
         border-radius: 12px;
-        background: #f6f2ec;
+        background: var(--surface-soft);
       }
       html.dark .milk-item {
         background: rgba(255, 255, 255, 0.06);
@@ -387,19 +311,13 @@
       }
       .milk-notes {
         font-size: 12px;
-        color: #6a6259;
+        color: var(--text-secondary);
         text-align: right;
-      }
-      html.dark .milk-notes {
-        color: #9db9a6;
       }
       .milk-meta {
         font-size: 12px;
-        color: #6a6259;
+        color: var(--text-secondary);
         text-align: right;
-      }
-      html.dark .milk-meta {
-        color: #9db9a6;
       }
       .milk-sparkline-skeleton {
         display: none;
@@ -440,38 +358,29 @@
         padding: 14px;
         text-align: center;
         font-size: 13px;
-        color: #8b857e;
-      }
-      html.dark .summary-empty {
-        color: #9db9a6;
+        color: var(--text-secondary);
       }
       .status {
         font-size: 12px;
-        color: #666;
+        color: var(--text-secondary);
         margin-top: 10px;
-      }
-      html.dark .status {
-        color: #9db9a6;
       }
       .user-setup {
         margin-top: 12px;
         padding: 12px;
         border-radius: 14px;
-        border: 1px dashed #e5e1da;
-        background: #f9f6f1;
+        border: 1px dashed var(--border-light);
+        background: var(--surface-soft);
       }
       html.dark .user-setup {
-        border-color: rgba(255, 255, 255, 0.08);
+        border-color: var(--border-dark);
         background: rgba(26, 44, 32, 0.9);
       }
       .user-setup label {
         font-size: 11px;
         text-transform: uppercase;
         letter-spacing: 0.12em;
-        color: #6a6259;
-      }
-      html.dark .user-setup label {
-        color: #9db9a6;
+        color: var(--text-secondary);
       }
       .user-row {
         display: flex;
@@ -481,27 +390,25 @@
       .user-input {
         flex: 1;
         border-radius: 10px;
-        border: 1px solid #e5e1da;
+        border: 1px solid var(--border-light);
         padding: 10px 12px;
         font-size: 14px;
+        background: #ffffff;
+        color: var(--text-primary);
       }
       html.dark .user-input {
         background: rgba(26, 44, 32, 0.9);
-        border-color: rgba(255, 255, 255, 0.12);
+        border-color: var(--border-dark);
         color: #ffffff;
       }
       .user-btn {
         border-radius: 10px;
         border: none;
         padding: 0 16px;
-        background: #f6c453;
-        color: #1f1f1f;
+        background: var(--primary);
+        color: #0f1a12;
         font-weight: 700;
         cursor: pointer;
-      }
-      html.dark .user-btn {
-        background: #f0b428;
-        color: #1f1f1f;
       }
       .disabled {
         opacity: 0.5;
@@ -521,11 +428,11 @@
             <a id="home-link" href="#">Back to chart</a>
             <a id="log-link" href="#">Event log</a>
             <a id="timeline-link" href="#">Timeline</a>
-            <button class="icon-btn" id="refresh-btn" type="button" aria-label="Refresh summary" title="Refresh summary">
+            <button class="nav-icon" id="refresh-btn" type="button" aria-label="Refresh summary" title="Refresh summary">
               <span class="material-symbols-outlined">refresh</span>
             </button>
             <a href="/settings">Settings</a>
-            <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Switch to light mode">
+            <button class="nav-icon" id="theme-toggle" type="button" aria-label="Switch to light mode">
               <span class="material-symbols-outlined">dark_mode</span>
             </button>
           </div>

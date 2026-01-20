@@ -7,9 +7,14 @@
     <link rel="manifest" href="/static/manifest.json">
     <link rel="apple-touch-icon" href="/apple-touch-icon.png">
     <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    >
+    <link
       href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@400,0"
       rel="stylesheet"
     >
+    <link rel="stylesheet" href="/static/styles.css">
     <script>
       (() => {
         const stored = localStorage.getItem("baby-tracker-theme");
@@ -22,90 +27,17 @@
       })();
     </script>
     <style>
-      :root {
-        --skeleton-base: #e5e1da;
-        --skeleton-glow: #f4f1eb;
-      }
-      html.dark {
-        --skeleton-base: #203328;
-        --skeleton-glow: #2b4234;
-      }
-      html {
-        color-scheme: light;
-      }
-      html.dark {
-        color-scheme: dark;
-      }
-      body {
-        font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-        margin: 0;
-        padding: 0;
-        background: #f7f4ef;
-        color: #1f1f1f;
-        min-height: 100vh;
-      }
-      html.dark body {
-        background: #102216;
-        color: #ffffff;
-      }
-      .page {
-        padding: 16px;
-      }
       .card {
-        background: #ffffff;
-        border-radius: 16px;
-        padding: 16px;
-        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
         max-width: 960px;
         width: min(100%, 960px);
         margin: 0 auto;
       }
-      html.dark .card {
-        background: #1a2c20;
-        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
-      }
       h1 {
         margin: 0 0 12px 0;
-        font-size: 22px;
+        font-size: 24px;
       }
       .user-chip {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        padding: 6px 10px;
-        background: #f0ede7;
-        border-radius: 999px;
-        font-size: 12px;
-        color: #4a453f;
         margin-bottom: 10px;
-      }
-      html.dark .user-chip {
-        background: rgba(255, 255, 255, 0.08);
-        color: #d3e4d7;
-      }
-      .nav-row {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 12px;
-        font-size: 14px;
-        color: #444;
-      }
-      html.dark .nav-row {
-        color: #d3e4d7;
-      }
-      .nav-actions {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-      }
-      .nav-row a {
-        color: #4a453f;
-        text-decoration: none;
-        font-weight: 600;
-      }
-      html.dark .nav-row a {
-        color: #d3e4d7;
       }
       ul {
         list-style: none;
@@ -118,10 +50,10 @@
         align-items: start;
         gap: 12px;
         padding: 8px 0;
-        border-bottom: 1px solid #e5e1da;
+        border-bottom: 1px solid var(--border-light);
       }
       html.dark li {
-        border-bottom-color: rgba(255, 255, 255, 0.08);
+        border-bottom-color: var(--border-dark);
       }
       .entry-details {
         display: grid;
@@ -129,10 +61,7 @@
       }
       .entry-meta {
         font-size: 13px;
-        color: #444;
-      }
-      html.dark .entry-meta {
-        color: #d3e4d7;
+        color: var(--text-secondary);
       }
       .entry-type {
         font-weight: 600;
@@ -164,8 +93,8 @@
         font-size: 12px;
         padding: 6px 8px;
         border-radius: 10px;
-        border: 1px solid #e5e1da;
-        background: #f9f6f1;
+        border: 1px solid var(--border-light);
+        background: var(--surface-muted);
         cursor: pointer;
       }
       .log-actions .material-symbols-outlined {
@@ -175,7 +104,7 @@
         white-space: nowrap;
       }
       html.dark .log-actions button {
-        border-color: rgba(255, 255, 255, 0.08);
+        border-color: var(--border-dark);
         background: rgba(255, 255, 255, 0.08);
         color: #d3e4d7;
       }
@@ -186,63 +115,51 @@
       }
       .log-empty {
         text-align: center;
-        color: #8b857e;
+        color: var(--text-secondary);
         font-size: 14px;
         padding: 24px 12px;
       }
-      html.dark .log-empty {
-        color: #9db9a6;
-      }
       .status {
         font-size: 12px;
-        color: #666;
+        color: var(--text-secondary);
         margin-top: 10px;
-      }
-      html.dark .status {
-        color: #9db9a6;
       }
       .user-setup {
         margin-top: 12px;
         padding: 12px;
         border-radius: 14px;
-        border: 1px dashed #e5e1da;
-        background: #f9f6f1;
+        border: 1px dashed var(--border-light);
+        background: var(--surface-soft);
       }
       html.dark .user-setup {
-        border-color: rgba(255, 255, 255, 0.08);
+        border-color: var(--border-dark);
         background: rgba(26, 44, 32, 0.9);
       }
       .user-setup label {
         font-size: 11px;
         text-transform: uppercase;
         letter-spacing: 0.12em;
-        color: #6a6259;
-      }
-      html.dark .user-setup label {
-        color: #9db9a6;
+        color: var(--text-secondary);
       }
       .import-panel {
         margin-top: 12px;
         padding: 12px;
         border-radius: 14px;
-        border: 1px dashed #e5e1da;
-        background: #f9f6f1;
+        border: 1px dashed var(--border-light);
+        background: var(--surface-soft);
         display: flex;
         flex-direction: column;
         gap: 8px;
       }
       html.dark .import-panel {
-        border-color: rgba(255, 255, 255, 0.08);
+        border-color: var(--border-dark);
         background: rgba(26, 44, 32, 0.9);
       }
       .import-panel label {
         font-size: 11px;
         text-transform: uppercase;
         letter-spacing: 0.12em;
-        color: #6a6259;
-      }
-      html.dark .import-panel label {
-        color: #9db9a6;
+        color: var(--text-secondary);
       }
       .import-row {
         display: flex;
@@ -252,23 +169,20 @@
       .import-file {
         flex: 1;
         border-radius: 10px;
-        border: 1px solid #e5e1da;
+        border: 1px solid var(--border-light);
         padding: 8px 10px;
         font-size: 12px;
         background: #ffffff;
-        color: #1f1f1f;
+        color: var(--text-primary);
       }
       html.dark .import-file {
-        border-color: rgba(255, 255, 255, 0.12);
+        border-color: var(--border-dark);
         background: rgba(16, 24, 18, 0.8);
         color: #f3f6f4;
       }
       .import-hint {
         font-size: 12px;
-        color: #7b736a;
-      }
-      html.dark .import-hint {
-        color: #9db9a6;
+        color: var(--text-secondary);
       }
       .user-row {
         display: flex;
@@ -278,14 +192,14 @@
       .user-input {
         flex: 1;
         border-radius: 10px;
-        border: 1px solid #e5e1da;
+        border: 1px solid var(--border-light);
         padding: 10px 12px;
         font-size: 14px;
         background: #ffffff;
-        color: #1f1f1f;
+        color: var(--text-primary);
       }
       html.dark .user-input {
-        border-color: rgba(255, 255, 255, 0.12);
+        border-color: var(--border-dark);
         background: rgba(16, 24, 18, 0.8);
         color: #f3f6f4;
       }
@@ -293,33 +207,15 @@
         border-radius: 10px;
         border: none;
         padding: 0 16px;
-        background: #f6c453;
-        color: #1f1f1f;
+        background: var(--primary);
+        color: #0f1a12;
         font-weight: 700;
         cursor: pointer;
       }
       .user-hint {
         margin-top: 6px;
         font-size: 12px;
-        color: #7b736a;
-      }
-      html.dark .user-hint {
-        color: #9db9a6;
-      }
-      .theme-toggle {
-        width: 32px;
-        height: 32px;
-        border-radius: 999px;
-        border: 1px solid #e5e1da;
-        background: #f9f6f1;
-        display: grid;
-        place-items: center;
-        cursor: pointer;
-      }
-      html.dark .theme-toggle {
-        border-color: rgba(255, 255, 255, 0.08);
-        background: rgba(255, 255, 255, 0.08);
-        color: #d3e4d7;
+        color: var(--text-secondary);
       }
       .disabled {
         opacity: 0.5;
@@ -412,11 +308,11 @@
             <a id="home-link" href="#">Back to chart</a>
             <a id="summary-link" href="/summary">Summary</a>
             <a id="timeline-link" href="#">Timeline</a>
-            <button class="theme-toggle" id="refresh-btn" type="button" aria-label="Refresh entries" title="Refresh entries">
+            <button class="nav-icon" id="refresh-btn" type="button" aria-label="Refresh entries" title="Refresh entries">
               <span class="material-symbols-outlined">refresh</span>
             </button>
             <a href="/settings">Settings</a>
-            <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Switch to light mode">
+            <button class="nav-icon" id="theme-toggle" type="button" aria-label="Switch to light mode">
               <span class="material-symbols-outlined">dark_mode</span>
             </button>
           </div>
