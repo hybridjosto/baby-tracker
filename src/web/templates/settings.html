@@ -83,6 +83,21 @@
         margin: 0;
         font-size: 22px;
       }
+      .user-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 10px;
+        background: #f0ede7;
+        border-radius: 999px;
+        font-size: 12px;
+        color: #4a453f;
+        margin: 6px 0 14px;
+      }
+      html.dark .user-chip {
+        background: rgba(255, 255, 255, 0.08);
+        color: #d3e4d7;
+      }
       .field {
         margin-bottom: 16px;
       }
@@ -197,6 +212,7 @@
             </button>
           </div>
         </div>
+        <div class="user-chip" id="user-message"></div>
         <form id="settings-form">
           <div class="field">
             <label for="dob-input">Baby date of birth</label>
