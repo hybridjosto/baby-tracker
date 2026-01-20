@@ -26,6 +26,16 @@ CREATE TABLE IF NOT EXISTS baby_settings (
 
 INSERT OR IGNORE INTO baby_settings (id) VALUES (1);
 
+CREATE TABLE IF NOT EXISTS feeding_goals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    goal_ml REAL NOT NULL,
+    start_date TEXT NOT NULL,
+    created_at_utc TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_feeding_goals_start_date
+    ON feeding_goals (start_date DESC, created_at_utc DESC);
+
 CREATE TABLE IF NOT EXISTS reminders (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,

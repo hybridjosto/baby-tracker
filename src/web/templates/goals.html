@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Feeding Goals</title>
+    <link rel="manifest" href="/static/manifest.json">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@400;600"
+      rel="stylesheet"
+    >
+    <script>
+      (() => {
+        const stored = localStorage.getItem("baby-tracker-theme");
+        const prefersDark = window.matchMedia
+          && window.matchMedia("(prefers-color-scheme: dark)").matches;
+        const theme = stored || (prefersDark ? "dark" : "light");
+        if (theme === "dark") {
+          document.documentElement.classList.add("dark");
+        }
+      })();
+    </script>
+    <style>
+      html {
+        color-scheme: light;
+      }
+      html.dark {
+        color-scheme: dark;
+      }
+      body {
+        font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+        background: #f7f4ef;
+        color: #1f1f1f;
+        min-height: 100vh;
+      }
+      html.dark body {
+        background: #102216;
+        color: #ffffff;
+      }
+      .page {
+        padding: 16px;
+      }
+      .card {
+        background: #ffffff;
+        border-radius: 16px;
+        padding: 18px;
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+        max-width: 560px;
+        margin: 0 auto;
+      }
+      html.dark .card {
+        background: #1a2c20;
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+      }
+      .nav-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 18px;
+        font-size: 14px;
+        color: #444;
+      }
+      html.dark .nav-row {
+        color: #d3e4d7;
+      }
+      .nav-actions {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .nav-row a {
+        color: #4a453f;
+        text-decoration: none;
+        font-weight: 600;
+      }
+      .theme-toggle {
+        border: none;
+        background: transparent;
+        color: inherit;
+        cursor: pointer;
+      }
+      html.dark .nav-row a {
+        color: #d3e4d7;
+      }
+      h1 {
+        margin: 0;
+        font-size: 22px;
+      }
+      .user-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 10px;
+        background: #f0ede7;
+        border-radius: 999px;
+        font-size: 12px;
+        color: #4a453f;
+        margin: 6px 0 18px;
+      }
+      html.dark .user-chip {
+        background: rgba(255, 255, 255, 0.08);
+        color: #d3e4d7;
+      }
+      .field {
+        margin-bottom: 16px;
+      }
+      label {
+        display: block;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: #6a6259;
+        margin-bottom: 6px;
+      }
+      html.dark label {
+        color: #9db9a6;
+      }
+      input {
+        width: 100%;
+        border-radius: 10px;
+        border: 1px solid #e5e1da;
+        padding: 10px 12px;
+        font-size: 14px;
+        background: #ffffff;
+        color: #1f1f1f;
+        box-sizing: border-box;
+      }
+      html.dark input {
+        background: rgba(26, 44, 32, 0.9);
+        border-color: rgba(255, 255, 255, 0.12);
+        color: #ffffff;
+      }
+      .add-btn {
+        border-radius: 10px;
+        border: none;
+        padding: 10px 14px;
+        background: #f6c453;
+        color: #1f1f1f;
+        font-weight: 700;
+        cursor: pointer;
+        width: 100%;
+      }
+      html.dark .add-btn {
+        background: #f0b428;
+        color: #1f1f1f;
+      }
+      .hint {
+        font-size: 12px;
+        color: #8b857e;
+        margin-top: 6px;
+      }
+      html.dark .hint {
+        color: #9db9a6;
+      }
+      .section-title {
+        margin: 18px 0 8px;
+        font-size: 14px;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: #6a6259;
+      }
+      html.dark .section-title {
+        color: #9db9a6;
+      }
+      .goal-list {
+        display: grid;
+        gap: 10px;
+      }
+      .goal-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px 14px;
+        border-radius: 12px;
+        background: #f7f3ee;
+      }
+      html.dark .goal-item {
+        background: rgba(255, 255, 255, 0.08);
+      }
+      .goal-meta {
+        font-size: 12px;
+        color: #6a6259;
+        font-weight: 600;
+      }
+      html.dark .goal-meta {
+        color: #b2c7b8;
+      }
+      .goal-amount {
+        font-size: 16px;
+        font-weight: 700;
+      }
+      .status {
+        margin-top: 12px;
+        font-size: 12px;
+        color: #6a6259;
+      }
+      html.dark .status {
+        color: #b2c7b8;
+      }
+      .skeleton-text {
+        position: relative;
+        display: inline-block;
+        min-width: 8ch;
+        border-radius: 999px;
+      }
+      .skeleton-text::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(90deg, #e4e0d9 0%, #f5f3ee 45%, #e4e0d9 100%);
+        background-size: 200% 100%;
+        opacity: 0;
+      }
+      .is-loading .skeleton-text {
+        color: transparent;
+      }
+      .is-loading .skeleton-text::after {
+        opacity: 1;
+        animation: skeleton-shimmer 1.2s ease-in-out infinite;
+      }
+      @keyframes skeleton-shimmer {
+        0% {
+          background-position: 200% 0;
+        }
+        100% {
+          background-position: -200% 0;
+        }
+      }
+    </style>
+  </head>
+  <body data-page="goals">
+    <div class="page">
+      <div class="card">
+        <div class="nav-row">
+          <h1>Feeding goals</h1>
+          <div class="nav-actions">
+            <a href="/">Back to home</a>
+            <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Switch to light mode">
+              <span class="material-symbols-outlined">dark_mode</span>
+            </button>
+          </div>
+        </div>
+        <div class="user-chip" id="user-message">Goals apply to all feeds logged in the last 24 hours.</div>
+        <form id="goals-form">
+          <div class="field">
+            <label for="goal-amount">24h goal (ml)</label>
+            <input id="goal-amount" type="number" name="goal_amount" min="1" step="1" inputmode="decimal" required>
+          </div>
+          <div class="field">
+            <label for="goal-start-date">Start date</label>
+            <input id="goal-start-date" type="date" name="start_date">
+            <div class="hint">Applies from this day until the next goal is added.</div>
+          </div>
+          <button class="add-btn" type="submit">Save goal</button>
+        </form>
+        <div class="status" id="status"></div>
+        <div class="section-title">Goal history</div>
+        <div class="goal-list" id="goal-history"></div>
+        <div class="hint" id="goal-empty">Loading goals...</div>
+      </div>
+    </div>
+    <script src="/static/app.js"></script>
+  </body>
+</html>

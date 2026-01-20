@@ -170,6 +170,22 @@
         font-size: 22px;
         font-weight: 700;
       }
+      .stat-sub {
+        margin-top: 4px;
+        font-size: 11px;
+        color: var(--text-secondary);
+      }
+      .stat-link {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        margin-top: 6px;
+        font-size: 11px;
+        color: var(--primary);
+        text-decoration: none;
+        font-weight: 600;
+        gap: 4px;
+      }
       .stats-range {
         margin-top: 10px;
         font-size: 11px;
@@ -193,6 +209,11 @@
         align-items: center;
         justify-content: space-between;
         margin-bottom: 12px;
+      }
+      .chart-links {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
       }
       .chart-header h3 {
         margin: 0;
@@ -302,6 +323,15 @@
         font-weight: 700;
         color: var(--text-secondary);
         text-decoration: none;
+      }
+      .timeline-link {
+        font-size: 12px;
+        font-weight: 700;
+        color: #2d6f60;
+        text-decoration: none;
+      }
+      html.dark .timeline-link {
+        color: #7fe0c3;
       }
       .status {
         font-size: 12px;
@@ -714,6 +744,9 @@
           <button class="icon-btn" id="refresh-btn" type="button" aria-label="Refresh data" title="Refresh data">
             <span class="material-symbols-outlined">refresh</span>
           </button>
+          <a class="icon-btn" id="goals-link" href="/goals" aria-label="Feeding goals">
+            <span class="material-symbols-outlined">track_changes</span>
+          </a>
           <a class="icon-btn" id="summary-link" href="/summary" aria-label="Summary">
             <span class="material-symbols-outlined">query_stats</span>
           </a>
@@ -733,6 +766,19 @@
               Feed total (24h)
             </div>
             <div class="stat-value skeleton-text skeleton-mid" id="stat-feed-ml">0 ml</div>
+            <div class="stat-sub skeleton-text skeleton-wide" id="stat-feed-breakdown">Expressed 0 ml · Formula 0 ml</div>
+          </div>
+          <div class="stat-card" aria-label="24 hour feeding goal progress">
+            <div class="stat-label">
+              <span class="material-symbols-outlined" style="font-size: 18px; color: #38bdf8;">track_changes</span>
+              Goal (24h)
+            </div>
+            <div class="stat-value skeleton-text skeleton-mid" id="stat-goal-progress">--</div>
+            <div class="stat-sub skeleton-text skeleton-wide" id="stat-goal-detail">Set a 24h goal</div>
+            <a class="stat-link" href="/goals" aria-label="Edit feeding goals">
+              Edit goals
+              <span class="material-symbols-outlined" style="font-size: 14px;">arrow_forward</span>
+            </a>
           </div>
           <div class="stat-card" data-log-type="feed" role="button" tabindex="0" aria-label="View feed events">
             <div class="stat-label">
@@ -761,7 +807,10 @@
         <section class="chart-card">
           <div class="chart-header">
             <h3>Last 6 Hours</h3>
-            <a class="log-link" id="log-link" href="#">Event log</a>
+            <div class="chart-links">
+              <a class="log-link" id="log-link" href="#">Event log</a>
+              <a class="timeline-link" id="timeline-link" href="#">Timeline</a>
+            </div>
           </div>
           <div class="legend">
             <span class="legend-item"><span class="legend-dot" style="background: var(--primary);"></span>Feed</span>
