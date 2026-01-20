@@ -4,6 +4,7 @@ from flask import Flask, render_template
 
 from src.app.config import load_config
 from src.app.routes.entries import entries_api
+from src.app.routes.goals import goals_api
 from src.app.routes.settings import settings_api
 from src.app.storage.db import init_db
 from src.lib.logging import configure_logging
@@ -28,6 +29,7 @@ def create_app() -> Flask:
 
     init_db(app.config["DB_PATH"])
     app.register_blueprint(entries_api)
+    app.register_blueprint(goals_api)
     app.register_blueprint(settings_api)
 
     def render_log_page(
@@ -100,6 +102,10 @@ def create_app() -> Flask:
     def settings():
         return render_template("settings.html", page="settings")
 
+    @app.get("/goals")
+    def goals():
+        return render_template("goals.html", page="goals")
+
     def render_summary_page(
         user_slug: str,
         user_valid: bool,
@@ -117,9 +123,34 @@ def create_app() -> Flask:
             status_code,
         )
 
+    def render_timeline_page(
+        user_slug: str,
+        user_valid: bool,
+        user_message: str,
+        status_code: int = 200,
+    ):
+        return (
+            render_template(
+                "timeline.html",
+                user_slug=user_slug,
+                user_valid=user_valid,
+                user_message=user_message,
+                page="timeline",
+            ),
+            status_code,
+        )
+
     @app.get("/summary")
     def summary():
         return render_summary_page(
+            user_slug="",
+            user_valid=False,
+            user_message="Choose a user below (example: josh).",
+        )
+
+    @app.get("/timeline")
+    def timeline():
+        return render_timeline_page(
             user_slug="",
             user_valid=False,
             user_message="Choose a user below (example: josh).",
@@ -160,6 +191,23 @@ def create_app() -> Flask:
                 status_code=400,
             )
         return render_summary_page(
+            user_slug=normalized,
+            user_valid=True,
+            user_message=f"Logging as {normalized}",
+        )
+
+    @app.get("/<user_slug>/timeline")
+    def user_timeline(user_slug: str):
+        try:
+            normalized = normalize_user_slug(user_slug)
+        except ValueError as exc:
+            return render_timeline_page(
+                user_slug="",
+                user_valid=False,
+                user_message=str(exc),
+                status_code=400,
+            )
+        return render_timeline_page(
             user_slug=normalized,
             user_valid=True,
             user_message=f"Logging as {normalized}",

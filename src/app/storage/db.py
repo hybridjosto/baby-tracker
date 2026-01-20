@@ -25,6 +25,7 @@ def init_db(db_path: str) -> None:
         _ensure_feed_duration_column(conn)
         _ensure_feed_amount_columns(conn)
         _ensure_settings_table(conn)
+        _ensure_feeding_goals_table(conn)
         _ensure_reminders_table(conn)
         _ensure_default_reminders(conn)
         conn.commit()
@@ -163,6 +164,25 @@ def _ensure_reminders_table(conn: sqlite3.Connection) -> None:
     )
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_reminders_next_due_at_utc ON reminders (next_due_at_utc)"
+    )
+
+
+def _ensure_feeding_goals_table(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS feeding_goals (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            goal_ml REAL NOT NULL,
+            start_date TEXT NOT NULL,
+            created_at_utc TEXT NOT NULL
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_feeding_goals_start_date
+            ON feeding_goals (start_date DESC, created_at_utc DESC)
+        """
     )
 
 
