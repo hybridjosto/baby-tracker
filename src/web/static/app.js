@@ -99,6 +99,11 @@ const settingsFormEl = document.getElementById("settings-form");
 const dobInputEl = document.getElementById("dob-input");
 const ageOutputEl = document.getElementById("age-output");
 const intervalInputEl = document.getElementById("interval-input");
+const feedGoalMinInputEl = document.getElementById("feed-goal-min");
+const feedGoalMaxInputEl = document.getElementById("feed-goal-max");
+const overnightGapMinInputEl = document.getElementById("overnight-gap-min");
+const overnightGapMaxInputEl = document.getElementById("overnight-gap-max");
+const behindTargetModeEl = document.getElementById("behind-target-mode");
 const customTypeInputEl = document.getElementById("custom-type-input");
 const customTypeAddBtn = document.getElementById("custom-type-add");
 const customTypeListEl = document.getElementById("custom-type-list");
@@ -684,6 +689,39 @@ function initSettingsHandlers() {
         const minutes = Math.round(nextValue * 60);
         void saveBabySettings({ feed_interval_min: minutes });
       }
+    });
+  }
+  if (feedGoalMinInputEl) {
+    feedGoalMinInputEl.addEventListener("change", () => {
+      const value = Number.parseInt(feedGoalMinInputEl.value, 10);
+      void saveBabySettings({ feed_goal_min: Number.isNaN(value) ? null : value });
+    });
+  }
+  if (feedGoalMaxInputEl) {
+    feedGoalMaxInputEl.addEventListener("change", () => {
+      const value = Number.parseInt(feedGoalMaxInputEl.value, 10);
+      void saveBabySettings({ feed_goal_max: Number.isNaN(value) ? null : value });
+    });
+  }
+  if (overnightGapMinInputEl) {
+    overnightGapMinInputEl.addEventListener("change", () => {
+      const value = Number.parseFloat(overnightGapMinInputEl.value);
+      void saveBabySettings({
+        overnight_gap_min_hours: Number.isNaN(value) ? null : value,
+      });
+    });
+  }
+  if (overnightGapMaxInputEl) {
+    overnightGapMaxInputEl.addEventListener("change", () => {
+      const value = Number.parseFloat(overnightGapMaxInputEl.value);
+      void saveBabySettings({
+        overnight_gap_max_hours: Number.isNaN(value) ? null : value,
+      });
+    });
+  }
+  if (behindTargetModeEl) {
+    behindTargetModeEl.addEventListener("change", () => {
+      void saveBabySettings({ behind_target_mode: behindTargetModeEl.value || null });
     });
   }
   if (customTypeAddBtn && customTypeInputEl) {
@@ -3245,6 +3283,29 @@ async function loadBabySettings() {
         ? String(feedIntervalMinutes / 60)
         : "";
     }
+    if (feedGoalMinInputEl) {
+      feedGoalMinInputEl.value = Number.isInteger(data.feed_goal_min)
+        ? String(data.feed_goal_min)
+        : "";
+    }
+    if (feedGoalMaxInputEl) {
+      feedGoalMaxInputEl.value = Number.isInteger(data.feed_goal_max)
+        ? String(data.feed_goal_max)
+        : "";
+    }
+    if (overnightGapMinInputEl) {
+      overnightGapMinInputEl.value = Number.isFinite(data.overnight_gap_min_hours)
+        ? String(data.overnight_gap_min_hours)
+        : "";
+    }
+    if (overnightGapMaxInputEl) {
+      overnightGapMaxInputEl.value = Number.isFinite(data.overnight_gap_max_hours)
+        ? String(data.overnight_gap_max_hours)
+        : "";
+    }
+    if (behindTargetModeEl) {
+      behindTargetModeEl.value = data.behind_target_mode || "";
+    }
     applyCustomEventTypes();
     updateAgeDisplay();
     updateNextFeed();
@@ -3271,6 +3332,37 @@ async function saveBabySettings(patch) {
     customEventTypes = Array.isArray(data.custom_event_types)
       ? data.custom_event_types
       : [];
+    if (dobInputEl) {
+      dobInputEl.value = babyDob || "";
+    }
+    if (intervalInputEl) {
+      intervalInputEl.value = feedIntervalMinutes
+        ? String(feedIntervalMinutes / 60)
+        : "";
+    }
+    if (feedGoalMinInputEl) {
+      feedGoalMinInputEl.value = Number.isInteger(data.feed_goal_min)
+        ? String(data.feed_goal_min)
+        : "";
+    }
+    if (feedGoalMaxInputEl) {
+      feedGoalMaxInputEl.value = Number.isInteger(data.feed_goal_max)
+        ? String(data.feed_goal_max)
+        : "";
+    }
+    if (overnightGapMinInputEl) {
+      overnightGapMinInputEl.value = Number.isFinite(data.overnight_gap_min_hours)
+        ? String(data.overnight_gap_min_hours)
+        : "";
+    }
+    if (overnightGapMaxInputEl) {
+      overnightGapMaxInputEl.value = Number.isFinite(data.overnight_gap_max_hours)
+        ? String(data.overnight_gap_max_hours)
+        : "";
+    }
+    if (behindTargetModeEl) {
+      behindTargetModeEl.value = data.behind_target_mode || "";
+    }
     applyCustomEventTypes();
     updateAgeDisplay();
     updateNextFeed();
