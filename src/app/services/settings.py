@@ -37,6 +37,7 @@ def _normalize_feed_interval(value: object) -> int | None:
 
 
 _CUSTOM_TYPE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 /-]{0,31}$")
+_BEHIND_TARGET_MODES = {"increase_next", "add_feed"}
 
 
 def _normalize_custom_event_types(value: object) -> str:
@@ -60,6 +61,39 @@ def _normalize_custom_event_types(value: object) -> str:
     return json.dumps(cleaned)
 
 
+def _normalize_feed_goal_count(value: object, field: str) -> int | None:
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValueError(f"{field} must be a positive integer")
+    if value <= 0:
+        raise ValueError(f"{field} must be a positive integer")
+    return value
+
+
+def _normalize_gap_hours(value: object, field: str) -> float | None:
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"{field} must be a positive number")
+    if not value or float(value) <= 0:
+        raise ValueError(f"{field} must be a positive number")
+    return float(value)
+
+
+def _normalize_behind_target_mode(value: object) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError("behind_target_mode must be increase_next or add_feed")
+    trimmed = value.strip()
+    if not trimmed:
+        return None
+    if trimmed not in _BEHIND_TARGET_MODES:
+        raise ValueError("behind_target_mode must be increase_next or add_feed")
+    return trimmed
+
+
 def get_settings(db_path: str) -> dict:
     with get_connection(db_path) as conn:
         return repo_get_settings(conn)
@@ -77,7 +111,43 @@ def update_settings(db_path: str, payload: dict) -> dict:
         fields["custom_event_types"] = _normalize_custom_event_types(
             payload["custom_event_types"]
         )
-    if fields:
-        fields["updated_at_utc"] = _now_utc_iso()
     with get_connection(db_path) as conn:
+        current = repo_get_settings(conn)
+        if "feed_goal_min" in payload:
+            fields["feed_goal_min"] = _normalize_feed_goal_count(
+                payload["feed_goal_min"], "feed_goal_min"
+            )
+        if "feed_goal_max" in payload:
+            fields["feed_goal_max"] = _normalize_feed_goal_count(
+                payload["feed_goal_max"], "feed_goal_max"
+            )
+        if "overnight_gap_min_hours" in payload:
+            fields["overnight_gap_min_hours"] = _normalize_gap_hours(
+                payload["overnight_gap_min_hours"], "overnight_gap_min_hours"
+            )
+        if "overnight_gap_max_hours" in payload:
+            fields["overnight_gap_max_hours"] = _normalize_gap_hours(
+                payload["overnight_gap_max_hours"], "overnight_gap_max_hours"
+            )
+        if "behind_target_mode" in payload:
+            fields["behind_target_mode"] = _normalize_behind_target_mode(
+                payload["behind_target_mode"]
+            )
+
+        next_min = fields.get("feed_goal_min", current.get("feed_goal_min"))
+        next_max = fields.get("feed_goal_max", current.get("feed_goal_max"))
+        if next_min is not None and next_max is not None and next_min > next_max:
+            raise ValueError("feed_goal_min must be <= feed_goal_max")
+
+        gap_min = fields.get(
+            "overnight_gap_min_hours", current.get("overnight_gap_min_hours")
+        )
+        gap_max = fields.get(
+            "overnight_gap_max_hours", current.get("overnight_gap_max_hours")
+        )
+        if gap_min is not None and gap_max is not None and gap_min > gap_max:
+            raise ValueError("overnight_gap_min_hours must be <= overnight_gap_max_hours")
+
+        if fields:
+            fields["updated_at_utc"] = _now_utc_iso()
         return repo_update_settings(conn, fields)

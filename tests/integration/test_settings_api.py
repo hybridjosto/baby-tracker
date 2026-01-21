@@ -45,3 +45,55 @@ def test_patch_settings_rejects_invalid_values(client):
         "/api/settings", json={"custom_event_types": ["bad*chars"]}
     )
     assert response.status_code == 400
+
+
+def test_patch_settings_updates_schedule_helper_fields(client):
+    response = client.patch(
+        "/api/settings",
+        json={
+            "feed_goal_min": 7,
+            "feed_goal_max": 8,
+            "overnight_gap_min_hours": 4,
+            "overnight_gap_max_hours": 5,
+            "behind_target_mode": "increase_next",
+        },
+    )
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["feed_goal_min"] == 7
+    assert payload["feed_goal_max"] == 8
+    assert payload["overnight_gap_min_hours"] == 4
+    assert payload["overnight_gap_max_hours"] == 5
+    assert payload["behind_target_mode"] == "increase_next"
+
+
+def test_patch_settings_rejects_invalid_schedule_helper_fields(client):
+    response = client.patch("/api/settings", json={"feed_goal_min": 0})
+    assert response.status_code == 400
+
+    response = client.patch("/api/settings", json={"feed_goal_max": -1})
+    assert response.status_code == 400
+
+    response = client.patch(
+        "/api/settings",
+        json={"feed_goal_min": 9, "feed_goal_max": 8},
+    )
+    assert response.status_code == 400
+
+    response = client.patch(
+        "/api/settings",
+        json={"overnight_gap_min_hours": -1},
+    )
+    assert response.status_code == 400
+
+    response = client.patch(
+        "/api/settings",
+        json={"overnight_gap_min_hours": 6, "overnight_gap_max_hours": 5},
+    )
+    assert response.status_code == 400
+
+    response = client.patch(
+        "/api/settings",
+        json={"behind_target_mode": "nope"},
+    )
+    assert response.status_code == 400
