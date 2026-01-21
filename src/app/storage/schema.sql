@@ -26,7 +26,6 @@ CREATE TABLE IF NOT EXISTS baby_settings (
     overnight_gap_min_hours REAL,
     overnight_gap_max_hours REAL,
     behind_target_mode TEXT,
-    feed_schedule_anchor_time TEXT,
     updated_at_utc TEXT NOT NULL DEFAULT (datetime('now'))
 );
 

@@ -38,7 +38,6 @@ def _normalize_feed_interval(value: object) -> int | None:
 
 _CUSTOM_TYPE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 /-]{0,31}$")
 _BEHIND_TARGET_MODES = {"increase_next", "add_feed"}
-_ANCHOR_TIME_RE = re.compile(r"^([01]\d|2[0-3]):([0-5]\d)$")
 
 
 def _normalize_custom_event_types(value: object) -> str:
@@ -95,19 +94,6 @@ def _normalize_behind_target_mode(value: object) -> str | None:
     return trimmed
 
 
-def _normalize_anchor_time(value: object) -> str | None:
-    if value is None:
-        return None
-    if not isinstance(value, str):
-        raise ValueError("feed_schedule_anchor_time must be HH:MM")
-    trimmed = value.strip()
-    if not trimmed:
-        return None
-    if not _ANCHOR_TIME_RE.match(trimmed):
-        raise ValueError("feed_schedule_anchor_time must be HH:MM")
-    return trimmed
-
-
 def get_settings(db_path: str) -> dict:
     with get_connection(db_path) as conn:
         return repo_get_settings(conn)
@@ -146,10 +132,6 @@ def update_settings(db_path: str, payload: dict) -> dict:
         if "behind_target_mode" in payload:
             fields["behind_target_mode"] = _normalize_behind_target_mode(
                 payload["behind_target_mode"]
-            )
-        if "feed_schedule_anchor_time" in payload:
-            fields["feed_schedule_anchor_time"] = _normalize_anchor_time(
-                payload["feed_schedule_anchor_time"]
             )
 
         next_min = fields.get("feed_goal_min", current.get("feed_goal_min"))

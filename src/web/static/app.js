@@ -10,14 +10,7 @@ const THEME_KEY = "baby-tracker-theme";
 const USER_KEY = "baby-tracker-user";
 const BREASTFEED_TIMER_KEY = "baby-tracker-breastfeed-start";
 const USER_RE = /^[a-z0-9-]{1,24}$/;
-const RESERVED_USER_SLUGS = new Set([
-  "timeline",
-  "summary",
-  "log",
-  "settings",
-  "goals",
-  "feed-coach",
-]);
+const RESERVED_USER_SLUGS = new Set(["timeline", "summary", "log", "settings", "goals"]);
 const themeToggleBtn = document.getElementById("theme-toggle");
 const userFormEl = document.getElementById("user-form");
 const userInputEl = document.getElementById("user-input");
@@ -92,12 +85,11 @@ const statFeedBreakdownEl = document.getElementById("stat-feed-breakdown");
 const statGoalProgressEl = document.getElementById("stat-goal-progress");
 const statGoalDetailEl = document.getElementById("stat-goal-detail");
 const statWindowEl = document.getElementById("stat-window");
-const coachTotalEl = document.getElementById("coach-total");
-const coachGoalEl = document.getElementById("coach-goal");
 const coachRemainingEl = document.getElementById("coach-remaining");
-const coachFeedCountEl = document.getElementById("coach-feed-count");
-const coachScheduleEl = document.getElementById("coach-schedule");
-const coachScheduleHintEl = document.getElementById("coach-schedule-hint");
+const coachFeedsEl = document.getElementById("coach-feeds");
+const coachSuggestionEl = document.getElementById("coach-suggestion");
+const coachGapEl = document.getElementById("coach-gap");
+const coachHintEl = document.getElementById("coach-hint");
 const lastActivityEl = document.getElementById("last-activity");
 const lastFeedEl = document.getElementById("last-feed");
 const nextFeedEl = document.getElementById("next-feed");
@@ -117,7 +109,6 @@ const feedGoalMaxInputEl = document.getElementById("feed-goal-max");
 const overnightGapMinInputEl = document.getElementById("overnight-gap-min");
 const overnightGapMaxInputEl = document.getElementById("overnight-gap-max");
 const behindTargetModeEl = document.getElementById("behind-target-mode");
-const feedAnchorTimeEl = document.getElementById("feed-anchor-time");
 const customTypeInputEl = document.getElementById("custom-type-input");
 const customTypeAddBtn = document.getElementById("custom-type-add");
 const customTypeListEl = document.getElementById("custom-type-list");
@@ -738,12 +729,6 @@ function initSettingsHandlers() {
       void saveBabySettings({ behind_target_mode: behindTargetModeEl.value || null });
     });
   }
-  if (feedAnchorTimeEl) {
-    feedAnchorTimeEl.addEventListener("change", () => {
-      const value = feedAnchorTimeEl.value;
-      void saveBabySettings({ feed_schedule_anchor_time: value || null });
-    });
-  }
   if (customTypeAddBtn && customTypeInputEl) {
     const handleAdd = () => {
       const normalized = normalizeCustomTypeInput(customTypeInputEl.value);
@@ -822,11 +807,6 @@ function applyUserState() {
     initGoalsHandlers();
     updateUserDisplay();
     loadGoalHistory();
-    return;
-  }
-  if (pageType === "feed-coach") {
-    updateUserDisplay();
-    loadFeedCoachPage();
     return;
   }
   const allowTimeline = pageType === "timeline";
@@ -2559,71 +2539,56 @@ function renderGoalComparison() {
   statGoalDetailEl.textContent = `${formatMl(latestFeedTotalMl)} / ${formatMl(goalValue)}`;
 }
 
-function formatLocalTimeLabel(value) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return "--";
-  }
-  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-}
-
 function renderFeedCoach(data) {
-  if (!coachTotalEl || !coachGoalEl || !coachRemainingEl || !coachFeedCountEl) {
+  if (!coachRemainingEl || !coachFeedsEl || !coachSuggestionEl || !coachGapEl) {
     return;
   }
   if (!data || !data.goal_ml) {
-    coachTotalEl.textContent = "--";
-    coachGoalEl.textContent = "--";
     coachRemainingEl.textContent = "--";
-    coachFeedCountEl.textContent = "--";
-    if (coachScheduleEl) {
-      coachScheduleEl.innerHTML = "";
-    }
-    if (coachScheduleHintEl) {
-      coachScheduleHintEl.textContent = "Set an anchor time and feed goals to see a schedule.";
+    coachFeedsEl.textContent = "--";
+    coachSuggestionEl.textContent = "--";
+    coachGapEl.textContent = "--";
+    if (coachHintEl) {
+      coachHintEl.textContent = "Set a 24h goal and schedule settings to see suggestions.";
     }
     return;
   }
 
-  coachTotalEl.textContent = Number.isFinite(data.total_ml) ? formatMl(data.total_ml) : "--";
-  coachGoalEl.textContent = Number.isFinite(data.goal_ml) ? formatMl(data.goal_ml) : "--";
   coachRemainingEl.textContent = Number.isFinite(data.remaining_ml)
     ? formatMl(data.remaining_ml)
     : "--";
-  coachFeedCountEl.textContent = Number.isFinite(data.feed_count)
-    ? String(data.feed_count)
-    : "--";
 
-  if (!coachScheduleEl) {
-    return;
+  if (Number.isInteger(data.feeds_remaining_min) && Number.isInteger(data.feeds_remaining_max)) {
+    coachFeedsEl.textContent = `${data.feeds_remaining_min}–${data.feeds_remaining_max}`;
+  } else {
+    coachFeedsEl.textContent = "--";
   }
 
-  coachScheduleEl.innerHTML = "";
-  const schedule = Array.isArray(data.schedule) ? data.schedule : [];
-  if (!schedule.length) {
-    if (coachScheduleHintEl) {
-      coachScheduleHintEl.textContent = "No upcoming feeds in the next 12 hours.";
+  if (Number.isFinite(data.suggested_next_min_ml) && Number.isFinite(data.suggested_next_max_ml)) {
+    if (data.suggested_next_min_ml === data.suggested_next_max_ml) {
+      coachSuggestionEl.textContent = formatMl(data.suggested_next_min_ml);
+    } else {
+      coachSuggestionEl.textContent = `${formatMl(data.suggested_next_min_ml)}–${formatMl(data.suggested_next_max_ml)}`;
     }
-    return;
+  } else {
+    coachSuggestionEl.textContent = "--";
   }
-  if (coachScheduleHintEl) {
-    coachScheduleHintEl.textContent = "Minimum ml per feed to close the rolling 24h gap.";
+
+  if (Number.isFinite(data.overnight_gap_min_hours) && Number.isFinite(data.overnight_gap_max_hours)) {
+    coachGapEl.textContent = `${data.overnight_gap_min_hours}–${data.overnight_gap_max_hours}h`;
+  } else {
+    coachGapEl.textContent = "--";
   }
-  schedule.forEach((item) => {
-    const row = document.createElement("div");
-    row.className = "schedule-row";
-    const time = document.createElement("div");
-    time.className = "schedule-time";
-    time.textContent = formatLocalTimeLabel(item.time_local);
-    const ml = document.createElement("div");
-    ml.className = "schedule-ml";
-    ml.textContent = Number.isFinite(item.suggested_min_ml)
-      ? formatMl(item.suggested_min_ml)
-      : "--";
-    row.appendChild(time);
-    row.appendChild(ml);
-    coachScheduleEl.appendChild(row);
-  });
+
+  if (coachHintEl) {
+    if (data.remaining_ml === 0) {
+      coachHintEl.textContent = "Goal met for the last 24h.";
+    } else if (data.behind_target_mode === "add_feed") {
+      coachHintEl.textContent = "Behind target: add a feed slot if needed.";
+    } else {
+      coachHintEl.textContent = "Behind target: increase the next feed size if needed.";
+    }
+  }
 }
 
 function renderGoalHistory(goals) {
@@ -3217,20 +3182,6 @@ async function loadGoalHistory() {
   }
 }
 
-async function loadFeedCoachPage() {
-  if (pageType !== "feed-coach") {
-    return;
-  }
-  try {
-    const coach = await fetchFeedCoach();
-    renderFeedCoach(coach);
-  } catch (err) {
-    if (coachScheduleHintEl) {
-      coachScheduleHintEl.textContent = "Failed to load feed coach data.";
-    }
-  }
-}
-
 async function loadHomeEntries() {
   const shouldShowLoading = !hasLoadedHomeEntries;
   if (shouldShowLoading) {
@@ -3239,13 +3190,14 @@ async function loadHomeEntries() {
   try {
     const statsWindow = computeWindow(24);
     const chartWindow = computeWindow(6);
-    const [entries, goals] = await Promise.all([
+    const [entries, goals, coach] = await Promise.all([
       fetchEntries({
         limit: 200,
         since: statsWindow.sinceIso,
         until: statsWindow.untilIso,
       }),
       loadFeedingGoals(1).catch(() => []),
+      fetchFeedCoach().catch(() => null),
     ]);
     activeFeedingGoal = goals[0] || null;
     const chartEntries = entries.filter((entry) => {
@@ -3255,6 +3207,7 @@ async function loadHomeEntries() {
     renderChart(chartEntries, chartWindow);
     renderStats(entries);
     renderGoalComparison();
+    renderFeedCoach(coach);
     renderStatsWindow(statsWindow);
     renderLastActivity(entries);
     renderLastByType(entries);
@@ -3420,9 +3373,6 @@ async function loadBabySettings() {
     if (behindTargetModeEl) {
       behindTargetModeEl.value = data.behind_target_mode || "";
     }
-    if (feedAnchorTimeEl) {
-      feedAnchorTimeEl.value = data.feed_schedule_anchor_time || "";
-    }
     applyCustomEventTypes();
     updateAgeDisplay();
     updateNextFeed();
@@ -3479,9 +3429,6 @@ async function saveBabySettings(patch) {
     }
     if (behindTargetModeEl) {
       behindTargetModeEl.value = data.behind_target_mode || "";
-    }
-    if (feedAnchorTimeEl) {
-      feedAnchorTimeEl.value = data.feed_schedule_anchor_time || "";
     }
     applyCustomEventTypes();
     updateAgeDisplay();

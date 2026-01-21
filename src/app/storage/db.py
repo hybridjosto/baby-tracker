@@ -142,8 +142,6 @@ def _ensure_settings_table(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE baby_settings ADD COLUMN overnight_gap_max_hours REAL")
     if "behind_target_mode" not in columns:
         conn.execute("ALTER TABLE baby_settings ADD COLUMN behind_target_mode TEXT")
-    if "feed_schedule_anchor_time" not in columns:
-        conn.execute("ALTER TABLE baby_settings ADD COLUMN feed_schedule_anchor_time TEXT")
     row = conn.execute("SELECT id FROM baby_settings WHERE id = 1").fetchone()
     if not row:
         now = datetime.now(timezone.utc).isoformat()
@@ -153,8 +151,8 @@ def _ensure_settings_table(conn: sqlite3.Connection) -> None:
                 (id, dob, feed_interval_min, custom_event_types,
                  feed_goal_min, feed_goal_max,
                  overnight_gap_min_hours, overnight_gap_max_hours,
-                 behind_target_mode, feed_schedule_anchor_time, updated_at_utc)
-            VALUES (1, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, ?)
+                 behind_target_mode, updated_at_utc)
+            VALUES (1, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, ?)
             """,
             (now,),
         )

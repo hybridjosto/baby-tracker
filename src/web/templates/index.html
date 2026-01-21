@@ -692,6 +692,41 @@
       .is-loading #chart-empty {
         opacity: 0;
       }
+      .coach-card {
+        background: var(--card);
+        border-radius: 16px;
+        padding: 16px;
+        box-shadow: var(--shadow);
+        display: grid;
+        gap: 12px;
+      }
+      .coach-header {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+      }
+      .coach-grid {
+        display: grid;
+        gap: 12px;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      }
+      .coach-label {
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--muted);
+      }
+      .coach-value {
+        font-size: 20px;
+        font-weight: 600;
+      }
+      .coach-hint {
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .coach-link {
+        font-size: 12px;
+      }
       @keyframes skeleton-shimmer {
         0% {
           background-position: 200% 0;
@@ -714,9 +749,6 @@
           <button class="icon-btn" id="refresh-btn" type="button" aria-label="Refresh data" title="Refresh data">
             <span class="material-symbols-outlined">refresh</span>
           </button>
-          <a class="icon-btn" href="/feed-coach" aria-label="Feed coach">
-            <span class="material-symbols-outlined">schedule</span>
-          </a>
           <a class="icon-btn" id="goals-link" href="/goals" aria-label="Feeding goals">
             <span class="material-symbols-outlined">track_changes</span>
           </a>
@@ -774,6 +806,31 @@
             </div>
             <div class="stat-value skeleton-text" id="stat-poo">0</div>
           </div>
+        </section>
+        <section class="coach-card" aria-label="Feed coach">
+          <div class="coach-header">
+            <h3>Feed Coach (rolling 24h)</h3>
+            <a class="coach-link" href="/settings">Settings</a>
+          </div>
+          <div class="coach-grid">
+            <div>
+              <div class="coach-label">Remaining today</div>
+              <div class="coach-value" id="coach-remaining">--</div>
+            </div>
+            <div>
+              <div class="coach-label">Feeds remaining</div>
+              <div class="coach-value" id="coach-feeds">--</div>
+            </div>
+            <div>
+              <div class="coach-label">Next feed suggestion</div>
+              <div class="coach-value" id="coach-suggestion">--</div>
+            </div>
+            <div>
+              <div class="coach-label">Overnight gap</div>
+              <div class="coach-value" id="coach-gap">--</div>
+            </div>
+          </div>
+          <div class="coach-hint" id="coach-hint">Set a 24h goal and schedule settings to see suggestions.</div>
         </section>
         <div class="stats-range skeleton-text skeleton-wide" id="stat-window">Rolling 24h: --</div>
 
