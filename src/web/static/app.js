@@ -85,6 +85,11 @@ const statFeedBreakdownEl = document.getElementById("stat-feed-breakdown");
 const statGoalProgressEl = document.getElementById("stat-goal-progress");
 const statGoalDetailEl = document.getElementById("stat-goal-detail");
 const statWindowEl = document.getElementById("stat-window");
+const coachRemainingEl = document.getElementById("coach-remaining");
+const coachFeedsEl = document.getElementById("coach-feeds");
+const coachSuggestionEl = document.getElementById("coach-suggestion");
+const coachGapEl = document.getElementById("coach-gap");
+const coachHintEl = document.getElementById("coach-hint");
 const lastActivityEl = document.getElementById("last-activity");
 const lastFeedEl = document.getElementById("last-feed");
 const nextFeedEl = document.getElementById("next-feed");
@@ -1969,6 +1974,14 @@ async function fetchFeedingGoals(params) {
   return normalizeGoalsResponse(data);
 }
 
+async function fetchFeedCoach() {
+  const response = await fetch("/api/feed-coach");
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}`);
+  }
+  return response.json();
+}
+
 async function loadFeedingGoals(limit) {
   const goals = await fetchFeedingGoals({ limit });
   activeFeedingGoal = goals[0] || null;
@@ -2524,6 +2537,58 @@ function renderGoalComparison() {
   const percent = Math.round((latestFeedTotalMl / goalValue) * 100);
   statGoalProgressEl.textContent = `${percent}%`;
   statGoalDetailEl.textContent = `${formatMl(latestFeedTotalMl)} / ${formatMl(goalValue)}`;
+}
+
+function renderFeedCoach(data) {
+  if (!coachRemainingEl || !coachFeedsEl || !coachSuggestionEl || !coachGapEl) {
+    return;
+  }
+  if (!data || !data.goal_ml) {
+    coachRemainingEl.textContent = "--";
+    coachFeedsEl.textContent = "--";
+    coachSuggestionEl.textContent = "--";
+    coachGapEl.textContent = "--";
+    if (coachHintEl) {
+      coachHintEl.textContent = "Set a 24h goal and schedule settings to see suggestions.";
+    }
+    return;
+  }
+
+  coachRemainingEl.textContent = Number.isFinite(data.remaining_ml)
+    ? formatMl(data.remaining_ml)
+    : "--";
+
+  if (Number.isInteger(data.feeds_remaining_min) && Number.isInteger(data.feeds_remaining_max)) {
+    coachFeedsEl.textContent = `${data.feeds_remaining_min}–${data.feeds_remaining_max}`;
+  } else {
+    coachFeedsEl.textContent = "--";
+  }
+
+  if (Number.isFinite(data.suggested_next_min_ml) && Number.isFinite(data.suggested_next_max_ml)) {
+    if (data.suggested_next_min_ml === data.suggested_next_max_ml) {
+      coachSuggestionEl.textContent = formatMl(data.suggested_next_min_ml);
+    } else {
+      coachSuggestionEl.textContent = `${formatMl(data.suggested_next_min_ml)}–${formatMl(data.suggested_next_max_ml)}`;
+    }
+  } else {
+    coachSuggestionEl.textContent = "--";
+  }
+
+  if (Number.isFinite(data.overnight_gap_min_hours) && Number.isFinite(data.overnight_gap_max_hours)) {
+    coachGapEl.textContent = `${data.overnight_gap_min_hours}–${data.overnight_gap_max_hours}h`;
+  } else {
+    coachGapEl.textContent = "--";
+  }
+
+  if (coachHintEl) {
+    if (data.remaining_ml === 0) {
+      coachHintEl.textContent = "Goal met for the last 24h.";
+    } else if (data.behind_target_mode === "add_feed") {
+      coachHintEl.textContent = "Behind target: add a feed slot if needed.";
+    } else {
+      coachHintEl.textContent = "Behind target: increase the next feed size if needed.";
+    }
+  }
 }
 
 function renderGoalHistory(goals) {
@@ -3125,13 +3190,14 @@ async function loadHomeEntries() {
   try {
     const statsWindow = computeWindow(24);
     const chartWindow = computeWindow(6);
-    const [entries, goals] = await Promise.all([
+    const [entries, goals, coach] = await Promise.all([
       fetchEntries({
         limit: 200,
         since: statsWindow.sinceIso,
         until: statsWindow.untilIso,
       }),
       loadFeedingGoals(1).catch(() => []),
+      fetchFeedCoach().catch(() => null),
     ]);
     activeFeedingGoal = goals[0] || null;
     const chartEntries = entries.filter((entry) => {
@@ -3141,6 +3207,7 @@ async function loadHomeEntries() {
     renderChart(chartEntries, chartWindow);
     renderStats(entries);
     renderGoalComparison();
+    renderFeedCoach(coach);
     renderStatsWindow(statsWindow);
     renderLastActivity(entries);
     renderLastByType(entries);
