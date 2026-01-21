@@ -4,6 +4,7 @@ from flask import Flask, render_template
 
 from src.app.config import load_config
 from src.app.routes.entries import entries_api
+from src.app.routes.feed_coach import feed_coach_api
 from src.app.routes.goals import goals_api
 from src.app.routes.settings import settings_api
 from src.app.storage.db import init_db
@@ -29,6 +30,7 @@ def create_app() -> Flask:
 
     init_db(app.config["DB_PATH"])
     app.register_blueprint(entries_api)
+    app.register_blueprint(feed_coach_api)
     app.register_blueprint(goals_api)
     app.register_blueprint(settings_api)
 
