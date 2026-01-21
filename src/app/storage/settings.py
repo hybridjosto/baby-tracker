@@ -32,13 +32,25 @@ def get_settings(conn: sqlite3.Connection) -> dict:
     _ensure_settings_row(conn)
     row = conn.execute(
         """
-        SELECT dob, feed_interval_min, custom_event_types
+        SELECT dob, feed_interval_min, custom_event_types,
+               feed_goal_min, feed_goal_max,
+               overnight_gap_min_hours, overnight_gap_max_hours,
+               behind_target_mode
         FROM baby_settings
         WHERE id = 1
         """
     ).fetchone()
     if not row:
-        return {"dob": None, "feed_interval_min": None, "custom_event_types": []}
+        return {
+            "dob": None,
+            "feed_interval_min": None,
+            "custom_event_types": [],
+            "feed_goal_min": None,
+            "feed_goal_max": None,
+            "overnight_gap_min_hours": None,
+            "overnight_gap_max_hours": None,
+            "behind_target_mode": None,
+        }
     data = dict(row)
     data["custom_event_types"] = _parse_custom_event_types(data.get("custom_event_types"))
     return data
@@ -48,7 +60,17 @@ def update_settings(conn: sqlite3.Connection, fields: dict) -> dict:
     _ensure_settings_row(conn)
     assignments: list[str] = []
     values: list[object] = []
-    for key in ("dob", "feed_interval_min", "custom_event_types", "updated_at_utc"):
+    for key in (
+        "dob",
+        "feed_interval_min",
+        "custom_event_types",
+        "feed_goal_min",
+        "feed_goal_max",
+        "overnight_gap_min_hours",
+        "overnight_gap_max_hours",
+        "behind_target_mode",
+        "updated_at_utc",
+    ):
         if key in fields:
             assignments.append(f"{key} = ?")
             values.append(fields[key])

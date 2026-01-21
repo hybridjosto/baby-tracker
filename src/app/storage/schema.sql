@@ -21,6 +21,11 @@ CREATE TABLE IF NOT EXISTS baby_settings (
     dob TEXT,
     feed_interval_min INTEGER,
     custom_event_types TEXT,
+    feed_goal_min INTEGER,
+    feed_goal_max INTEGER,
+    overnight_gap_min_hours REAL,
+    overnight_gap_max_hours REAL,
+    behind_target_mode TEXT,
     updated_at_utc TEXT NOT NULL DEFAULT (datetime('now'))
 );
 

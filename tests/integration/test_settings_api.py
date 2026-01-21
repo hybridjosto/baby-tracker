@@ -5,6 +5,11 @@ def test_get_settings_defaults(client):
     assert payload["dob"] is None
     assert payload["feed_interval_min"] is None
     assert payload["custom_event_types"] == []
+    assert payload["feed_goal_min"] is None
+    assert payload["feed_goal_max"] is None
+    assert payload["overnight_gap_min_hours"] is None
+    assert payload["overnight_gap_max_hours"] is None
+    assert payload["behind_target_mode"] is None
 
 
 def test_patch_settings_updates_values(client):

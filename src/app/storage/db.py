@@ -132,14 +132,27 @@ def _ensure_settings_table(conn: sqlite3.Connection) -> None:
     }
     if "custom_event_types" not in columns:
         conn.execute("ALTER TABLE baby_settings ADD COLUMN custom_event_types TEXT")
+    if "feed_goal_min" not in columns:
+        conn.execute("ALTER TABLE baby_settings ADD COLUMN feed_goal_min INTEGER")
+    if "feed_goal_max" not in columns:
+        conn.execute("ALTER TABLE baby_settings ADD COLUMN feed_goal_max INTEGER")
+    if "overnight_gap_min_hours" not in columns:
+        conn.execute("ALTER TABLE baby_settings ADD COLUMN overnight_gap_min_hours REAL")
+    if "overnight_gap_max_hours" not in columns:
+        conn.execute("ALTER TABLE baby_settings ADD COLUMN overnight_gap_max_hours REAL")
+    if "behind_target_mode" not in columns:
+        conn.execute("ALTER TABLE baby_settings ADD COLUMN behind_target_mode TEXT")
     row = conn.execute("SELECT id FROM baby_settings WHERE id = 1").fetchone()
     if not row:
         now = datetime.now(timezone.utc).isoformat()
         conn.execute(
             """
             INSERT INTO baby_settings
-                (id, dob, feed_interval_min, custom_event_types, updated_at_utc)
-            VALUES (1, NULL, NULL, NULL, ?)
+                (id, dob, feed_interval_min, custom_event_types,
+                 feed_goal_min, feed_goal_max,
+                 overnight_gap_min_hours, overnight_gap_max_hours,
+                 behind_target_mode, updated_at_utc)
+            VALUES (1, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, ?)
             """,
             (now,),
         )
