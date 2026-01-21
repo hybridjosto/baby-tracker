@@ -108,6 +108,10 @@ def create_app() -> Flask:
     def goals():
         return render_template("goals.html", page="goals")
 
+    @app.get("/feed-coach")
+    def feed_coach():
+        return render_template("feed_coach.html", page="feed-coach")
+
     def render_summary_page(
         user_slug: str,
         user_valid: bool,

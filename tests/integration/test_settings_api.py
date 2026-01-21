@@ -10,6 +10,7 @@ def test_get_settings_defaults(client):
     assert payload["overnight_gap_min_hours"] is None
     assert payload["overnight_gap_max_hours"] is None
     assert payload["behind_target_mode"] is None
+    assert payload["feed_schedule_anchor_time"] is None
 
 
 def test_patch_settings_updates_values(client):
@@ -56,6 +57,7 @@ def test_patch_settings_updates_schedule_helper_fields(client):
             "overnight_gap_min_hours": 4,
             "overnight_gap_max_hours": 5,
             "behind_target_mode": "increase_next",
+            "feed_schedule_anchor_time": "06:00",
         },
     )
     assert response.status_code == 200
@@ -65,6 +67,7 @@ def test_patch_settings_updates_schedule_helper_fields(client):
     assert payload["overnight_gap_min_hours"] == 4
     assert payload["overnight_gap_max_hours"] == 5
     assert payload["behind_target_mode"] == "increase_next"
+    assert payload["feed_schedule_anchor_time"] == "06:00"
 
 
 def test_patch_settings_rejects_invalid_schedule_helper_fields(client):
@@ -95,5 +98,11 @@ def test_patch_settings_rejects_invalid_schedule_helper_fields(client):
     response = client.patch(
         "/api/settings",
         json={"behind_target_mode": "nope"},
+    )
+    assert response.status_code == 400
+
+    response = client.patch(
+        "/api/settings",
+        json={"feed_schedule_anchor_time": "6am"},
     )
     assert response.status_code == 400

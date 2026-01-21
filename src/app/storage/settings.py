@@ -35,7 +35,7 @@ def get_settings(conn: sqlite3.Connection) -> dict:
         SELECT dob, feed_interval_min, custom_event_types,
                feed_goal_min, feed_goal_max,
                overnight_gap_min_hours, overnight_gap_max_hours,
-               behind_target_mode
+               behind_target_mode, feed_schedule_anchor_time
         FROM baby_settings
         WHERE id = 1
         """
@@ -50,6 +50,7 @@ def get_settings(conn: sqlite3.Connection) -> dict:
             "overnight_gap_min_hours": None,
             "overnight_gap_max_hours": None,
             "behind_target_mode": None,
+            "feed_schedule_anchor_time": None,
         }
     data = dict(row)
     data["custom_event_types"] = _parse_custom_event_types(data.get("custom_event_types"))
@@ -69,6 +70,7 @@ def update_settings(conn: sqlite3.Connection, fields: dict) -> dict:
         "overnight_gap_min_hours",
         "overnight_gap_max_hours",
         "behind_target_mode",
+        "feed_schedule_anchor_time",
         "updated_at_utc",
     ):
         if key in fields:

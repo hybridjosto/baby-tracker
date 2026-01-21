@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#0f172a">
+    <title>Feed Coach</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@400;500;700" />
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family: "Manrope", system-ui, -apple-system, sans-serif;
+        --bg: #f8fafc;
+        --card: #ffffff;
+        --text: #0f172a;
+        --muted: #64748b;
+        --primary: #0ea5e9;
+        --shadow: 0 20px 40px rgba(15, 23, 42, 0.08);
+      }
+      html.dark {
+        --bg: #0b1220;
+        --card: #111827;
+        --text: #f8fafc;
+        --muted: #94a3b8;
+        --primary: #38bdf8;
+        --shadow: 0 20px 40px rgba(2, 6, 23, 0.4);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+      }
+      .page {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 24px 20px 80px;
+        display: grid;
+        gap: 16px;
+      }
+      .card {
+        background: var(--card);
+        border-radius: 20px;
+        padding: 20px;
+        box-shadow: var(--shadow);
+        display: grid;
+        gap: 16px;
+      }
+      .nav-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .nav-actions {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+      }
+      .nav-icon {
+        border: none;
+        background: transparent;
+        color: inherit;
+        cursor: pointer;
+        padding: 6px;
+        border-radius: 10px;
+      }
+      .muted {
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .coach-grid {
+        display: grid;
+        gap: 12px;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      }
+      .coach-metric {
+        border-radius: 16px;
+        padding: 14px;
+        background: rgba(14, 165, 233, 0.08);
+      }
+      .coach-label {
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--muted);
+      }
+      .coach-value {
+        font-size: 22px;
+        font-weight: 600;
+        margin-top: 6px;
+      }
+      .schedule-list {
+        display: grid;
+        gap: 10px;
+      }
+      .schedule-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 14px;
+        border-radius: 14px;
+        background: rgba(15, 23, 42, 0.04);
+      }
+      html.dark .schedule-row {
+        background: rgba(148, 163, 184, 0.12);
+      }
+      .schedule-time {
+        font-weight: 600;
+      }
+      .schedule-ml {
+        font-weight: 600;
+        color: var(--primary);
+      }
+    </style>
+  </head>
+  <body data-page="feed-coach">
+    <div class="page">
+      <div class="card">
+        <div class="nav-row">
+          <div>
+            <h1>Feed Coach</h1>
+            <div class="muted">Rolling 24h outlook + 12h schedule</div>
+          </div>
+          <div class="nav-actions">
+            <a href="/">Back home</a>
+            <a href="/settings" aria-label="Settings">Settings</a>
+            <button class="nav-icon" id="theme-toggle" type="button" aria-label="Switch to light mode">
+              <span class="material-symbols-outlined">dark_mode</span>
+            </button>
+          </div>
+        </div>
+        <div class="coach-grid">
+          <div class="coach-metric">
+            <div class="coach-label">Rolling total</div>
+            <div class="coach-value" id="coach-total">--</div>
+          </div>
+          <div class="coach-metric">
+            <div class="coach-label">Goal (24h)</div>
+            <div class="coach-value" id="coach-goal">--</div>
+          </div>
+          <div class="coach-metric">
+            <div class="coach-label">Remaining</div>
+            <div class="coach-value" id="coach-remaining">--</div>
+          </div>
+          <div class="coach-metric">
+            <div class="coach-label">Feeds logged (24h)</div>
+            <div class="coach-value" id="coach-feed-count">--</div>
+          </div>
+        </div>
+        <div>
+          <h2>Next 4 feeds (next 12h)</h2>
+          <div class="schedule-list" id="coach-schedule"></div>
+          <div class="muted" id="coach-schedule-hint">Set an anchor time and feed goals to see a schedule.</div>
+        </div>
+      </div>
+    </div>
+    <script src="/static/app.js"></script>
+  </body>
+</html>
