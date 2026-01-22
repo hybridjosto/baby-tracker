@@ -66,6 +66,28 @@ const milkExpressSparklineTotalEl = document.getElementById("milk-express-sparkl
 const milkExpressSparklineToggleEls = document.querySelectorAll(
   "[data-milk-sparkline-mode]",
 );
+const insightLastFeedEl = document.getElementById("insight-last-feed");
+const insightLastFeedSubEl = document.getElementById("insight-last-feed-sub");
+const insightLastExpressEl = document.getElementById("insight-last-express");
+const insightLastExpressSubEl = document.getElementById("insight-last-express-sub");
+const insightFeedInterval24El = document.getElementById("insight-feed-interval-24");
+const insightFeedInterval24SubEl = document.getElementById("insight-feed-interval-24-sub");
+const insightFeedInterval7dEl = document.getElementById("insight-feed-interval-7d");
+const insightFeedInterval7dSubEl = document.getElementById("insight-feed-interval-7d-sub");
+const insightExpressTotal24El = document.getElementById("insight-express-total-24");
+const insightExpressTotal24SubEl = document.getElementById("insight-express-total-24-sub");
+const insightExpressTotal7El = document.getElementById("insight-express-total-7");
+const insightExpressTotal7SubEl = document.getElementById("insight-express-total-7-sub");
+const insightDiaper24El = document.getElementById("insight-diaper-24");
+const insightDiaper24SubEl = document.getElementById("insight-diaper-24-sub");
+const insightDiaper7El = document.getElementById("insight-diaper-7");
+const insightDiaper7SubEl = document.getElementById("insight-diaper-7-sub");
+const insightAnchorLabelEl = document.getElementById("insight-anchor-label");
+const insightTimeframeBodyEl = document.getElementById("insight-timeframe-body");
+const feedHourGridEl = document.getElementById("feed-hour-grid");
+const expressHourGridEl = document.getElementById("express-hour-grid");
+const feedTrendBarsEl = document.getElementById("feed-trend-bars");
+const expressTrendBarsEl = document.getElementById("express-trend-bars");
 
 const timelineWrapEl = document.getElementById("timeline-wrap");
 const timelineTrackEl = document.getElementById("timeline-track");
@@ -89,6 +111,7 @@ const lastActivityEl = document.getElementById("last-activity");
 const lastFeedEl = document.getElementById("last-feed");
 const nextFeedEl = document.getElementById("next-feed");
 const nextFeedShortcutEl = document.getElementById("next-feed-shortcut");
+const nextFeedCardEl = document.getElementById("next-feed-card");
 const lastWeeEl = document.getElementById("last-wee");
 const lastPooEl = document.getElementById("last-poo");
 const statCardEls = document.querySelectorAll(".stat-card[data-log-type]");
@@ -118,6 +141,7 @@ let breastfeedTickerId = null;
 let hasLoadedHomeEntries = false;
 let hasLoadedLogEntries = false;
 let hasLoadedSummaryEntries = false;
+let hasLoadedSummaryInsights = false;
 
 const CUSTOM_TYPE_RE = /^[A-Za-z0-9][A-Za-z0-9 /-]{0,31}$/;
 const MILK_EXPRESS_TYPE = "milk express";
@@ -427,6 +451,9 @@ let nextFeedTimer = null;
 let refreshTimer = null;
 let summaryDate = null;
 let summaryEntries = [];
+let summaryInsightsEntries = [];
+let summaryInsightsAnchor = null;
+let summaryInsightsLoading = null;
 let summaryType = "feed";
 let milkExpressSparklineMode = "all";
 let milkExpressAllEntries = [];
@@ -458,6 +485,7 @@ function initHomeHandlers() {
   }
   bindTimestampPopup(lastFeedEl);
   bindTimestampPopup(nextFeedEl);
+  bindTimestampPopup(nextFeedCardEl);
   bindTimestampPopup(lastWeeEl);
   bindTimestampPopup(lastPooEl);
   if (feedBtn) {
@@ -1239,27 +1267,45 @@ function setNextFeedShortcut(enabled, href) {
 }
 
 function updateNextFeed() {
-  if (!nextFeedEl) {
+  if (!nextFeedEl && !nextFeedCardEl) {
     return;
   }
   const intervalMinutes = getFeedIntervalMinutes();
   const lastTimestamp = lastFeedEl ? lastFeedEl.dataset.timestamp : null;
   if (!intervalMinutes || !lastTimestamp) {
-    nextFeedEl.textContent = "--";
-    nextFeedEl.removeAttribute("data-timestamp");
+    if (nextFeedEl) {
+      nextFeedEl.textContent = "--";
+      nextFeedEl.removeAttribute("data-timestamp");
+    }
+    if (nextFeedCardEl) {
+      nextFeedCardEl.textContent = "--";
+      nextFeedCardEl.removeAttribute("data-timestamp");
+    }
     setNextFeedShortcut(false, "");
     return;
   }
   const lastDate = new Date(lastTimestamp);
   if (Number.isNaN(lastDate.getTime())) {
-    nextFeedEl.textContent = "--";
-    nextFeedEl.removeAttribute("data-timestamp");
+    if (nextFeedEl) {
+      nextFeedEl.textContent = "--";
+      nextFeedEl.removeAttribute("data-timestamp");
+    }
+    if (nextFeedCardEl) {
+      nextFeedCardEl.textContent = "--";
+      nextFeedCardEl.removeAttribute("data-timestamp");
+    }
     setNextFeedShortcut(false, "");
     return;
   }
   const nextDate = new Date(lastDate.getTime() + intervalMinutes * 60000);
-  nextFeedEl.textContent = formatTimeUntil(nextDate);
-  nextFeedEl.dataset.timestamp = nextDate.toISOString();
+  if (nextFeedEl) {
+    nextFeedEl.textContent = formatTimeUntil(nextDate);
+    nextFeedEl.dataset.timestamp = nextDate.toISOString();
+  }
+  if (nextFeedCardEl) {
+    nextFeedCardEl.textContent = formatTimeUntil(nextDate);
+    nextFeedCardEl.dataset.timestamp = nextDate.toISOString();
+  }
   const shortcutUrl = buildFeedShortcutUrl(nextDate);
   setNextFeedShortcut(Boolean(shortcutUrl), shortcutUrl);
 }
@@ -1654,6 +1700,14 @@ function formatMilkExpressSparklineRange(entries, isAllTime) {
     return formatSummaryDateLabel(base);
   }
   if (!entries.length) {
+    if (insightAnchorLabelEl && anchorEnd) {
+      const anchorLabel = formatSummaryDateLabel(anchorEnd);
+      const anchorShort = anchorEnd.toLocaleDateString(undefined, {
+        month: "short",
+        day: "numeric",
+      });
+      insightAnchorLabelEl.textContent = `${anchorLabel} • ${anchorShort}`;
+    }
     return "All time";
   }
   const sorted = [...entries].sort((a, b) => {
@@ -1745,6 +1799,436 @@ function buildAllTimeSparklinePoints(entries, config) {
     const y = height - padding - (day.total / maxMl) * plotHeight;
     return { x, y };
   });
+}
+
+function formatRelativeTimeFrom(baseDate, value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime()) || !baseDate || Number.isNaN(baseDate.getTime())) {
+    return "--";
+  }
+  const diffMs = baseDate.getTime() - date.getTime();
+  const diffMinutes = Math.max(0, Math.floor(diffMs / 60000));
+  if (diffMinutes < 1) {
+    return "just now";
+  }
+  if (diffMinutes < 60) {
+    return `${diffMinutes} min${diffMinutes === 1 ? "" : "s"}`;
+  }
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) {
+    return `${diffHours} hour${diffHours === 1 ? "" : "s"}`;
+  }
+  const diffDays = Math.floor(diffHours / 24);
+  return `${diffDays} day${diffDays === 1 ? "" : "s"}`;
+}
+
+function getInsightAnchor(date) {
+  const base = date ? new Date(date) : new Date();
+  const window = getSummaryDayWindow(base);
+  const now = new Date();
+  const anchorEnd = isSameDay(base, now) ? now : window.until;
+  return {
+    base,
+    anchorEnd,
+    anchorIso: anchorEnd.toISOString(),
+  };
+}
+
+function filterEntriesByWindow(entries, sinceMs, untilMs) {
+  return entries.filter((entry) => {
+    const ts = new Date(entry.timestamp_utc);
+    if (Number.isNaN(ts.getTime())) {
+      return false;
+    }
+    const time = ts.getTime();
+    if (sinceMs && time < sinceMs) {
+      return false;
+    }
+    if (untilMs && time > untilMs) {
+      return false;
+    }
+    return true;
+  });
+}
+
+function computeFeedStats(entries) {
+  const feedEntries = entries.filter((entry) => entry.type === "feed");
+  const sorted = [...feedEntries].sort((a, b) => {
+    return new Date(a.timestamp_utc) - new Date(b.timestamp_utc);
+  });
+  let durationTotal = 0;
+  let expressedTotal = 0;
+  let formulaTotal = 0;
+  sorted.forEach((entry) => {
+    const duration = Number.parseFloat(entry.feed_duration_min);
+    if (Number.isFinite(duration)) {
+      durationTotal += duration;
+    }
+    const expressed = Number.parseFloat(entry.expressed_ml);
+    if (Number.isFinite(expressed)) {
+      expressedTotal += expressed;
+    }
+    const formula = Number.parseFloat(entry.formula_ml);
+    if (Number.isFinite(formula)) {
+      formulaTotal += formula;
+    }
+  });
+  const gaps = [];
+  for (let i = 1; i < sorted.length; i += 1) {
+    const prev = new Date(sorted[i - 1].timestamp_utc);
+    const next = new Date(sorted[i].timestamp_utc);
+    if (Number.isNaN(prev.getTime()) || Number.isNaN(next.getTime())) {
+      continue;
+    }
+    const diffMinutes = (next.getTime() - prev.getTime()) / 60000;
+    if (diffMinutes > 0) {
+      gaps.push(diffMinutes);
+    }
+  }
+  const avgGap = gaps.length
+    ? gaps.reduce((sum, value) => sum + value, 0) / gaps.length
+    : null;
+  const medianGap = gaps.length
+    ? [...gaps].sort((a, b) => a - b)[Math.floor(gaps.length / 2)]
+    : null;
+  return {
+    count: feedEntries.length,
+    durationTotal,
+    expressedTotal,
+    formulaTotal,
+    avgGap,
+    medianGap,
+    entries: sorted,
+  };
+}
+
+function computeExpressStats(entries) {
+  const expressEntries = entries.filter((entry) => isMilkExpressType(entry.type));
+  const sorted = [...expressEntries].sort((a, b) => {
+    return new Date(a.timestamp_utc) - new Date(b.timestamp_utc);
+  });
+  let totalMl = 0;
+  let totalMinutes = 0;
+  sorted.forEach((entry) => {
+    const { ml, minutes } = getMilkExpressAmounts(entry);
+    totalMl += Number.isFinite(ml) ? ml : 0;
+    totalMinutes += Number.isFinite(minutes) ? minutes : 0;
+  });
+  return {
+    count: expressEntries.length,
+    totalMl,
+    totalMinutes,
+    entries: sorted,
+  };
+}
+
+function computeDiaperStats(entries) {
+  let weeCount = 0;
+  let pooCount = 0;
+  entries.forEach((entry) => {
+    if (entry.type === "wee") {
+      weeCount += 1;
+    } else if (entry.type === "poo") {
+      pooCount += 1;
+    }
+  });
+  return {
+    wee: weeCount,
+    poo: pooCount,
+    total: weeCount + pooCount,
+  };
+}
+
+function buildHourCounts(entries, isExpress = false) {
+  const counts = new Array(24).fill(0);
+  entries.forEach((entry) => {
+    if (isExpress && !isMilkExpressType(entry.type)) {
+      return;
+    }
+    if (!isExpress && entry.type !== "feed") {
+      return;
+    }
+    const ts = new Date(entry.timestamp_utc);
+    if (Number.isNaN(ts.getTime())) {
+      return;
+    }
+    counts[ts.getHours()] += 1;
+  });
+  return counts;
+}
+
+function renderHourGrid(container, counts, variantClass) {
+  if (!container) {
+    return;
+  }
+  container.innerHTML = "";
+  const max = Math.max(...counts, 1);
+  counts.forEach((count, hour) => {
+    const bar = document.createElement("div");
+    bar.className = variantClass ? `hour-bar ${variantClass}` : "hour-bar";
+    const height = Math.max(6, (count / max) * 52);
+    bar.style.height = `${height}px`;
+    bar.title = `${hour}:00 • ${count}`;
+    container.appendChild(bar);
+  });
+}
+
+function renderTrendBars(container, values, variantClass) {
+  if (!container) {
+    return;
+  }
+  container.innerHTML = "";
+  const max = Math.max(...values, 1);
+  values.forEach((value, idx) => {
+    const bar = document.createElement("div");
+    bar.className = variantClass ? `trend-bar ${variantClass}` : "trend-bar";
+    const height = Math.max(6, (value / max) * 44);
+    bar.style.height = `${height}px`;
+    bar.title = `Day ${idx + 1}: ${value}`;
+    container.appendChild(bar);
+  });
+}
+
+function renderSummaryInsights(entries, anchorEnd) {
+  if (!entries.length) {
+    if (insightLastFeedEl) {
+      insightLastFeedEl.textContent = "--";
+    }
+    if (insightLastFeedSubEl) {
+      insightLastFeedSubEl.textContent = "No feed logged";
+    }
+    if (insightLastExpressEl) {
+      insightLastExpressEl.textContent = "--";
+    }
+    if (insightLastExpressSubEl) {
+      insightLastExpressSubEl.textContent = "No express logged";
+    }
+    if (insightFeedInterval24El) {
+      insightFeedInterval24El.textContent = "--";
+    }
+    if (insightFeedInterval24SubEl) {
+      insightFeedInterval24SubEl.textContent = "--";
+    }
+    if (insightFeedInterval7dEl) {
+      insightFeedInterval7dEl.textContent = "--";
+    }
+    if (insightFeedInterval7dSubEl) {
+      insightFeedInterval7dSubEl.textContent = "--";
+    }
+    if (insightExpressTotal24El) {
+      insightExpressTotal24El.textContent = "--";
+    }
+    if (insightExpressTotal24SubEl) {
+      insightExpressTotal24SubEl.textContent = "--";
+    }
+    if (insightExpressTotal7El) {
+      insightExpressTotal7El.textContent = "--";
+    }
+    if (insightExpressTotal7SubEl) {
+      insightExpressTotal7SubEl.textContent = "--";
+    }
+    if (insightDiaper24El) {
+      insightDiaper24El.textContent = "--";
+    }
+    if (insightDiaper24SubEl) {
+      insightDiaper24SubEl.textContent = "--";
+    }
+    if (insightDiaper7El) {
+      insightDiaper7El.textContent = "--";
+    }
+    if (insightDiaper7SubEl) {
+      insightDiaper7SubEl.textContent = "--";
+    }
+    if (insightTimeframeBodyEl) {
+      insightTimeframeBodyEl.innerHTML = "";
+    }
+    if (feedHourGridEl) {
+      feedHourGridEl.innerHTML = "";
+    }
+    if (expressHourGridEl) {
+      expressHourGridEl.innerHTML = "";
+    }
+    if (feedTrendBarsEl) {
+      feedTrendBarsEl.innerHTML = "";
+    }
+    if (expressTrendBarsEl) {
+      expressTrendBarsEl.innerHTML = "";
+    }
+    return;
+  }
+  const anchorLabel = formatSummaryDateLabel(anchorEnd);
+  const anchorShort = anchorEnd.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  });
+  if (insightAnchorLabelEl) {
+    insightAnchorLabelEl.textContent = `${anchorLabel} • ${anchorShort}`;
+  }
+
+  const allFeedStats = computeFeedStats(entries);
+  const allExpressStats = computeExpressStats(entries);
+  const lastFeed = allFeedStats.entries[allFeedStats.entries.length - 1];
+  const lastExpress = allExpressStats.entries[allExpressStats.entries.length - 1];
+
+  if (insightLastFeedEl) {
+    if (lastFeed) {
+      insightLastFeedEl.textContent = formatSummaryTime(lastFeed.timestamp_utc);
+    } else {
+      insightLastFeedEl.textContent = "--";
+    }
+  }
+  if (insightLastFeedSubEl) {
+    if (lastFeed) {
+      const date = new Date(lastFeed.timestamp_utc);
+      insightLastFeedSubEl.textContent = `${formatSummaryDateLabel(date)} • ${formatRelativeTimeFrom(anchorEnd, date)}`;
+    } else {
+      insightLastFeedSubEl.textContent = "No feed logged";
+    }
+  }
+  if (insightLastExpressEl) {
+    if (lastExpress) {
+      insightLastExpressEl.textContent = formatSummaryTime(lastExpress.timestamp_utc);
+    } else {
+      insightLastExpressEl.textContent = "--";
+    }
+  }
+  if (insightLastExpressSubEl) {
+    if (lastExpress) {
+      const date = new Date(lastExpress.timestamp_utc);
+      insightLastExpressSubEl.textContent = `${formatSummaryDateLabel(date)} • ${formatRelativeTimeFrom(anchorEnd, date)}`;
+    } else {
+      insightLastExpressSubEl.textContent = "No express logged";
+    }
+  }
+
+  const timeframeSpecs = [
+    { key: "24h", label: "Last 24h", hours: 24 },
+    { key: "3d", label: "Last 3d", hours: 72 },
+    { key: "7d", label: "Last 7d", hours: 168 },
+    { key: "30d", label: "Last 30d", hours: 720 },
+    { key: "all", label: "All time", hours: null },
+  ];
+  if (insightTimeframeBodyEl) {
+    insightTimeframeBodyEl.innerHTML = "";
+  }
+  timeframeSpecs.forEach((spec) => {
+    const untilMs = anchorEnd.getTime();
+    const sinceMs = spec.hours ? untilMs - spec.hours * 3600000 : null;
+    const windowEntries = filterEntriesByWindow(entries, sinceMs, untilMs);
+    const feedStats = computeFeedStats(windowEntries);
+    const expressStats = computeExpressStats(windowEntries);
+    const diaperStats = computeDiaperStats(windowEntries);
+    const avgGapText = feedStats.avgGap ? formatDurationMinutes(feedStats.avgGap) : "--";
+    const expressAvgText = expressStats.count
+      ? formatMl(expressStats.totalMl / expressStats.count)
+      : "--";
+
+    if (spec.key === "24h") {
+      if (insightFeedInterval24El) {
+        insightFeedInterval24El.textContent = avgGapText;
+      }
+      if (insightFeedInterval24SubEl) {
+        insightFeedInterval24SubEl.textContent = feedStats.medianGap
+          ? `Median ${formatDurationMinutes(feedStats.medianGap)} • ${feedStats.count} feeds`
+          : `${feedStats.count} feeds`;
+      }
+      if (insightExpressTotal24El) {
+        insightExpressTotal24El.textContent = formatMl(expressStats.totalMl);
+      }
+      if (insightExpressTotal24SubEl) {
+        insightExpressTotal24SubEl.textContent = expressStats.count
+          ? `${expressStats.count} sessions • avg ${expressAvgText}`
+          : "No express sessions";
+      }
+      if (insightDiaper24El) {
+        insightDiaper24El.textContent = `${diaperStats.total} changes`;
+      }
+      if (insightDiaper24SubEl) {
+        insightDiaper24SubEl.textContent = `Wee ${diaperStats.wee} • Poo ${diaperStats.poo}`;
+      }
+    }
+    if (spec.key === "7d") {
+      if (insightFeedInterval7dEl) {
+        insightFeedInterval7dEl.textContent = avgGapText;
+      }
+      if (insightFeedInterval7dSubEl) {
+        insightFeedInterval7dSubEl.textContent = feedStats.medianGap
+          ? `Median ${formatDurationMinutes(feedStats.medianGap)} • ${feedStats.count} feeds`
+          : `${feedStats.count} feeds`;
+      }
+      if (insightExpressTotal7El) {
+        insightExpressTotal7El.textContent = formatMl(expressStats.totalMl);
+      }
+      if (insightExpressTotal7SubEl) {
+        insightExpressTotal7SubEl.textContent = expressStats.count
+          ? `${expressStats.count} sessions • avg ${expressAvgText}`
+          : "No express sessions";
+      }
+      if (insightDiaper7El) {
+        insightDiaper7El.textContent = `${diaperStats.total} changes`;
+      }
+      if (insightDiaper7SubEl) {
+        insightDiaper7SubEl.textContent = `Wee ${diaperStats.wee} • Poo ${diaperStats.poo}`;
+      }
+    }
+
+    if (insightTimeframeBodyEl) {
+      const row = document.createElement("div");
+      row.className = "insight-row";
+      const cells = [
+        spec.label,
+        `${feedStats.count}`,
+        avgGapText,
+        formatDurationMinutes(feedStats.durationTotal),
+        `${formatMl(expressStats.totalMl)} • ${expressStats.count}x`,
+        expressAvgText,
+      ];
+      cells.forEach((text, idx) => {
+        const cell = document.createElement("div");
+        cell.className = "insight-cell";
+        cell.textContent = text;
+        if (idx === 0) {
+          const strong = document.createElement("strong");
+          strong.textContent = text;
+          cell.textContent = "";
+          cell.appendChild(strong);
+        }
+        row.appendChild(cell);
+      });
+      insightTimeframeBodyEl.appendChild(row);
+    }
+  });
+
+  renderHourGrid(feedHourGridEl, buildHourCounts(entries, false), "");
+  renderHourGrid(expressHourGridEl, buildHourCounts(entries, true), "express");
+
+  const dayTotals = new Map();
+  const expressTotals = new Map();
+  entries.forEach((entry) => {
+    const ts = new Date(entry.timestamp_utc);
+    if (Number.isNaN(ts.getTime())) {
+      return;
+    }
+    const key = formatDateInputValue(ts);
+    if (entry.type === "feed") {
+      dayTotals.set(key, (dayTotals.get(key) || 0) + 1);
+    }
+    if (isMilkExpressType(entry.type)) {
+      const { ml } = getMilkExpressAmounts(entry);
+      expressTotals.set(key, (expressTotals.get(key) || 0) + (Number.isFinite(ml) ? ml : 0));
+    }
+  });
+
+  const trendDays = [];
+  for (let i = 13; i >= 0; i -= 1) {
+    const day = new Date(anchorEnd);
+    day.setDate(day.getDate() - i);
+    trendDays.push(formatDateInputValue(day));
+  }
+  const feedTrendValues = trendDays.map((key) => dayTotals.get(key) || 0);
+  const expressTrendValues = trendDays.map((key) => Math.round(expressTotals.get(key) || 0));
+  renderTrendBars(feedTrendBarsEl, feedTrendValues, "");
+  renderTrendBars(expressTrendBarsEl, expressTrendValues, "express");
 }
 
 function getSummaryTypeColor(type) {
@@ -1913,6 +2397,28 @@ async function fetchEntries(params) {
   }
   const data = await response.json();
   return normalizeEntriesResponse(data);
+}
+
+async function fetchAllEntriesUntil(untilIso) {
+  const limit = 500;
+  let batchUntil = untilIso;
+  let entries = [];
+  for (let page = 0; page < 20; page += 1) {
+    const batch = await fetchEntries({
+      limit,
+      until: batchUntil,
+    });
+    entries = entries.concat(batch);
+    if (batch.length < limit) {
+      break;
+    }
+    const oldest = batch[batch.length - 1];
+    if (!oldest || !oldest.timestamp_utc) {
+      break;
+    }
+    batchUntil = decrementIsoTimestamp(oldest.timestamp_utc);
+  }
+  return entries;
 }
 
 async function fetchFeedingGoals(params) {
@@ -3137,6 +3643,7 @@ async function loadSummaryEntries() {
     summaryEntries = entries;
     renderSummaryStats(entries);
     renderMilkExpressSummary(entries);
+    await loadSummaryInsights();
   } catch (err) {
     setStatus(`Failed to load entries: ${err.message || "unknown error"}`);
   } finally {
@@ -3145,6 +3652,36 @@ async function loadSummaryEntries() {
     }
     hasLoadedSummaryEntries = true;
   }
+}
+
+async function loadSummaryInsights() {
+  if (pageType !== "summary") {
+    return;
+  }
+  const { anchorEnd, anchorIso } = getInsightAnchor(summaryDate || new Date());
+  if (summaryInsightsAnchor === anchorIso && summaryInsightsEntries.length) {
+    renderSummaryInsights(summaryInsightsEntries, anchorEnd);
+    return;
+  }
+  if (summaryInsightsLoading) {
+    return summaryInsightsLoading;
+  }
+  summaryInsightsLoading = fetchAllEntriesUntil(anchorIso)
+    .then((entries) => {
+      summaryInsightsEntries = entries;
+      summaryInsightsAnchor = anchorIso;
+      renderSummaryInsights(entries, anchorEnd);
+      return entries;
+    })
+    .catch((err) => {
+      setStatus(`Failed to load insights: ${err.message || "unknown error"}`);
+      summaryInsightsEntries = [];
+    })
+    .finally(() => {
+      summaryInsightsLoading = null;
+      hasLoadedSummaryInsights = true;
+    });
+  return summaryInsightsLoading;
 }
 
 async function ensureMilkExpressAllEntries() {
