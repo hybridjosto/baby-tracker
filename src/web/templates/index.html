@@ -97,7 +97,7 @@
       }
       .stats {
         display: grid;
-        grid-template-columns: repeat(3, 1fr);
+        grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 10px;
       }
       .stat-card {
@@ -107,6 +107,7 @@
         border: 1px solid #e5ebe6;
         text-align: center;
         box-shadow: 0 6px 14px rgba(0, 0, 0, 0.06);
+        min-width: 0;
       }
       .stat-card.is-clickable {
         cursor: pointer;
@@ -123,6 +124,14 @@
       html.dark .stat-card {
         background: var(--card-dark);
         border-color: rgba(255, 255, 255, 0.06);
+      }
+      @media (max-width: 520px) {
+        .content {
+          padding: 8px 12px 170px;
+        }
+        .stats {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
       }
       .stat-label {
         font-size: 10px;
@@ -730,6 +739,17 @@
       </header>
       <main class="content">
         <section class="stats">
+          <div class="stat-card" aria-label="Next feed time">
+            <div class="stat-label">
+              <span class="material-symbols-outlined" style="font-size: 18px; color: #f6c453;">schedule</span>
+              Next feed
+            </div>
+            <div class="stat-value skeleton-text skeleton-mid" id="next-feed">--</div>
+            <a class="stat-link is-disabled" id="next-feed-shortcut" aria-label="Run feed reminder shortcut">
+              + Reminder
+              <span class="material-symbols-outlined" style="font-size: 14px;">arrow_forward</span>
+            </a>
+          </div>
           <div class="stat-card" aria-label="Total feed amount in last 24 hours">
             <div class="stat-label">
               <span class="material-symbols-outlined" style="font-size: 18px; color: var(--primary);">local_drink</span>
@@ -797,14 +817,6 @@
               <span class="legend-dot" style="background: var(--primary);"></span>
               <span>Last feed</span>
               <span class="last-time skeleton-text" id="last-feed">--</span>
-            </div>
-            <div class="last-row">
-              <span class="legend-dot" style="background: #f6c453;"></span>
-              <span>Next feed</span>
-              <span class="last-actions">
-                <span class="last-time skeleton-text" id="next-feed">--</span>
-                <a class="shortcut-link is-disabled" id="next-feed-shortcut" aria-label="Run feed reminder shortcut">+ Reminder</a>
-              </span>
             </div>
             <div class="last-row">
               <span class="legend-dot" style="background: #7dd3fc;"></span>
