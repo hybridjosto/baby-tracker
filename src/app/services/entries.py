@@ -9,6 +9,7 @@ from src.app.storage.entries import (
     create_entry as repo_create_entry,
     delete_entry as repo_delete_entry,
     list_entries as repo_list_entries,
+    list_entries_for_export as repo_list_entries_for_export,
     update_entry as repo_update_entry,
 )
 from src.lib.validation import (
@@ -47,6 +48,16 @@ def _parse_csv_timestamp(value: str) -> str:
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=timezone.utc)
     return parsed.astimezone(timezone.utc).isoformat()
+
+
+def _parse_entry_timestamp(value: str) -> datetime:
+    cleaned = (value or "").strip()
+    if cleaned.endswith("Z"):
+        cleaned = cleaned[:-1] + "+00:00"
+    parsed = datetime.fromisoformat(cleaned)
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
 
 
 def create_entry(db_path: str, payload: dict) -> dict:
@@ -106,6 +117,40 @@ def list_entries(
             until_utc=normalized_until,
             entry_type=normalized_type,
         )
+
+
+def export_entries_csv(db_path: str, user_slug: str | None = None) -> str:
+    normalized_slug = normalize_user_slug(user_slug) if user_slug else None
+    with get_connection(db_path) as conn:
+        entries = repo_list_entries_for_export(conn, user_slug=normalized_slug)
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(
+        [
+            "date",
+            "time",
+            "event",
+            "duration_min",
+            "amount_ml",
+            "expressed_ml",
+            "formula_ml",
+        ]
+    )
+    for entry in entries:
+        timestamp = _parse_entry_timestamp(entry.get("timestamp_utc") or "")
+        writer.writerow(
+            [
+                timestamp.date().isoformat(),
+                timestamp.strftime("%H:%M"),
+                entry.get("type") or "",
+                entry.get("feed_duration_min") if entry.get("feed_duration_min") is not None else "",
+                entry.get("amount_ml") if entry.get("amount_ml") is not None else "",
+                entry.get("expressed_ml") if entry.get("expressed_ml") is not None else "",
+                entry.get("formula_ml") if entry.get("formula_ml") is not None else "",
+            ]
+        )
+    return output.getvalue()
 
 
 def import_entries_csv(db_path: str, user_slug: str, file_storage) -> dict:

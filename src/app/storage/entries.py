@@ -83,6 +83,43 @@ def list_entries(
     return [dict(row) for row in cursor.fetchall()]
 
 
+def list_entries_for_export(
+    conn: sqlite3.Connection,
+    user_slug: str | None = None,
+    since_utc: str | None = None,
+    until_utc: str | None = None,
+    entry_type: str | None = None,
+) -> list[dict]:
+    clauses: list[str] = []
+    params: list[object] = []
+    if user_slug:
+        clauses.append("user_slug = ?")
+        params.append(user_slug)
+    if entry_type:
+        clauses.append("type = ?")
+        params.append(entry_type)
+    if since_utc:
+        clauses.append("timestamp_utc >= ?")
+        params.append(since_utc)
+    if until_utc:
+        clauses.append("timestamp_utc <= ?")
+        params.append(until_utc)
+
+    where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+    cursor = conn.execute(
+        f"""
+        SELECT id, user_slug, type, timestamp_utc, client_event_id, notes, amount_ml,
+               expressed_ml, formula_ml, feed_duration_min, caregiver_id,
+               created_at_utc, updated_at_utc
+        FROM entries
+        {where}
+        ORDER BY timestamp_utc ASC
+        """,
+        params,
+    )
+    return [dict(row) for row in cursor.fetchall()]
+
+
 def get_entry(conn: sqlite3.Connection, entry_id: int) -> Optional[dict]:
     cursor = conn.execute(
         """

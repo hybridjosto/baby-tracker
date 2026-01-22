@@ -1,14 +1,16 @@
-from flask import Blueprint, current_app, jsonify, request
+from flask import Blueprint, current_app, jsonify, request, Response
 
 from src.app.services.entries import (
     DuplicateEntryError,
     EntryNotFoundError,
     create_entry,
     delete_entry,
+    export_entries_csv,
     import_entries_csv,
     list_entries,
     update_entry,
 )
+from src.lib.validation import normalize_user_slug
 
 entries_api = Blueprint("entries_api", __name__, url_prefix="/api")
 
@@ -88,6 +90,20 @@ def import_user_entries_route(user_slug: str):
         return jsonify(result), 201
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
+
+
+@entries_api.get("/users/<user_slug>/entries/export")
+def export_user_entries_route(user_slug: str):
+    try:
+        normalized_slug = normalize_user_slug(user_slug)
+        csv_text = export_entries_csv(_db_path(), user_slug=normalized_slug)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    response = Response(csv_text, mimetype="text/csv")
+    response.headers["Content-Disposition"] = (
+        f'attachment; filename="baby-tracker-events-{normalized_slug}.csv"'
+    )
+    return response
 
 
 @entries_api.patch("/entries/<int:entry_id>")

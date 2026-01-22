@@ -228,3 +228,26 @@ def test_import_csv_rejects_missing_headers(client):
     assert response.status_code == 400
     payload = response.get_json()
     assert payload["error"] == "CSV must have headings: timestamp, type, duration, comment"
+
+
+def test_export_entries_csv_includes_feed_amounts(client):
+    client.post(
+        "/api/users/suz/entries",
+        json={
+            "type": "feed",
+            "client_event_id": "evt-export-1",
+            "timestamp_utc": "2024-02-01T08:30:00+00:00",
+            "feed_duration_min": 12.5,
+            "amount_ml": 80,
+            "expressed_ml": 40,
+            "formula_ml": 20,
+        },
+    )
+    response = client.get("/api/users/suz/entries/export")
+    assert response.status_code == 200
+    assert response.mimetype == "text/csv"
+
+    text = response.get_data(as_text=True)
+    lines = [line for line in text.strip().splitlines() if line]
+    assert lines[0] == "date,time,event,duration_min,amount_ml,expressed_ml,formula_ml"
+    assert "2024-02-01,08:30,feed,12.5,80.0,40.0,20.0" in lines[1:]
