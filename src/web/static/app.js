@@ -1405,6 +1405,10 @@ function isMilkExpressType(value) {
   return normalizeEntryType(value) === MILK_EXPRESS_TYPE;
 }
 
+function isFeedType(value) {
+  return normalizeEntryType(value) === "feed";
+}
+
 function parseMilkExpressNotes(value) {
   if (typeof value !== "string") {
     return { ml: 0, minutes: 0 };
@@ -1467,7 +1471,7 @@ function renderSummaryStats(entries) {
   let expressedTotal = 0;
   let formulaTotal = 0;
   entries.forEach((entry) => {
-    if (entry.type === "feed") {
+    if (isFeedType(entry.type)) {
       feedCount += 1;
       const duration = Number.parseFloat(entry.feed_duration_min);
       if (Number.isFinite(duration)) {
@@ -2427,7 +2431,7 @@ function renderStats(entries) {
     }
   };
   entries.forEach((entry) => {
-    if (entry.type === "feed") {
+    if (isFeedType(entry.type)) {
       feedCount += 1;
       addMl(entry.amount_ml);
       if (typeof entry.expressed_ml === "number" && Number.isFinite(entry.expressed_ml)) {
