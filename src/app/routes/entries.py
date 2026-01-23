@@ -8,6 +8,7 @@ from src.app.services.entries import (
     export_entries_csv,
     import_entries_csv,
     list_entries,
+    sync_entries,
     update_entry,
 )
 from src.lib.validation import normalize_user_slug
@@ -125,3 +126,13 @@ def delete_entry_route(entry_id: int):
         return ("", 204)
     except EntryNotFoundError:
         return jsonify({"error": "not_found"}), 404
+
+
+@entries_api.post("/sync/entries")
+def sync_entries_route():
+    payload = request.get_json(silent=True) or {}
+    try:
+        result = sync_entries(_db_path(), payload)
+        return jsonify(result)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400

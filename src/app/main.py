@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from flask import Flask, render_template
+from flask import Flask, render_template, send_from_directory
 
 from src.app.config import load_config
 from src.app.routes.entries import entries_api
@@ -105,6 +105,12 @@ def create_app() -> Flask:
     @app.get("/goals")
     def goals():
         return render_template("goals.html", page="goals")
+
+    @app.get("/sw.js")
+    def service_worker():
+        response = send_from_directory(app.static_folder, "sw.js")
+        response.headers["Service-Worker-Allowed"] = "/"
+        return response
 
     def render_summary_page(
         user_slug: str,
