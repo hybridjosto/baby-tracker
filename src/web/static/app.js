@@ -104,6 +104,7 @@ const customTypeAddBtn = document.getElementById("custom-type-add");
 const customTypeListEl = document.getElementById("custom-type-list");
 const customTypeHintEl = document.getElementById("custom-type-hint");
 const customTypeEmptyEl = document.getElementById("custom-type-empty");
+const exportCsvBtn = document.getElementById("export-csv");
 const goalsFormEl = document.getElementById("goals-form");
 const goalAmountInputEl = document.getElementById("goal-amount");
 const goalStartDateInputEl = document.getElementById("goal-start-date");
@@ -721,6 +722,12 @@ function initSettingsHandlers() {
       event.preventDefault();
     });
   }
+  if (exportCsvBtn) {
+    exportCsvBtn.addEventListener("click", () => {
+      void handleCsvExport();
+    });
+    toggleDisabled(exportCsvBtn, !userValid);
+  }
 }
 
 function initGoalsHandlers() {
@@ -758,6 +765,9 @@ function applyUserState() {
   if (pageType === "settings") {
     initSettingsHandlers();
     updateUserDisplay();
+    if (exportCsvBtn) {
+      toggleDisabled(exportCsvBtn, !userValid);
+    }
     return;
   }
   if (pageType === "goals") {
@@ -1032,6 +1042,41 @@ async function handleCsvUpload(event) {
     await loadLogEntries();
   } catch (error) {
     setStatus("Upload failed.");
+  }
+}
+
+async function handleCsvExport() {
+  if (!userValid || !activeUser) {
+    setStatus("Choose a user below to export entries.");
+    return;
+  }
+  setStatus("Preparing CSV...");
+  try {
+    const response = await fetch(`/api/users/${activeUser}/entries/export`);
+    if (!response.ok) {
+      let detail = "";
+      try {
+        const err = await response.json();
+        detail = err.error || JSON.stringify(err);
+      } catch (parseError) {
+        detail = await response.text();
+      }
+      setStatus(`Error: ${detail || response.status}`);
+      return;
+    }
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    const dateStamp = new Date().toISOString().slice(0, 10);
+    link.href = url;
+    link.download = `baby-tracker-events-${activeUser}-${dateStamp}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+    setStatus("CSV downloaded");
+  } catch (error) {
+    setStatus("Error: network issue exporting CSV");
   }
 }
 
