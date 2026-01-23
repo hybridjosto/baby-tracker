@@ -119,7 +119,6 @@ const lastActivityEl = document.getElementById("last-activity");
 const lastFeedEl = document.getElementById("last-feed");
 const nextFeedEl = document.getElementById("next-feed");
 const nextFeedShortcutEl = document.getElementById("next-feed-shortcut");
-const nextFeedCardEl = document.getElementById("next-feed-card");
 const lastWeeEl = document.getElementById("last-wee");
 const lastPooEl = document.getElementById("last-poo");
 const statCardEls = document.querySelectorAll(".stat-card[data-log-type]");
@@ -496,7 +495,6 @@ function initHomeHandlers() {
   }
   bindTimestampPopup(lastFeedEl);
   bindTimestampPopup(nextFeedEl);
-  bindTimestampPopup(nextFeedCardEl);
   bindTimestampPopup(lastWeeEl);
   bindTimestampPopup(lastPooEl);
   if (feedBtn) {
@@ -1590,7 +1588,7 @@ function setNextFeedShortcut(enabled, href) {
 }
 
 function updateNextFeed() {
-  if (!nextFeedEl && !nextFeedCardEl) {
+  if (!nextFeedEl) {
     return;
   }
   const intervalMinutes = getFeedIntervalMinutes();
@@ -1600,10 +1598,7 @@ function updateNextFeed() {
       nextFeedEl.textContent = "--";
       nextFeedEl.removeAttribute("data-timestamp");
     }
-    if (nextFeedCardEl) {
-      nextFeedCardEl.textContent = "--";
-      nextFeedCardEl.removeAttribute("data-timestamp");
-    }
+    // nextFeedCard removed
     setNextFeedShortcut(false, "");
     return;
   }
@@ -1613,10 +1608,7 @@ function updateNextFeed() {
       nextFeedEl.textContent = "--";
       nextFeedEl.removeAttribute("data-timestamp");
     }
-    if (nextFeedCardEl) {
-      nextFeedCardEl.textContent = "--";
-      nextFeedCardEl.removeAttribute("data-timestamp");
-    }
+    // nextFeedCard removed
     setNextFeedShortcut(false, "");
     return;
   }
@@ -1624,10 +1616,6 @@ function updateNextFeed() {
   if (nextFeedEl) {
     nextFeedEl.textContent = formatTimeUntil(nextDate);
     nextFeedEl.dataset.timestamp = nextDate.toISOString();
-  }
-  if (nextFeedCardEl) {
-    nextFeedCardEl.textContent = formatTimeUntil(nextDate);
-    nextFeedCardEl.dataset.timestamp = nextDate.toISOString();
   }
   const shortcutUrl = buildFeedShortcutUrl(nextDate);
   setNextFeedShortcut(Boolean(shortcutUrl), shortcutUrl);
