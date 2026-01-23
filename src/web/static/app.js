@@ -9,6 +9,14 @@ const logWindowHours = Number.parseInt(bodyEl.dataset.logWindowHours || "", 10);
 const THEME_KEY = "baby-tracker-theme";
 const USER_KEY = "baby-tracker-user";
 const BREASTFEED_TIMER_KEY = "baby-tracker-breastfeed-start";
+const OFFLINE_WINDOW_DAYS = 30;
+const DB_NAME = "baby-tracker";
+const DB_VERSION = 1;
+const STORE_ENTRIES = "entries";
+const STORE_OUTBOX = "outbox";
+const STORE_META = "meta";
+const META_DEVICE_ID = "device_id";
+const META_SYNC_CURSOR = "sync_cursor";
 const USER_RE = /^[a-z0-9-]{1,24}$/;
 const RESERVED_USER_SLUGS = new Set(["timeline", "summary", "log", "settings", "goals"]);
 const themeToggleBtn = document.getElementById("theme-toggle");
@@ -143,6 +151,8 @@ let hasLoadedHomeEntries = false;
 let hasLoadedLogEntries = false;
 let hasLoadedSummaryEntries = false;
 let hasLoadedSummaryInsights = false;
+let syncInFlight = null;
+let syncTimerId = null;
 
 const CUSTOM_TYPE_RE = /^[A-Za-z0-9][A-Za-z0-9 /-]{0,31}$/;
 const MILK_EXPRESS_TYPE = "milk express";
@@ -1124,6 +1134,274 @@ function generateId() {
     return window.crypto.randomUUID();
   }
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function requestToPromise(request) {
+  return new Promise((resolve, reject) => {
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+function openDb() {
+  if (!("indexedDB" in window)) {
+    return Promise.reject(new Error("IndexedDB not supported"));
+  }
+  if (openDb.cached) {
+    return openDb.cached;
+  }
+  openDb.cached = new Promise((resolve, reject) => {
+    const request = window.indexedDB.open(DB_NAME, DB_VERSION);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(STORE_ENTRIES)) {
+        const store = db.createObjectStore(STORE_ENTRIES, { keyPath: "client_event_id" });
+        store.createIndex("by_timestamp_utc", "timestamp_utc", { unique: false });
+        store.createIndex("by_user_slug", "user_slug", { unique: false });
+      }
+      if (!db.objectStoreNames.contains(STORE_OUTBOX)) {
+        db.createObjectStore(STORE_OUTBOX, { autoIncrement: true });
+      }
+      if (!db.objectStoreNames.contains(STORE_META)) {
+        db.createObjectStore(STORE_META, { keyPath: "key" });
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+  return openDb.cached;
+}
+
+async function getMetaValue(key) {
+  const db = await openDb();
+  const tx = db.transaction(STORE_META, "readonly");
+  const store = tx.objectStore(STORE_META);
+  const record = await requestToPromise(store.get(key));
+  return record ? record.value : null;
+}
+
+async function setMetaValue(key, value) {
+  const db = await openDb();
+  const tx = db.transaction(STORE_META, "readwrite");
+  const store = tx.objectStore(STORE_META);
+  await requestToPromise(store.put({ key, value }));
+}
+
+async function getDeviceId() {
+  let deviceId = await getMetaValue(META_DEVICE_ID);
+  if (!deviceId) {
+    deviceId = generateId();
+    await setMetaValue(META_DEVICE_ID, deviceId);
+  }
+  return deviceId;
+}
+
+async function getSyncCursor() {
+  return getMetaValue(META_SYNC_CURSOR);
+}
+
+async function setSyncCursor(cursor) {
+  await setMetaValue(META_SYNC_CURSOR, cursor);
+}
+
+async function upsertEntryLocal(entry) {
+  const db = await openDb();
+  const tx = db.transaction(STORE_ENTRIES, "readwrite");
+  const store = tx.objectStore(STORE_ENTRIES);
+  await requestToPromise(store.put(entry));
+}
+
+async function getEntryLocal(clientEventId) {
+  const db = await openDb();
+  const tx = db.transaction(STORE_ENTRIES, "readonly");
+  const store = tx.objectStore(STORE_ENTRIES);
+  return requestToPromise(store.get(clientEventId));
+}
+
+async function pruneEntriesLocal(entries, cutoffMs) {
+  const staleKeys = entries
+    .filter((entry) => {
+      const timestamp = new Date(entry.timestamp_utc);
+      return !Number.isNaN(timestamp.getTime()) && timestamp.getTime() < cutoffMs;
+    })
+    .map((entry) => entry.client_event_id);
+  if (!staleKeys.length) {
+    return;
+  }
+  const db = await openDb();
+  await new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_ENTRIES, "readwrite");
+    const store = tx.objectStore(STORE_ENTRIES);
+    staleKeys.forEach((key) => store.delete(key));
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error);
+  });
+}
+
+async function listEntriesLocal(params = {}) {
+  const db = await openDb();
+  const tx = db.transaction(STORE_ENTRIES, "readonly");
+  const store = tx.objectStore(STORE_ENTRIES);
+  const allEntries = await requestToPromise(store.getAll());
+  const cutoffMs = Date.now() - OFFLINE_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+  void pruneEntriesLocal(allEntries, cutoffMs);
+
+  const since = params.since ? new Date(params.since) : null;
+  const until = params.until ? new Date(params.until) : null;
+  const filtered = allEntries.filter((entry) => {
+    if (entry.deleted_at_utc) {
+      return false;
+    }
+    if (params.user_slug && entry.user_slug !== params.user_slug) {
+      return false;
+    }
+    if (params.type && entry.type !== params.type) {
+      return false;
+    }
+    const timestamp = new Date(entry.timestamp_utc);
+    if (Number.isNaN(timestamp.getTime())) {
+      return false;
+    }
+    if (timestamp.getTime() < cutoffMs) {
+      return false;
+    }
+    if (since && timestamp < since) {
+      return false;
+    }
+    if (until && timestamp > until) {
+      return false;
+    }
+    return true;
+  });
+  filtered.sort((a, b) => {
+    const left = new Date(a.timestamp_utc).getTime();
+    const right = new Date(b.timestamp_utc).getTime();
+    return right - left;
+  });
+  if (Number.isFinite(params.limit)) {
+    return filtered.slice(0, params.limit);
+  }
+  return filtered;
+}
+
+async function enqueueOutbox(change) {
+  const db = await openDb();
+  const tx = db.transaction(STORE_OUTBOX, "readwrite");
+  const store = tx.objectStore(STORE_OUTBOX);
+  await requestToPromise(
+    store.add({ ...change, queued_at: new Date().toISOString() }),
+  );
+}
+
+async function drainOutbox(limit = 100) {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_OUTBOX, "readonly");
+    const store = tx.objectStore(STORE_OUTBOX);
+    const items = [];
+    let count = 0;
+    const request = store.openCursor();
+    request.onsuccess = (event) => {
+      const cursor = event.target.result;
+      if (!cursor || count >= limit) {
+        resolve(items);
+        return;
+      }
+      items.push({ key: cursor.key, value: cursor.value });
+      count += 1;
+      cursor.continue();
+    };
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function clearOutbox(keys) {
+  if (!keys.length) {
+    return;
+  }
+  const db = await openDb();
+  await new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_OUTBOX, "readwrite");
+    const store = tx.objectStore(STORE_OUTBOX);
+    keys.forEach((key) => store.delete(key));
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error);
+  });
+}
+
+async function applyServerEntries(entries) {
+  if (!entries || !entries.length) {
+    return;
+  }
+  const db = await openDb();
+  await new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_ENTRIES, "readwrite");
+    const store = tx.objectStore(STORE_ENTRIES);
+    entries.forEach((entry) => store.put(entry));
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error);
+  });
+}
+
+async function syncNow() {
+  if (!navigator.onLine) {
+    return null;
+  }
+  if (syncInFlight) {
+    return syncInFlight;
+  }
+  syncInFlight = (async () => {
+    const deviceId = await getDeviceId();
+    const cursor = await getSyncCursor();
+    const outbox = await drainOutbox();
+    const changes = outbox.map((item) => item.value);
+
+    if (changes.length) {
+      setStatus("Syncing...");
+    }
+
+    const response = await fetch("/api/sync/entries", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ device_id: deviceId, cursor, changes }),
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const data = await response.json();
+    await applyServerEntries(data.entries || []);
+    await setSyncCursor(data.cursor);
+    await clearOutbox(outbox.map((item) => item.key));
+    if (changes.length) {
+      setStatus("Synced");
+    }
+    return data;
+  })()
+    .catch((err) => {
+      console.warn("Sync failed", err);
+      if (!navigator.onLine) {
+        setStatus("Offline - changes will sync when online");
+      } else if (statusEl) {
+        setStatus("Sync failed");
+      }
+      return null;
+    })
+    .finally(() => {
+      syncInFlight = null;
+    });
+  return syncInFlight;
+}
+
+function scheduleSync() {
+  if (syncTimerId) {
+    return;
+  }
+  syncTimerId = window.setInterval(() => {
+    void syncNow();
+  }, 60000);
 }
 
 function formatTimestamp(value) {
@@ -2415,6 +2693,35 @@ function normalizeGoalsResponse(data) {
   return [];
 }
 
+async function listEntriesLocalSafe(params) {
+  try {
+    return await listEntriesLocal(params);
+  } catch (err) {
+    return null;
+  }
+}
+
+async function loadEntriesWithFallback(params) {
+  const localEntries = await listEntriesLocalSafe(params);
+  try {
+    const serverEntries = await fetchEntries(params);
+    try {
+      await applyServerEntries(serverEntries);
+    } catch (err) {
+      // Ignore cache failures and return server data.
+    }
+    return serverEntries;
+  } catch (err) {
+    if (localEntries) {
+      return localEntries;
+    }
+    if (localEntries === null) {
+      throw err;
+    }
+    return [];
+  }
+}
+
 function buildQuery(params) {
   const search = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
@@ -2916,7 +3223,23 @@ async function loadTimelineEntries(options = {}) {
     if (!options.reset && timelineOldestTimestamp) {
       params.until = timelineOldestTimestamp;
     }
-    const entries = await fetchEntries(params);
+    if (!navigator.onLine) {
+      const cachedEntries = await listEntriesLocalSafe(params);
+      if (cachedEntries && cachedEntries.length) {
+        appendTimelineEntries(cachedEntries);
+        if (cachedEntries.length) {
+          timelineOldestTimestamp = decrementIsoTimestamp(
+            cachedEntries[cachedEntries.length - 1].timestamp_utc,
+          );
+        }
+        if (cachedEntries.length < params.limit) {
+          timelineHasMore = false;
+        }
+      }
+      return;
+    }
+    await syncNow();
+    const entries = await loadEntriesWithFallback(params);
     appendTimelineEntries(entries);
     if (entries.length) {
       timelineOldestTimestamp = decrementIsoTimestamp(
@@ -3185,48 +3508,64 @@ function buildEntryPayload(type) {
     type,
     timestamp_utc: new Date().toISOString(),
     client_event_id: generateId(),
+    user_slug: activeUser || null,
   };
 }
 
 async function saveEntry(payload) {
   setStatus("Saving...");
+  const now = new Date().toISOString();
+  const entry = {
+    ...payload,
+    user_slug: activeUser,
+    created_at_utc: now,
+    updated_at_utc: now,
+    deleted_at_utc: null,
+  };
   try {
-    const response = await fetch(`/api/users/${activeUser}/entries`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
-    if (response.status === 409) {
-      setStatus("Already saved (duplicate tap)");
-      if (pageType === "log") {
-        await loadLogEntries();
-      } else {
-        await loadHomeEntries();
-      }
-      return;
+    await upsertEntryLocal(entry);
+    await enqueueOutbox({ action: "upsert", entry });
+    if (!navigator.onLine) {
+      setStatus("Saved offline");
+    } else {
+      setStatus("Saved (syncing...)");
+      await syncNow();
     }
-
-    if (!response.ok) {
-      let detail = "";
-      try {
-        const err = await response.json();
-        detail = err.error || JSON.stringify(err);
-      } catch (parseError) {
-        detail = await response.text();
-      }
-      setStatus(`Error: ${detail || response.status}`);
-      return;
-    }
-
-    setStatus("Saved");
     if (pageType === "log") {
       await loadLogEntries();
     } else {
       await loadHomeEntries();
     }
   } catch (err) {
-    setStatus("Error: network issue saving entry");
+    try {
+      const response = await fetch(`/api/users/${activeUser}/entries`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (response.status === 409) {
+        setStatus("Already saved (duplicate tap)");
+      } else if (!response.ok) {
+        let detail = "";
+        try {
+          const errBody = await response.json();
+          detail = errBody.error || JSON.stringify(errBody);
+        } catch (parseError) {
+          detail = await response.text();
+        }
+        setStatus(`Error: ${detail || response.status}`);
+        return;
+      } else {
+        setStatus("Saved");
+      }
+      if (pageType === "log") {
+        await loadLogEntries();
+      } else {
+        await loadHomeEntries();
+      }
+    } catch (networkErr) {
+      setStatus("Error: network issue saving entry");
+    }
   }
 }
 
@@ -3514,22 +3853,27 @@ async function editEntry(entry) {
   const trimmedNote = noteInput.trim();
   payload.notes = trimmedNote ? trimmedNote : null;
 
-  const response = await fetch(`/api/entries/${entry.id}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-
-  if (response.ok) {
-    setStatus("Updated");
+  try {
+    const updated = {
+      ...entry,
+      ...payload,
+      updated_at_utc: new Date().toISOString(),
+    };
+    await upsertEntryLocal(updated);
+    await enqueueOutbox({ action: "upsert", entry: updated });
+    if (!navigator.onLine) {
+      setStatus("Updated offline");
+    } else {
+      setStatus("Updated (syncing...)");
+      await syncNow();
+    }
     if (pageType === "log") {
       await loadLogEntries();
     } else {
       await loadHomeEntries();
     }
-  } else {
-    const err = await response.json();
-    setStatus(`Error: ${err.error || "unknown"}`);
+  } catch (err) {
+    setStatus("Error: unable to update entry");
   }
 }
 
@@ -3545,22 +3889,27 @@ async function editEntryTime(entry) {
     return;
   }
 
-  const response = await fetch(`/api/entries/${entry.id}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ timestamp_utc: nextDate.toISOString() }),
-  });
-
-  if (response.ok) {
-    setStatus("Updated time");
+  try {
+    const updated = {
+      ...entry,
+      timestamp_utc: nextDate.toISOString(),
+      updated_at_utc: new Date().toISOString(),
+    };
+    await upsertEntryLocal(updated);
+    await enqueueOutbox({ action: "upsert", entry: updated });
+    if (!navigator.onLine) {
+      setStatus("Updated time offline");
+    } else {
+      setStatus("Updated time (syncing...)");
+      await syncNow();
+    }
     if (pageType === "log") {
       await loadLogEntries();
     } else {
       await loadHomeEntries();
     }
-  } else {
-    const err = await response.json();
-    setStatus(`Error: ${err.error || "unknown"}`);
+  } catch (err) {
+    setStatus("Error: unable to update time");
   }
 }
 
@@ -3568,19 +3917,28 @@ async function deleteEntry(entry) {
   if (!window.confirm("Delete this entry?")) {
     return;
   }
-  const response = await fetch(`/api/entries/${entry.id}`, {
-    method: "DELETE",
-  });
-  if (response.status === 204) {
-    setStatus("Deleted");
+  try {
+    const deletedAt = new Date().toISOString();
+    const updated = {
+      ...entry,
+      deleted_at_utc: deletedAt,
+      updated_at_utc: deletedAt,
+    };
+    await upsertEntryLocal(updated);
+    await enqueueOutbox({ action: "delete", client_event_id: entry.client_event_id });
+    if (!navigator.onLine) {
+      setStatus("Deleted offline");
+    } else {
+      setStatus("Deleted (syncing...)");
+      await syncNow();
+    }
     if (pageType === "log") {
       await loadLogEntries();
     } else {
       await loadHomeEntries();
     }
-  } else {
-    const err = await response.json();
-    setStatus(`Error: ${err.error || "unknown"}`);
+  } catch (err) {
+    setStatus("Error: unable to delete entry");
   }
 }
 
@@ -3638,8 +3996,28 @@ async function loadHomeEntries() {
   try {
     const statsWindow = computeWindow(24);
     const chartWindow = computeWindow(6);
+    const cachedEntries = await listEntriesLocalSafe({
+      limit: 200,
+      since: statsWindow.sinceIso,
+      until: statsWindow.untilIso,
+    });
+    if (cachedEntries) {
+      const cachedChartEntries = cachedEntries.filter((entry) => {
+        const ts = new Date(entry.timestamp_utc);
+        return ts >= chartWindow.since && ts <= chartWindow.until;
+      });
+      renderChart(cachedChartEntries, chartWindow);
+      renderStats(cachedEntries);
+      renderGoalComparison();
+      renderStatsWindow(statsWindow);
+      renderLastActivity(cachedEntries);
+      renderLastByType(cachedEntries);
+    }
+
+    await syncNow();
+
     const [entries, goals] = await Promise.all([
-      fetchEntries({
+      loadEntriesWithFallback({
         limit: 200,
         since: statsWindow.sinceIso,
         until: statsWindow.untilIso,
@@ -3677,8 +4055,21 @@ async function loadSummaryEntries() {
       setSummaryDate(new Date());
     }
     const dayWindow = getSummaryDayWindow(summaryDate);
+    const cachedEntries = await listEntriesLocalSafe({
+      limit: 200,
+      since: dayWindow.sinceIso,
+      until: dayWindow.untilIso,
+    });
+    if (cachedEntries) {
+      summaryEntries = cachedEntries;
+      renderSummaryStats(cachedEntries);
+      renderMilkExpressSummary(cachedEntries);
+    }
+
+    await syncNow();
+
     const [entries] = await Promise.all([
-      fetchEntries({
+      loadEntriesWithFallback({
         limit: 200,
         since: dayWindow.sinceIso,
         until: dayWindow.untilIso,
@@ -3736,9 +4127,7 @@ async function ensureMilkExpressAllEntries() {
   if (milkExpressAllLoading) {
     return milkExpressAllLoading;
   }
-  milkExpressAllLoading = fetchEntries({
-    limit: 200,
-  })
+  milkExpressAllLoading = loadEntriesWithFallback({ limit: 200 })
     .then((entries) => {
       const filtered = entries.filter((entry) => isMilkExpressType(entry.type));
       milkExpressAllEntries = filtered;
@@ -3770,7 +4159,12 @@ async function loadLogEntries() {
     if (logFilterType) {
       params.type = logFilterType;
     }
-    const entries = await fetchEntries(params);
+    const cachedEntries = await listEntriesLocalSafe(params);
+    if (cachedEntries) {
+      renderLogEntries(cachedEntries);
+    }
+    await syncNow();
+    const entries = await loadEntriesWithFallback(params);
     renderLogEntries(entries);
   } catch (err) {
     setStatus(`Failed to load entries: ${err.message || "unknown error"}`);
@@ -3870,3 +4264,15 @@ if (userFormEl) {
 }
 void loadBabySettings();
 initializeUser();
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch((err) => {
+      console.warn("Service worker registration failed", err);
+    });
+  });
+}
+window.addEventListener("online", () => {
+  setStatus("Back online");
+  void syncNow();
+});
+scheduleSync();

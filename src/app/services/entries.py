@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import math
 import csv
 import io
@@ -8,9 +8,12 @@ from src.app.storage.db import get_connection
 from src.app.storage.entries import (
     create_entry as repo_create_entry,
     delete_entry as repo_delete_entry,
+    get_entry_by_client_event_id as repo_get_entry_by_client_event_id,
     list_entries as repo_list_entries,
     list_entries_for_export as repo_list_entries_for_export,
+    list_entries_updated_since as repo_list_entries_updated_since,
     update_entry as repo_update_entry,
+    upsert_entry_by_client_event_id as repo_upsert_entry_by_client_event_id,
 )
 from src.lib.validation import (
     normalize_user_slug,
@@ -116,6 +119,7 @@ def list_entries(
             since_utc=normalized_since,
             until_utc=normalized_until,
             entry_type=normalized_type,
+            include_deleted=False,
         )
 
 
@@ -286,6 +290,66 @@ def update_entry(db_path: str, entry_id: int, payload: dict) -> dict:
 
 def delete_entry(db_path: str, entry_id: int) -> None:
     with get_connection(db_path) as conn:
-        deleted = repo_delete_entry(conn, entry_id)
+        now = _now_utc_iso()
+        deleted = repo_delete_entry(conn, entry_id, now, now)
     if not deleted:
         raise EntryNotFoundError()
+
+
+def sync_entries(db_path: str, payload: dict) -> dict:
+    device_id = payload.get("device_id")
+    if not isinstance(device_id, str) or not device_id.strip():
+        raise ValueError("device_id is required")
+
+    cursor = payload.get("cursor")
+    if cursor is not None and not isinstance(cursor, str):
+        raise ValueError("cursor must be a string")
+    normalized_cursor = _normalize_filter_ts(cursor) if cursor else None
+
+    changes = payload.get("changes", [])
+    if changes is None:
+        changes = []
+    if not isinstance(changes, list):
+        raise ValueError("changes must be a list")
+
+    now = _now_utc_iso()
+    with get_connection(db_path) as conn:
+        for change in changes:
+            if not isinstance(change, dict):
+                raise ValueError("change must be an object")
+            action = change.get("action")
+            if action == "upsert":
+                entry = change.get("entry")
+                if not isinstance(entry, dict):
+                    raise ValueError("entry is required for upsert")
+                validated = validate_entry_payload(entry, require_client_event=True)
+                validated["user_slug"] = normalize_user_slug(entry.get("user_slug"))
+                if not validated.get("timestamp_utc"):
+                    validated["timestamp_utc"] = now
+                validated["created_at_utc"] = now
+                validated["updated_at_utc"] = now
+                validated["deleted_at_utc"] = entry.get("deleted_at_utc")
+                repo_upsert_entry_by_client_event_id(conn, validated)
+            elif action == "delete":
+                client_event_id = change.get("client_event_id")
+                if not isinstance(client_event_id, str) or not client_event_id.strip():
+                    raise ValueError("client_event_id is required for delete")
+                existing = repo_get_entry_by_client_event_id(conn, client_event_id)
+                if existing:
+                    repo_delete_entry(conn, existing["id"], now, now)
+            else:
+                raise ValueError("action must be 'upsert' or 'delete'")
+
+        query_cursor = normalized_cursor
+        if query_cursor is None:
+            query_cursor = (
+                datetime.now(timezone.utc) - timedelta(days=30)
+            ).isoformat()
+        updated_entries = repo_list_entries_updated_since(conn, query_cursor, limit=500)
+
+    next_cursor = cursor
+    if updated_entries:
+        next_cursor = max(entry["updated_at_utc"] for entry in updated_entries)
+    else:
+        next_cursor = now
+    return {"cursor": next_cursor, "entries": updated_entries}

@@ -11,10 +11,12 @@ CREATE TABLE IF NOT EXISTS entries (
     feed_duration_min REAL,
     caregiver_id INTEGER,
     created_at_utc TEXT NOT NULL,
-    updated_at_utc TEXT NOT NULL
+    updated_at_utc TEXT NOT NULL,
+    deleted_at_utc TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_entries_timestamp_utc ON entries (timestamp_utc DESC);
+CREATE INDEX IF NOT EXISTS idx_entries_updated_at_utc ON entries (updated_at_utc DESC);
 
 CREATE TABLE IF NOT EXISTS baby_settings (
     id INTEGER PRIMARY KEY CHECK (id = 1),

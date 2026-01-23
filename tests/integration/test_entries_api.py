@@ -169,8 +169,27 @@ def test_delete_entry_success(client):
     response = client.delete(f"/api/entries/{created['id']}")
     assert response.status_code == 204
 
+    entries = client.get("/api/entries").get_json()
+    assert all(entry["id"] != created["id"] for entry in entries)
+
     response = client.delete(f"/api/entries/{created['id']}")
     assert response.status_code == 404
+
+
+def test_delete_entry_soft_delete_idempotent(client):
+    created = client.post(
+        "/api/users/suz/entries",
+        json={"type": "feed", "client_event_id": "evt-del-2"},
+    ).get_json()
+
+    response = client.delete(f"/api/entries/{created['id']}")
+    assert response.status_code == 204
+
+    response = client.delete(f"/api/entries/{created['id']}")
+    assert response.status_code == 404
+
+    entries = client.get("/api/entries").get_json()
+    assert all(entry["id"] != created["id"] for entry in entries)
 
 
 def test_list_entries_rejects_invalid_since_filter(client):
