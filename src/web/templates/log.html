@@ -247,6 +247,7 @@
       }
       .edit-modal-card {
         width: min(100%, 420px);
+        max-width: calc(100vw - 32px);
         border-radius: 16px;
         border: 1px solid var(--border-light);
         background: var(--card-light);
@@ -254,6 +255,7 @@
         display: grid;
         gap: 12px;
         box-shadow: var(--shadow-soft);
+        overflow: hidden;
       }
       html.dark .edit-modal-card {
         border-color: var(--border-dark);
@@ -299,6 +301,8 @@
       .edit-field select,
       .edit-field textarea {
         width: 100%;
+        max-width: 100%;
+        min-width: 0;
         border-radius: 10px;
         border: 1px solid var(--border-light);
         padding: 10px 12px;
@@ -307,10 +311,13 @@
         color: var(--text-primary);
         box-sizing: border-box;
         font-family: inherit;
+        display: block;
       }
       .edit-field input[type="datetime-local"] {
+        width: 100%;
         max-width: 100%;
         min-width: 0;
+        appearance: none;
       }
       html.dark .edit-field input,
       html.dark .edit-field select,
