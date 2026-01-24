@@ -54,7 +54,7 @@
         border-radius: 10px;
         border: 1px solid var(--border-light);
         padding: 10px 12px;
-        font-size: 14px;
+        font-size: 16px;
         background: #ffffff;
         color: var(--text-primary);
         box-sizing: border-box;
@@ -149,7 +149,15 @@
           </div>
           <div class="field">
             <label for="interval-input">Current feed interval (hours)</label>
-            <input id="interval-input" type="number" name="feed_interval" min="0" step="0.25" inputmode="decimal">
+            <input
+              id="interval-input"
+              type="number"
+              name="feed_interval"
+              min="0"
+              step="0.25"
+              inputmode="decimal"
+              pattern="[0-9]*[.,]?[0-9]*"
+            >
             <div class="hint">Used to estimate time to next feed.</div>
           </div>
           <div class="field">
