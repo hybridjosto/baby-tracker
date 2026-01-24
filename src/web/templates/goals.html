@@ -58,7 +58,7 @@
         border-radius: 10px;
         border: 1px solid var(--border-light);
         padding: 10px 12px;
-        font-size: 14px;
+        font-size: 16px;
         background: #ffffff;
         color: var(--text-primary);
         box-sizing: border-box;
@@ -171,7 +171,16 @@
         <form id="goals-form">
           <div class="field">
             <label for="goal-amount">24h goal (ml)</label>
-            <input id="goal-amount" type="number" name="goal_amount" min="1" step="1" inputmode="decimal" required>
+            <input
+              id="goal-amount"
+              type="number"
+              name="goal_amount"
+              min="1"
+              step="1"
+              inputmode="numeric"
+              pattern="[0-9]*"
+              required
+            >
           </div>
           <div class="field">
             <label for="goal-start-date">Start date</label>
