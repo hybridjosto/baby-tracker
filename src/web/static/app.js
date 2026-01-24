@@ -108,6 +108,17 @@ const chartSvg = document.getElementById("history-chart");
 const chartEmptyEl = document.getElementById("chart-empty");
 const logListEl = document.getElementById("log-entries");
 const logEmptyEl = document.getElementById("log-empty");
+const editEntryBackdropEl = document.getElementById("edit-entry-backdrop");
+const editEntryModalEl = document.getElementById("edit-entry-modal");
+const editEntryFormEl = document.getElementById("edit-entry-form");
+const editEntryTypeEl = document.getElementById("edit-entry-type");
+const editEntryTimeEl = document.getElementById("edit-entry-time");
+const editEntryDurationEl = document.getElementById("edit-entry-duration");
+const editEntryExpressedEl = document.getElementById("edit-entry-expressed");
+const editEntryFormulaEl = document.getElementById("edit-entry-formula");
+const editEntryNotesEl = document.getElementById("edit-entry-notes");
+const editEntryCancelEl = document.getElementById("edit-entry-cancel");
+const editEntryCloseEl = document.getElementById("edit-entry-close");
 const statFeedEl = document.getElementById("stat-feed");
 const statWeeEl = document.getElementById("stat-wee");
 const statPooEl = document.getElementById("stat-poo");
@@ -167,6 +178,10 @@ let syncTimerId = null;
 let milkExpressLedgerInitialized = false;
 let milkExpressLedgerEntries = [];
 const milkExpressLedgerSelections = new Set();
+let editEntryModalInitialized = false;
+let editEntryModalResolver = null;
+let editEntryModalEntry = null;
+let editEntryModalMode = "full";
 
 const CUSTOM_TYPE_RE = /^[A-Za-z0-9][A-Za-z0-9 /-]{0,31}$/;
 const MILK_EXPRESS_TYPE = "milk express";
@@ -638,6 +653,7 @@ function initLogHandlers() {
   if (csvFormEl) {
     csvFormEl.addEventListener("submit", handleCsvUpload);
   }
+  initEditEntryModalHandlers();
   startAutoRefresh(loadLogEntries);
   updateLogEmptyMessage();
 }
@@ -3851,6 +3867,23 @@ function parseOptionalMlInput(inputEl, label) {
   }
   return { value: ml, hasValue: true, valid: true };
 }
+
+function parseOptionalNumberInput(inputEl, label) {
+  if (!inputEl) {
+    return { value: null, hasValue: false, valid: true };
+  }
+  const trimmed = inputEl.value.trim();
+  if (!trimmed) {
+    return { value: null, hasValue: false, valid: true };
+  }
+  const amount = Number.parseFloat(trimmed);
+  if (!Number.isFinite(amount) || amount < 0) {
+    setStatus(`${label} must be a non-negative number`);
+    inputEl.focus();
+    return { value: null, hasValue: true, valid: false };
+  }
+  return { value: amount, hasValue: true, valid: true };
+}
 async function handleBreastfeedToggle() {
   if (!userValid) {
     setStatus("Choose a user below to start logging.");
@@ -3899,7 +3932,280 @@ async function handleMlEntry(inputEl, label) {
   await saveEntry(payload);
 }
 
+function isEditEntryModalAvailable() {
+  return Boolean(editEntryModalEl && editEntryFormEl && editEntryTimeEl);
+}
+
+function renderEditEntryTypeOptions(currentType) {
+  if (!editEntryTypeEl) {
+    return;
+  }
+  const normalizedCurrent = String(currentType || "").trim().toLowerCase();
+  const baseOptions = ["feed", "wee", "poo", "milk express"];
+  const options = [...new Set([...baseOptions, ...customEventTypes])].filter(Boolean);
+  if (normalizedCurrent && !options.includes(normalizedCurrent)) {
+    options.push(normalizedCurrent);
+  }
+  editEntryTypeEl.innerHTML = "";
+  options.forEach((value) => {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = value;
+    editEntryTypeEl.appendChild(option);
+  });
+  if (normalizedCurrent) {
+    editEntryTypeEl.value = normalizedCurrent;
+  }
+}
+
+function updateEditEntryFieldVisibility(type) {
+  if (!editEntryModalEl) {
+    return;
+  }
+  const normalized = String(type || "").trim().toLowerCase();
+  const isFeed = normalized === "feed";
+  const isExpress = isMilkExpressType(normalized);
+  const numbersWrap = editEntryModalEl.querySelector(".edit-field--numbers");
+  if (numbersWrap) {
+    numbersWrap.style.display = isFeed || isExpress ? "grid" : "none";
+  }
+  const durationField = editEntryDurationEl ? editEntryDurationEl.closest(".edit-field") : null;
+  const expressedField = editEntryExpressedEl ? editEntryExpressedEl.closest(".edit-field") : null;
+  const formulaField = editEntryFormulaEl ? editEntryFormulaEl.closest(".edit-field") : null;
+  if (durationField) {
+    durationField.style.display = isFeed || isExpress ? "grid" : "none";
+  }
+  if (expressedField) {
+    expressedField.style.display = isFeed || isExpress ? "grid" : "none";
+  }
+  if (formulaField) {
+    formulaField.style.display = isFeed ? "grid" : "none";
+  }
+}
+
+function closeEditEntryModal(result = null) {
+  if (editEntryModalEl) {
+    editEntryModalEl.hidden = true;
+    editEntryModalEl.setAttribute("aria-hidden", "true");
+    editEntryModalEl.classList.remove("is-time-only");
+  }
+  if (editEntryBackdropEl) {
+    editEntryBackdropEl.hidden = true;
+    editEntryBackdropEl.classList.remove("open");
+  }
+  const resolver = editEntryModalResolver;
+  editEntryModalResolver = null;
+  editEntryModalEntry = null;
+  editEntryModalMode = "full";
+  if (resolver) {
+    resolver(result);
+  }
+}
+
+function initEditEntryModalHandlers() {
+  if (editEntryModalInitialized || !isEditEntryModalAvailable()) {
+    return;
+  }
+  editEntryModalInitialized = true;
+  if (editEntryTypeEl) {
+    editEntryTypeEl.addEventListener("change", () => {
+      updateEditEntryFieldVisibility(editEntryTypeEl.value);
+    });
+  }
+  if (editEntryFormEl) {
+    editEntryFormEl.addEventListener("submit", (event) => {
+      event.preventDefault();
+      if (!editEntryModalEntry) {
+        closeEditEntryModal(null);
+        return;
+      }
+      const nextTime = editEntryTimeEl ? editEntryTimeEl.value : "";
+      if (!nextTime) {
+        setStatus("Timestamp is required");
+        editEntryTimeEl?.focus();
+        return;
+      }
+      const nextDate = new Date(nextTime);
+      if (Number.isNaN(nextDate.getTime())) {
+        setStatus("Invalid timestamp");
+        editEntryTimeEl?.focus();
+        return;
+      }
+      if (editEntryModalMode === "time") {
+        closeEditEntryModal({ timestamp_utc: nextDate.toISOString() });
+        return;
+      }
+      const rawType = editEntryTypeEl ? editEntryTypeEl.value : editEntryModalEntry.type;
+      const nextType = String(rawType || "").trim().toLowerCase();
+      if (!nextType) {
+        setStatus("Type is required");
+        editEntryTypeEl?.focus();
+        return;
+      }
+      const payload = { type: nextType, timestamp_utc: nextDate.toISOString() };
+      if (nextType === "feed") {
+        const duration = parseOptionalNumberInput(editEntryDurationEl, "Duration");
+        if (!duration.valid) {
+          return;
+        }
+        payload.feed_duration_min = duration.hasValue ? duration.value : null;
+
+        const expressed = parseOptionalNumberInput(editEntryExpressedEl, "Expressed amount");
+        if (!expressed.valid) {
+          return;
+        }
+        payload.expressed_ml = expressed.hasValue ? expressed.value : null;
+
+        const formula = parseOptionalNumberInput(editEntryFormulaEl, "Formula amount");
+        if (!formula.valid) {
+          return;
+        }
+        payload.formula_ml = formula.hasValue ? formula.value : null;
+      } else if (isMilkExpressType(nextType)) {
+        const expressed = parseOptionalNumberInput(editEntryExpressedEl, "Expressed amount");
+        if (!expressed.valid) {
+          return;
+        }
+        payload.expressed_ml = expressed.hasValue ? expressed.value : null;
+
+        const duration = parseOptionalNumberInput(editEntryDurationEl, "Duration");
+        if (!duration.valid) {
+          return;
+        }
+        payload.feed_duration_min = duration.hasValue ? duration.value : null;
+
+        if (editEntryModalEntry.formula_ml !== null && editEntryModalEntry.formula_ml !== undefined) {
+          payload.formula_ml = null;
+        }
+        if (editEntryModalEntry.amount_ml !== null && editEntryModalEntry.amount_ml !== undefined) {
+          payload.amount_ml = null;
+        }
+      } else if (
+        editEntryModalEntry.feed_duration_min !== null
+        && editEntryModalEntry.feed_duration_min !== undefined
+      ) {
+        payload.feed_duration_min = null;
+      }
+      if (nextType !== "feed" && !isMilkExpressType(nextType)) {
+        if (editEntryModalEntry.expressed_ml !== null && editEntryModalEntry.expressed_ml !== undefined) {
+          payload.expressed_ml = null;
+        }
+        if (editEntryModalEntry.formula_ml !== null && editEntryModalEntry.formula_ml !== undefined) {
+          payload.formula_ml = null;
+        }
+      }
+      const noteValue = editEntryNotesEl ? editEntryNotesEl.value.trim() : "";
+      payload.notes = noteValue ? noteValue : null;
+      closeEditEntryModal(payload);
+    });
+  }
+  if (editEntryCancelEl) {
+    editEntryCancelEl.addEventListener("click", () => closeEditEntryModal(null));
+  }
+  if (editEntryCloseEl) {
+    editEntryCloseEl.addEventListener("click", () => closeEditEntryModal(null));
+  }
+  if (editEntryBackdropEl) {
+    editEntryBackdropEl.addEventListener("click", () => closeEditEntryModal(null));
+  }
+  if (editEntryModalEl) {
+    editEntryModalEl.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        event.stopPropagation();
+        closeEditEntryModal(null);
+      }
+    });
+  }
+}
+
+function openEditEntryModal(entry, mode = "full") {
+  if (!isEditEntryModalAvailable()) {
+    return Promise.resolve(null);
+  }
+  initEditEntryModalHandlers();
+  editEntryModalEntry = entry;
+  editEntryModalMode = mode;
+  if (editEntryModalEl) {
+    editEntryModalEl.hidden = false;
+    editEntryModalEl.setAttribute("aria-hidden", "false");
+    editEntryModalEl.classList.toggle("is-time-only", mode === "time");
+  }
+  if (editEntryBackdropEl) {
+    editEntryBackdropEl.hidden = false;
+    editEntryBackdropEl.classList.add("open");
+  }
+  renderEditEntryTypeOptions(entry.type);
+  if (editEntryTimeEl) {
+    editEntryTimeEl.value = toLocalDateTimeValue(entry.timestamp_utc);
+  }
+  if (editEntryDurationEl) {
+    editEntryDurationEl.value = entry.feed_duration_min !== null && entry.feed_duration_min !== undefined
+      ? String(entry.feed_duration_min)
+      : "";
+  }
+  if (editEntryExpressedEl) {
+    const fallback = getMilkExpressAmounts(entry);
+    editEntryExpressedEl.value = entry.expressed_ml !== null && entry.expressed_ml !== undefined
+      ? String(entry.expressed_ml)
+      : (Number.isFinite(fallback.ml) && fallback.ml > 0 ? String(fallback.ml) : "");
+  }
+  if (editEntryFormulaEl) {
+    editEntryFormulaEl.value = entry.formula_ml !== null && entry.formula_ml !== undefined
+      ? String(entry.formula_ml)
+      : "";
+  }
+  if (editEntryNotesEl) {
+    editEntryNotesEl.value = entry.notes ?? "";
+  }
+  updateEditEntryFieldVisibility(entry.type);
+  if (mode === "time") {
+    editEntryTimeEl?.focus();
+  } else {
+    editEntryTypeEl?.focus();
+  }
+  return new Promise((resolve) => {
+    editEntryModalResolver = resolve;
+  });
+}
+
+async function commitEntryUpdate(entry, payload, messages) {
+  try {
+    const updated = {
+      ...entry,
+      ...payload,
+      updated_at_utc: new Date().toISOString(),
+    };
+    await upsertEntryLocal(updated);
+    await enqueueOutbox({ action: "upsert", entry: updated });
+    if (!navigator.onLine) {
+      setStatus(messages.offline);
+    } else {
+      setStatus(messages.online);
+      await syncNow();
+    }
+    if (pageType === "log") {
+      await loadLogEntries();
+    } else {
+      await loadHomeEntries();
+    }
+  } catch (err) {
+    setStatus(messages.error);
+  }
+}
+
 async function editEntry(entry) {
+  if (isEditEntryModalAvailable()) {
+    const payload = await openEditEntryModal(entry, "full");
+    if (!payload) {
+      return;
+    }
+    await commitEntryUpdate(entry, payload, {
+      online: "Updated (syncing...)",
+      offline: "Updated offline",
+      error: "Error: unable to update entry",
+    });
+    return;
+  }
   const rawType = window.prompt("Type", entry.type);
   if (!rawType) {
     return;
@@ -4041,31 +4347,26 @@ async function editEntry(entry) {
   const trimmedNote = noteInput.trim();
   payload.notes = trimmedNote ? trimmedNote : null;
 
-  try {
-    const updated = {
-      ...entry,
-      ...payload,
-      updated_at_utc: new Date().toISOString(),
-    };
-    await upsertEntryLocal(updated);
-    await enqueueOutbox({ action: "upsert", entry: updated });
-    if (!navigator.onLine) {
-      setStatus("Updated offline");
-    } else {
-      setStatus("Updated (syncing...)");
-      await syncNow();
-    }
-    if (pageType === "log") {
-      await loadLogEntries();
-    } else {
-      await loadHomeEntries();
-    }
-  } catch (err) {
-    setStatus("Error: unable to update entry");
-  }
+  await commitEntryUpdate(entry, payload, {
+    online: "Updated (syncing...)",
+    offline: "Updated offline",
+    error: "Error: unable to update entry",
+  });
 }
 
 async function editEntryTime(entry) {
+  if (isEditEntryModalAvailable()) {
+    const payload = await openEditEntryModal(entry, "time");
+    if (!payload) {
+      return;
+    }
+    await commitEntryUpdate(entry, payload, {
+      online: "Updated time (syncing...)",
+      offline: "Updated time offline",
+      error: "Error: unable to update time",
+    });
+    return;
+  }
   const current = toLocalDateTimeValue(entry.timestamp_utc);
   const nextValue = window.prompt("Timestamp (YYYY-MM-DDTHH:MM)", current);
   if (!nextValue) {
@@ -4077,28 +4378,11 @@ async function editEntryTime(entry) {
     return;
   }
 
-  try {
-    const updated = {
-      ...entry,
-      timestamp_utc: nextDate.toISOString(),
-      updated_at_utc: new Date().toISOString(),
-    };
-    await upsertEntryLocal(updated);
-    await enqueueOutbox({ action: "upsert", entry: updated });
-    if (!navigator.onLine) {
-      setStatus("Updated time offline");
-    } else {
-      setStatus("Updated time (syncing...)");
-      await syncNow();
-    }
-    if (pageType === "log") {
-      await loadLogEntries();
-    } else {
-      await loadHomeEntries();
-    }
-  } catch (err) {
-    setStatus("Error: unable to update time");
-  }
+  await commitEntryUpdate(entry, { timestamp_utc: nextDate.toISOString() }, {
+    online: "Updated time (syncing...)",
+    offline: "Updated time offline",
+    error: "Error: unable to update time",
+  });
 }
 
 async function deleteEntry(entry) {
