@@ -3009,7 +3009,6 @@ function renderLogEntries(entries) {
     };
 
     const editBtn = buildIconButton("Edit", "edit", () => editEntry(entry));
-    const timeBtn = buildIconButton("Edit time", "schedule", () => editEntryTime(entry));
     const delBtn = buildIconButton("Delete", "delete", () => deleteEntry(entry));
 
     amounts.forEach(({ label, value }) => {
@@ -3022,7 +3021,6 @@ function renderLogEntries(entries) {
       right.appendChild(amountsWrap);
     }
     buttonsWrap.appendChild(editBtn);
-    buttonsWrap.appendChild(timeBtn);
     buttonsWrap.appendChild(delBtn);
     right.appendChild(buttonsWrap);
     item.appendChild(left);
