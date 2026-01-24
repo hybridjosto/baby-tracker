@@ -55,20 +55,22 @@
       }
       .nav-actions {
         gap: 10px;
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
       }
       .nav-actions a,
       .nav-actions button {
-        font-size: 12px;
-        font-weight: 600;
         color: var(--text-primary);
         text-decoration: none;
         border: 1px solid var(--border-light);
         background: var(--surface-soft);
-        padding: 6px 10px;
+        width: 40px;
+        height: 40px;
+        padding: 0;
         border-radius: 999px;
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
+        display: grid;
+        place-items: center;
       }
       .nav-actions button {
         cursor: pointer;
@@ -397,13 +399,21 @@
           <div class="user-chip" id="user-message">{{ user_message }}</div>
         </div>
         <div class="nav-actions">
-          <a id="home-link" href="#">Dashboard</a>
-          <a id="log-link" href="#">Event log</a>
-          <a id="summary-link" href="/summary">Summary</a>
+          <a class="nav-icon" id="home-link" href="#" aria-label="Home" title="Home">
+            <span class="material-symbols-outlined">home</span>
+          </a>
+          <a class="nav-icon" id="log-link" href="#" aria-label="Event log" title="Event log">
+            <span class="material-symbols-outlined">list_alt</span>
+          </a>
+          <a class="nav-icon" id="summary-link" href="/summary" aria-label="Summary" title="Summary">
+            <span class="material-symbols-outlined">query_stats</span>
+          </a>
           <button class="nav-icon" id="refresh-btn" type="button" aria-label="Refresh timeline" title="Refresh timeline">
             <span class="material-symbols-outlined">refresh</span>
           </button>
-          <a href="/settings">Settings</a>
+          <a class="nav-icon" href="/settings" aria-label="Settings" title="Settings">
+            <span class="material-symbols-outlined">settings</span>
+          </a>
           <button class="nav-icon" id="theme-toggle" type="button" aria-label="Switch to light mode">
             <span class="material-symbols-outlined">dark_mode</span>
           </button>

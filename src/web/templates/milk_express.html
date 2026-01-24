@@ -88,20 +88,20 @@
         gap: 10px;
         display: flex;
         align-items: center;
+        flex-wrap: wrap;
       }
       .nav-actions a,
       .nav-actions button {
-        font-size: 12px;
-        font-weight: 600;
         color: var(--text-primary);
         text-decoration: none;
         border: 1px solid var(--border-light);
         background: var(--surface-soft);
-        padding: 6px 10px;
+        width: 40px;
+        height: 40px;
+        padding: 0;
         border-radius: 999px;
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
+        display: grid;
+        place-items: center;
       }
       html.dark .nav-actions a,
       html.dark .nav-actions button {
@@ -245,21 +245,17 @@
           <div class="page-subtitle" id="user-message">{{ user_message }}</div>
         </div>
         <div class="nav-actions">
-          <a id="home-link" href="/" aria-label="Home">
+          <a id="home-link" href="/" aria-label="Home" title="Home">
             <span class="material-symbols-outlined">home</span>
-            Home
           </a>
-          <a id="summary-link" href="/summary" aria-label="Summary">
-            <span class="material-symbols-outlined">monitoring</span>
-            Summary
+          <a id="summary-link" href="/summary" aria-label="Summary" title="Summary">
+            <span class="material-symbols-outlined">query_stats</span>
           </a>
-          <a id="timeline-link" href="/timeline" aria-label="Timeline">
+          <a id="timeline-link" href="/timeline" aria-label="Timeline" title="Timeline">
             <span class="material-symbols-outlined">history</span>
-            Timeline
           </a>
-          <a id="log-link" href="/log" aria-label="Event log">
+          <a id="log-link" href="/log" aria-label="Event log" title="Event log">
             <span class="material-symbols-outlined">list_alt</span>
-            Log
           </a>
         </div>
       </header>

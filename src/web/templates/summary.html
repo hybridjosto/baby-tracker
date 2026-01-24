@@ -570,13 +570,21 @@
             <div class="user-chip" id="user-message">{{ user_message }}</div>
           </div>
           <div class="nav-actions">
-            <a id="home-link" href="#">Back to chart</a>
-            <a id="log-link" href="#">Event log</a>
-            <a id="timeline-link" href="#">Timeline</a>
+            <a class="nav-icon" id="home-link" href="#" aria-label="Home" title="Home">
+              <span class="material-symbols-outlined">home</span>
+            </a>
+            <a class="nav-icon" id="log-link" href="#" aria-label="Event log" title="Event log">
+              <span class="material-symbols-outlined">list_alt</span>
+            </a>
+            <a class="nav-icon" id="timeline-link" href="#" aria-label="Timeline" title="Timeline">
+              <span class="material-symbols-outlined">history</span>
+            </a>
             <button class="nav-icon" id="refresh-btn" type="button" aria-label="Refresh summary" title="Refresh summary">
               <span class="material-symbols-outlined">refresh</span>
             </button>
-            <a href="/settings">Settings</a>
+            <a class="nav-icon" href="/settings" aria-label="Settings" title="Settings">
+              <span class="material-symbols-outlined">settings</span>
+            </a>
             <button class="nav-icon" id="theme-toggle" type="button" aria-label="Switch to light mode">
               <span class="material-symbols-outlined">dark_mode</span>
             </button>

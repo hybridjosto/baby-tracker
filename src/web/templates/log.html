@@ -457,13 +457,21 @@
         <div class="nav-row">
           <span>{{ log_subtitle or "Recent entries" }}</span>
           <div class="nav-actions">
-            <a id="home-link" href="#">Back to chart</a>
-            <a id="summary-link" href="/summary">Summary</a>
-            <a id="timeline-link" href="#">Timeline</a>
+            <a class="nav-icon" id="home-link" href="#" aria-label="Home" title="Home">
+              <span class="material-symbols-outlined">home</span>
+            </a>
+            <a class="nav-icon" id="summary-link" href="/summary" aria-label="Summary" title="Summary">
+              <span class="material-symbols-outlined">query_stats</span>
+            </a>
+            <a class="nav-icon" id="timeline-link" href="#" aria-label="Timeline" title="Timeline">
+              <span class="material-symbols-outlined">history</span>
+            </a>
             <button class="nav-icon" id="refresh-btn" type="button" aria-label="Refresh entries" title="Refresh entries">
               <span class="material-symbols-outlined">refresh</span>
             </button>
-            <a href="/settings">Settings</a>
+            <a class="nav-icon" href="/settings" aria-label="Settings" title="Settings">
+              <span class="material-symbols-outlined">settings</span>
+            </a>
             <button class="nav-icon" id="theme-toggle" type="button" aria-label="Switch to light mode">
               <span class="material-symbols-outlined">dark_mode</span>
             </button>
