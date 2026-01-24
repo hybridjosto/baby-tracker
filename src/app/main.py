@@ -146,6 +146,23 @@ def create_app() -> Flask:
             status_code,
         )
 
+    def render_milk_express_page(
+        user_slug: str,
+        user_valid: bool,
+        user_message: str,
+        status_code: int = 200,
+    ):
+        return (
+            render_template(
+                "milk_express.html",
+                user_slug=user_slug,
+                user_valid=user_valid,
+                user_message=user_message,
+                page="milk-express",
+            ),
+            status_code,
+        )
+
     @app.get("/summary")
     def summary():
         return render_summary_page(
@@ -157,6 +174,14 @@ def create_app() -> Flask:
     @app.get("/timeline")
     def timeline():
         return render_timeline_page(
+            user_slug="",
+            user_valid=False,
+            user_message="Choose a user below (example: josh).",
+        )
+
+    @app.get("/milk-express")
+    def milk_express():
+        return render_milk_express_page(
             user_slug="",
             user_valid=False,
             user_message="Choose a user below (example: josh).",
@@ -214,6 +239,23 @@ def create_app() -> Flask:
                 status_code=400,
             )
         return render_timeline_page(
+            user_slug=normalized,
+            user_valid=True,
+            user_message=f"Logging as {normalized}",
+        )
+
+    @app.get("/<user_slug>/milk-express")
+    def user_milk_express(user_slug: str):
+        try:
+            normalized = normalize_user_slug(user_slug)
+        except ValueError as exc:
+            return render_milk_express_page(
+                user_slug="",
+                user_valid=False,
+                user_message=str(exc),
+                status_code=400,
+            )
+        return render_milk_express_page(
             user_slug=normalized,
             user_valid=True,
             user_message=f"Logging as {normalized}",

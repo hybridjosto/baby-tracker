@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Milk Express Ledger</title>
+    <link rel="manifest" href="/static/manifest.json">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap"
+      rel="stylesheet"
+    >
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    >
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@400,0"
+      rel="stylesheet"
+    >
+    <link rel="stylesheet" href="/static/styles.css">
+    <script>
+      (() => {
+        const stored = localStorage.getItem("baby-tracker-theme");
+        const prefersDark = window.matchMedia
+          && window.matchMedia("(prefers-color-scheme: dark)").matches;
+        const theme = stored || (prefersDark ? "dark" : "light");
+        if (theme === "dark") {
+          document.documentElement.classList.add("dark");
+        }
+      })();
+    </script>
+    <style>
+      :root {
+        --ledger-ink: #2f251d;
+        --ledger-accent: #c76c24;
+        --ledger-sand: #f4efe8;
+        --ledger-warm: #f9f4ed;
+        --ledger-border: rgba(65, 46, 28, 0.14);
+        --ledger-shadow: 0 18px 40px rgba(57, 38, 16, 0.12);
+      }
+      html.dark {
+        --ledger-ink: #f3e8dc;
+        --ledger-accent: #f3b15b;
+        --ledger-sand: rgba(16, 14, 12, 0.9);
+        --ledger-warm: rgba(24, 19, 15, 0.95);
+        --ledger-border: rgba(255, 255, 255, 0.1);
+        --ledger-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+      }
+      body {
+        font-family: "IBM Plex Sans", sans-serif;
+      }
+      h1, h2 {
+        font-family: "Fraunces", serif;
+        color: var(--ledger-ink);
+      }
+      .page {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 28px 20px 36px;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+      }
+      .page-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        flex-wrap: wrap;
+      }
+      .eyebrow {
+        text-transform: uppercase;
+        letter-spacing: 0.35em;
+        font-size: 10px;
+        font-weight: 600;
+        color: var(--text-secondary);
+      }
+      h1 {
+        margin: 6px 0 4px;
+        font-size: 28px;
+      }
+      .page-subtitle {
+        color: var(--text-secondary);
+        font-size: 13px;
+      }
+      .nav-actions {
+        gap: 10px;
+        display: flex;
+        align-items: center;
+      }
+      .nav-actions a,
+      .nav-actions button {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--text-primary);
+        text-decoration: none;
+        border: 1px solid var(--border-light);
+        background: var(--surface-soft);
+        padding: 6px 10px;
+        border-radius: 999px;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      html.dark .nav-actions a,
+      html.dark .nav-actions button {
+        border-color: var(--border-dark);
+        background: rgba(255, 255, 255, 0.08);
+        color: #f1e6d8;
+      }
+      .nav-actions .material-symbols-outlined {
+        font-size: 16px;
+      }
+      .ledger-card {
+        background: var(--ledger-warm);
+        border-radius: 28px;
+        padding: 20px 22px 18px;
+        border: 1px solid var(--ledger-border);
+        box-shadow: var(--ledger-shadow);
+        position: relative;
+        overflow: hidden;
+      }
+      .ledger-card::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(circle at top right, rgba(255, 214, 155, 0.25), transparent 60%);
+        pointer-events: none;
+      }
+      html.dark .ledger-card::before {
+        background: radial-gradient(circle at top right, rgba(255, 190, 110, 0.18), transparent 60%);
+      }
+      .ledger-meta {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 12px;
+        position: relative;
+        z-index: 1;
+      }
+      .ledger-range {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--ledger-accent);
+        text-transform: uppercase;
+        letter-spacing: 0.2em;
+      }
+      .ledger-total {
+        font-size: 16px;
+        font-weight: 500;
+        color: var(--ledger-ink);
+        margin-top: 4px;
+      }
+      .ledger-actions {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-size: 12px;
+      }
+      .ledger-actions a {
+        color: var(--ledger-accent);
+        text-decoration: none;
+        font-weight: 600;
+      }
+      .ledger-table {
+        width: 100%;
+        border-collapse: collapse;
+        position: relative;
+        z-index: 1;
+      }
+      .ledger-table th,
+      .ledger-table td {
+        text-align: left;
+        padding: 12px 10px;
+        border-bottom: 1px solid var(--ledger-border);
+        font-size: 14px;
+        color: var(--ledger-ink);
+      }
+      .ledger-table th {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.18em;
+        color: var(--text-secondary);
+        position: sticky;
+        top: 0;
+        background: var(--ledger-sand);
+        z-index: 2;
+      }
+      .ledger-table tbody tr:nth-child(even) {
+        background: rgba(255, 255, 255, 0.5);
+      }
+      html.dark .ledger-table tbody tr:nth-child(even) {
+        background: rgba(255, 255, 255, 0.04);
+      }
+      .ledger-table tbody tr:hover {
+        background: rgba(199, 108, 36, 0.08);
+      }
+      .ledger-check {
+        width: 18px;
+        height: 18px;
+        accent-color: var(--ledger-accent);
+      }
+      .ledger-empty {
+        padding: 28px 10px;
+        text-align: center;
+        color: var(--text-secondary);
+        font-size: 14px;
+      }
+      .ledger-selection {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 12px 0;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+      }
+      html.dark .ledger-selection {
+        border-color: rgba(255, 255, 255, 0.08);
+      }
+      .subtotal-meta {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        font-size: 13px;
+      }
+      .status {
+        margin-top: 8px;
+      }
+      @media (max-width: 720px) {
+        .ledger-table th:nth-child(3),
+        .ledger-table td:nth-child(3) {
+          text-align: right;
+        }
+      }
+    </style>
+  </head>
+  <body data-user="{{ user_slug }}" data-user-valid="{{ 'true' if user_valid else 'false' }}" data-page="milk-express">
+    <div class="page">
+      <header class="page-header">
+        <div>
+          <div class="eyebrow">Milk Express</div>
+          <h1>Express Ledger</h1>
+          <div class="page-subtitle" id="user-message">{{ user_message }}</div>
+        </div>
+        <div class="nav-actions">
+          <a id="home-link" href="/" aria-label="Home">
+            <span class="material-symbols-outlined">home</span>
+            Home
+          </a>
+          <a id="summary-link" href="/summary" aria-label="Summary">
+            <span class="material-symbols-outlined">monitoring</span>
+            Summary
+          </a>
+          <a id="timeline-link" href="/timeline" aria-label="Timeline">
+            <span class="material-symbols-outlined">history</span>
+            Timeline
+          </a>
+          <a id="log-link" href="/log" aria-label="Event log">
+            <span class="material-symbols-outlined">list_alt</span>
+            Log
+          </a>
+        </div>
+      </header>
+
+      <section class="ledger-card">
+        <div class="ledger-meta">
+          <div>
+            <div class="ledger-range" id="milk-express-ledger-range">Last 48 hours</div>
+            <div class="ledger-total" id="milk-express-ledger-total-all">Total: 0 ml</div>
+          </div>
+          <div class="ledger-actions">
+            <label>
+              <input class="ledger-check" id="milk-express-ledger-select-all" type="checkbox">
+              Select all
+            </label>
+            <a href="#" id="milk-express-ledger-clear">Clear</a>
+          </div>
+        </div>
+
+        <div class="ledger-selection" id="milk-express-ledger-selection" hidden>
+          <div>Selected subtotal</div>
+          <div class="subtotal-meta">
+            <span id="milk-express-ledger-count">0 items</span>
+            <span id="milk-express-ledger-total">0 ml</span>
+          </div>
+        </div>
+        <table class="ledger-table" id="milk-express-ledger-table">
+          <thead>
+            <tr>
+              <th scope="col"></th>
+              <th scope="col">Time</th>
+              <th scope="col">Value</th>
+            </tr>
+          </thead>
+          <tbody id="milk-express-ledger-body"></tbody>
+        </table>
+        <div class="ledger-empty" id="milk-express-ledger-empty" hidden>
+          No milk express events in the last 48 hours.
+        </div>
+      </section>
+
+      <div class="status" id="status"></div>
+
+      <form class="user-setup" id="user-form" hidden>
+        <label for="user-input">User</label>
+        <div class="user-row">
+          <input
+            class="user-input"
+            id="user-input"
+            type="text"
+            inputmode="latin-prose"
+            autocapitalize="none"
+            autocomplete="off"
+            placeholder="Name (e.g. josh)"
+          >
+          <button class="user-btn" id="user-save" type="submit">Use</button>
+        </div>
+      </form>
+    </div>
+    <script src="/static/app.js"></script>
+  </body>
+</html>

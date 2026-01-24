@@ -18,7 +18,7 @@ const STORE_META = "meta";
 const META_DEVICE_ID = "device_id";
 const META_SYNC_CURSOR = "sync_cursor";
 const USER_RE = /^[a-z0-9-]{1,24}$/;
-const RESERVED_USER_SLUGS = new Set(["timeline", "summary", "log", "settings", "goals"]);
+const RESERVED_USER_SLUGS = new Set(["timeline", "summary", "log", "settings", "goals", "milk-express"]);
 const themeToggleBtn = document.getElementById("theme-toggle");
 const userFormEl = document.getElementById("user-form");
 const userInputEl = document.getElementById("user-input");
@@ -46,6 +46,7 @@ const miscBackdrop = document.getElementById("misc-backdrop");
 const logLinkEl = document.getElementById("log-link");
 const homeLinkEl = document.getElementById("home-link");
 const summaryLinkEl = document.getElementById("summary-link");
+const milkExpressLinkEl = document.getElementById("milk-express-link");
 const refreshBtn = document.getElementById("refresh-btn");
 const csvFormEl = document.getElementById("csv-upload-form");
 const csvFileEl = document.getElementById("csv-file");
@@ -125,6 +126,17 @@ const statCardEls = document.querySelectorAll(".stat-card[data-log-type]");
 
 const timelineLinkEl = document.getElementById("timeline-link");
 
+const milkExpressLedgerTableEl = document.getElementById("milk-express-ledger-table");
+const milkExpressLedgerBodyEl = document.getElementById("milk-express-ledger-body");
+const milkExpressLedgerEmptyEl = document.getElementById("milk-express-ledger-empty");
+const milkExpressLedgerCountEl = document.getElementById("milk-express-ledger-count");
+const milkExpressLedgerTotalEl = document.getElementById("milk-express-ledger-total");
+const milkExpressLedgerSelectAllEl = document.getElementById("milk-express-ledger-select-all");
+const milkExpressLedgerClearEl = document.getElementById("milk-express-ledger-clear");
+const milkExpressLedgerRangeEl = document.getElementById("milk-express-ledger-range");
+const milkExpressLedgerTotalAllEl = document.getElementById("milk-express-ledger-total-all");
+const milkExpressLedgerSelectionEl = document.getElementById("milk-express-ledger-selection");
+
 const settingsFormEl = document.getElementById("settings-form");
 const dobInputEl = document.getElementById("dob-input");
 const ageOutputEl = document.getElementById("age-output");
@@ -152,6 +164,9 @@ let hasLoadedSummaryEntries = false;
 let hasLoadedSummaryInsights = false;
 let syncInFlight = null;
 let syncTimerId = null;
+let milkExpressLedgerInitialized = false;
+let milkExpressLedgerEntries = [];
+const milkExpressLedgerSelections = new Set();
 
 const CUSTOM_TYPE_RE = /^[A-Za-z0-9][A-Za-z0-9 /-]{0,31}$/;
 const MILK_EXPRESS_TYPE = "milk express";
@@ -429,6 +444,8 @@ function updateUserDisplay() {
       userMessageEl.textContent = "Goals apply to all feeds logged in the last 24 hours.";
     } else if (pageType === "timeline") {
       userMessageEl.textContent = "All events";
+    } else if (pageType === "milk-express") {
+      userMessageEl.textContent = "Last 48 hours • All milk express";
     } else {
       userMessageEl.textContent = userValid
         ? "All events"
@@ -856,6 +873,10 @@ function applyUserState() {
   if (pageType === "timeline") {
     initTimelineHandlers();
     loadTimelineEntries({ reset: true });
+  }
+  if (pageType === "milk-express") {
+    initMilkExpressLedgerHandlers();
+    loadMilkExpressLedger();
   }
 }
 
@@ -3273,6 +3294,185 @@ function initTimelineHandlers() {
   }
 }
 
+function updateMilkExpressLedgerSubtotal() {
+  if (!milkExpressLedgerCountEl || !milkExpressLedgerTotalEl) {
+    return;
+  }
+  let totalMl = 0;
+  milkExpressLedgerEntries.forEach((entry) => {
+    const key = entry.client_event_id || entry.id || entry.timestamp_utc;
+    if (!milkExpressLedgerSelections.has(key)) {
+      return;
+    }
+    const { ml } = getMilkExpressAmounts(entry);
+    if (Number.isFinite(ml)) {
+      totalMl += ml;
+    }
+  });
+  const count = milkExpressLedgerSelections.size;
+  milkExpressLedgerCountEl.textContent = `${count} ${count === 1 ? "item" : "items"}`;
+  milkExpressLedgerTotalEl.textContent = formatMl(totalMl);
+}
+
+function updateMilkExpressLedgerTotalAll(entries) {
+  if (!milkExpressLedgerTotalAllEl) {
+    return;
+  }
+  const totalMl = entries.reduce((acc, entry) => {
+    const { ml } = getMilkExpressAmounts(entry);
+    return acc + (Number.isFinite(ml) ? ml : 0);
+  }, 0);
+  milkExpressLedgerTotalAllEl.textContent = `Total: ${formatMl(totalMl)}`;
+}
+
+function setMilkExpressLedgerEmptyState(message) {
+  if (!milkExpressLedgerEmptyEl || !milkExpressLedgerTableEl) {
+    return;
+  }
+  milkExpressLedgerEmptyEl.textContent = message;
+  milkExpressLedgerEmptyEl.hidden = false;
+  milkExpressLedgerTableEl.hidden = true;
+  if (milkExpressLedgerSelectionEl) {
+    milkExpressLedgerSelectionEl.hidden = true;
+  }
+}
+
+function renderMilkExpressLedger(entries) {
+  if (!milkExpressLedgerBodyEl || !milkExpressLedgerEmptyEl || !milkExpressLedgerTableEl) {
+    return;
+  }
+  milkExpressLedgerEntries = entries;
+  milkExpressLedgerSelections.clear();
+  milkExpressLedgerBodyEl.innerHTML = "";
+  updateMilkExpressLedgerTotalAll(entries);
+  if (!entries.length) {
+    setMilkExpressLedgerEmptyState("No milk express events in the last 48 hours.");
+    updateMilkExpressLedgerSubtotal();
+    return;
+  }
+  milkExpressLedgerEmptyEl.hidden = true;
+  milkExpressLedgerTableEl.hidden = false;
+  if (milkExpressLedgerSelectionEl) {
+    milkExpressLedgerSelectionEl.hidden = false;
+  }
+  entries.forEach((entry, index) => {
+    const key = entry.client_event_id || entry.id || `${entry.timestamp_utc}-${index}`;
+    const { ml } = getMilkExpressAmounts(entry);
+    const row = document.createElement("tr");
+    row.dataset.entryId = key;
+
+    const checkCell = document.createElement("td");
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.className = "ledger-check";
+    checkbox.dataset.entryId = key;
+    checkbox.addEventListener("change", () => {
+      if (checkbox.checked) {
+        milkExpressLedgerSelections.add(key);
+      } else {
+        milkExpressLedgerSelections.delete(key);
+      }
+      if (milkExpressLedgerSelectAllEl) {
+        const allChecked = milkExpressLedgerEntries.every((item, idx) => {
+          const itemKey = item.client_event_id || item.id || `${item.timestamp_utc}-${idx}`;
+          return milkExpressLedgerSelections.has(itemKey);
+        });
+        milkExpressLedgerSelectAllEl.checked = allChecked;
+      }
+      updateMilkExpressLedgerSubtotal();
+    });
+    checkCell.appendChild(checkbox);
+
+    const timeCell = document.createElement("td");
+    timeCell.textContent = formatTimestamp(entry.timestamp_utc);
+
+    const valueCell = document.createElement("td");
+    valueCell.textContent = formatMl(ml);
+
+    row.append(checkCell, timeCell, valueCell);
+    milkExpressLedgerBodyEl.appendChild(row);
+  });
+  if (milkExpressLedgerSelectAllEl) {
+    milkExpressLedgerSelectAllEl.checked = false;
+  }
+  updateMilkExpressLedgerSubtotal();
+}
+
+async function loadMilkExpressLedger() {
+  if (!milkExpressLedgerBodyEl) {
+    return;
+  }
+  if (milkExpressLedgerRangeEl) {
+    milkExpressLedgerRangeEl.textContent = "Last 48 hours";
+  }
+  const window = computeWindow(48);
+  const params = {
+    limit: 200,
+    since: window.sinceIso,
+    until: window.untilIso,
+  };
+  try {
+    const cachedEntries = await listEntriesLocalSafe(params);
+    if (cachedEntries) {
+      const filteredCached = cachedEntries.filter((entry) => (
+        isMilkExpressType(entry.type)
+      ));
+      renderMilkExpressLedger(filteredCached);
+    }
+    await syncNow();
+    const entries = await loadEntriesWithFallback(params);
+    const filtered = entries.filter((entry) => isMilkExpressType(entry.type));
+    renderMilkExpressLedger(filtered);
+  } catch (err) {
+    setStatus(`Failed to load milk express entries: ${err.message || "unknown error"}`);
+  }
+}
+
+function initMilkExpressLedgerHandlers() {
+  if (milkExpressLedgerInitialized || pageType !== "milk-express") {
+    return;
+  }
+  milkExpressLedgerInitialized = true;
+  if (milkExpressLedgerSelectAllEl) {
+    milkExpressLedgerSelectAllEl.addEventListener("change", () => {
+      const shouldSelectAll = milkExpressLedgerSelectAllEl.checked;
+      if (!milkExpressLedgerBodyEl) {
+        return;
+      }
+      const checkboxes = milkExpressLedgerBodyEl.querySelectorAll("input[type=\"checkbox\"]");
+      checkboxes.forEach((checkbox) => {
+        checkbox.checked = shouldSelectAll;
+        const key = checkbox.dataset.entryId;
+        if (key) {
+          if (shouldSelectAll) {
+            milkExpressLedgerSelections.add(key);
+          } else {
+            milkExpressLedgerSelections.delete(key);
+          }
+        }
+      });
+      updateMilkExpressLedgerSubtotal();
+    });
+  }
+  if (milkExpressLedgerClearEl) {
+    milkExpressLedgerClearEl.addEventListener("click", (event) => {
+      event.preventDefault();
+      if (!milkExpressLedgerBodyEl) {
+        return;
+      }
+      milkExpressLedgerSelections.clear();
+      const checkboxes = milkExpressLedgerBodyEl.querySelectorAll("input[type=\"checkbox\"]");
+      checkboxes.forEach((checkbox) => {
+        checkbox.checked = false;
+      });
+      if (milkExpressLedgerSelectAllEl) {
+        milkExpressLedgerSelectAllEl.checked = false;
+      }
+      updateMilkExpressLedgerSubtotal();
+    });
+  }
+}
+
 function renderStats(entries) {
   if (!statFeedEl || !statWeeEl || !statPooEl) {
     return;
@@ -4176,6 +4376,10 @@ function initLinks() {
   if (summaryLinkEl) {
     summaryLinkEl.classList.remove("disabled");
     summaryLinkEl.href = "/summary";
+  }
+  if (milkExpressLinkEl) {
+    milkExpressLinkEl.classList.remove("disabled");
+    milkExpressLinkEl.href = "/milk-express";
   }
   if (goalsLinkEl) {
     goalsLinkEl.classList.remove("disabled");
