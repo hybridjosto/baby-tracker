@@ -287,6 +287,7 @@
       .edit-field {
         display: grid;
         gap: 6px;
+        min-width: 0;
       }
       .edit-field label {
         font-size: 11px;
@@ -306,6 +307,10 @@
         color: var(--text-primary);
         box-sizing: border-box;
         font-family: inherit;
+      }
+      .edit-field input[type="datetime-local"] {
+        max-width: 100%;
+        min-width: 0;
       }
       html.dark .edit-field input,
       html.dark .edit-field select,
