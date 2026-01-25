@@ -4655,25 +4655,12 @@ async function loadHomeEntries() {
       entries.length ? entries[0].timestamp_utc : null,
     );
     activeFeedingGoal = selectActiveGoal(goals, lastEntryDateKey);
-    let goalTotalMl = 0;
-    if (activeFeedingGoal && activeFeedingGoal.start_date) {
-      const goalWindow = getGoalDayWindow(activeFeedingGoal.start_date);
-      if (goalWindow) {
-        const goalEntries = await loadEntriesWithFallback({
-          limit: 200,
-          since: goalWindow.sinceIso,
-          until: goalWindow.untilIso,
-        });
-        goalTotalMl = computeFeedTotalMl(goalEntries);
-      }
-    }
     const chartEntries = entries.filter((entry) => {
       const ts = new Date(entry.timestamp_utc);
       return ts >= chartWindow.since && ts <= chartWindow.until;
     });
     renderChart(chartEntries, chartWindow);
     renderStats(entries);
-    latestFeedTotalMl = goalTotalMl;
     renderGoalComparison();
     renderStatsWindow(statsWindow);
     renderLastActivity(entries);
