@@ -113,7 +113,7 @@ def list_entries_for_export(
         f"""
         SELECT id, user_slug, type, timestamp_utc, client_event_id, notes, amount_ml,
                expressed_ml, formula_ml, feed_duration_min, caregiver_id,
-               created_at_utc, updated_at_utc
+               created_at_utc, updated_at_utc, deleted_at_utc
         FROM entries
         {where}
         ORDER BY timestamp_utc ASC

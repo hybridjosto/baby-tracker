@@ -53,16 +53,6 @@ def _parse_csv_timestamp(value: str) -> str:
     return parsed.astimezone(timezone.utc).isoformat()
 
 
-def _parse_entry_timestamp(value: str) -> datetime:
-    cleaned = (value or "").strip()
-    if cleaned.endswith("Z"):
-        cleaned = cleaned[:-1] + "+00:00"
-    parsed = datetime.fromisoformat(cleaned)
-    if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=timezone.utc)
-    return parsed.astimezone(timezone.utc)
-
-
 def create_entry(db_path: str, payload: dict) -> dict:
     validated = validate_entry_payload(payload, require_client_event=True)
     validated["user_slug"] = normalize_user_slug(payload.get("user_slug"))
@@ -130,30 +120,25 @@ def export_entries_csv(db_path: str, user_slug: str | None = None) -> str:
 
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(
-        [
-            "date",
-            "time",
-            "event",
-            "duration_min",
-            "amount_ml",
-            "expressed_ml",
-            "formula_ml",
-        ]
-    )
+    columns = [
+        "id",
+        "user_slug",
+        "type",
+        "timestamp_utc",
+        "client_event_id",
+        "notes",
+        "amount_ml",
+        "feed_duration_min",
+        "caregiver_id",
+        "created_at_utc",
+        "updated_at_utc",
+        "expressed_ml",
+        "formula_ml",
+        "deleted_at_utc",
+    ]
+    writer.writerow(columns)
     for entry in entries:
-        timestamp = _parse_entry_timestamp(entry.get("timestamp_utc") or "")
-        writer.writerow(
-            [
-                timestamp.date().isoformat(),
-                timestamp.strftime("%H:%M"),
-                entry.get("type") or "",
-                entry.get("feed_duration_min") if entry.get("feed_duration_min") is not None else "",
-                entry.get("amount_ml") if entry.get("amount_ml") is not None else "",
-                entry.get("expressed_ml") if entry.get("expressed_ml") is not None else "",
-                entry.get("formula_ml") if entry.get("formula_ml") is not None else "",
-            ]
-        )
+        writer.writerow([entry.get(column) for column in columns])
     return output.getvalue()
 
 
