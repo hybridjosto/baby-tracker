@@ -702,6 +702,82 @@
       .is-loading #chart-empty {
         opacity: 0;
       }
+      .breastfeed-banner {
+        display: none;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 12px 16px;
+        border-radius: 16px;
+        margin: 10px 0 18px;
+        background: linear-gradient(135deg, rgba(19, 236, 91, 0.2), rgba(16, 185, 129, 0.08));
+        border: 1px solid rgba(19, 236, 91, 0.35);
+        box-shadow: 0 12px 30px rgba(10, 22, 14, 0.12);
+      }
+      .breastfeed-banner.is-active {
+        display: flex;
+      }
+      html.dark .breastfeed-banner {
+        background: linear-gradient(135deg, rgba(19, 236, 91, 0.16), rgba(16, 185, 129, 0.06));
+        border-color: rgba(19, 236, 91, 0.4);
+      }
+      .breastfeed-banner .banner-left {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .breastfeed-banner .banner-title {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 14px;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+        color: var(--text-primary);
+      }
+      .breastfeed-banner .pulse-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        background: #13ec5b;
+        box-shadow: 0 0 0 0 rgba(19, 236, 91, 0.6);
+        animation: banner-pulse 1.6s infinite;
+      }
+      .breastfeed-banner .banner-meta {
+        font-size: 12px;
+        color: var(--text-secondary);
+      }
+      .breastfeed-banner .banner-timer {
+        font-size: 20px;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+        color: #10b981;
+      }
+      .breastfeed-banner .banner-action {
+        border: none;
+        border-radius: 12px;
+        padding: 10px 14px;
+        font-weight: 700;
+        background: var(--primary);
+        color: #0f1a12;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      .breastfeed-banner .banner-action:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      @keyframes banner-pulse {
+        0% {
+          box-shadow: 0 0 0 0 rgba(19, 236, 91, 0.5);
+        }
+        70% {
+          box-shadow: 0 0 0 10px rgba(19, 236, 91, 0);
+        }
+        100% {
+          box-shadow: 0 0 0 0 rgba(19, 236, 91, 0);
+        }
+      }
       @keyframes skeleton-shimmer {
         0% {
           background-position: 200% 0;
@@ -739,6 +815,24 @@
         </div>
       </header>
       <main class="content">
+        <section
+          class="breastfeed-banner"
+          id="breastfeed-banner"
+          role="status"
+          aria-live="polite"
+        >
+          <div class="banner-left">
+            <div class="banner-title">
+              <span class="pulse-dot" aria-hidden="true"></span>
+              Breastfeeding active
+            </div>
+            <div class="banner-meta" id="breastfeed-banner-meta">Started by --</div>
+          </div>
+          <div class="banner-timer" id="breastfeed-banner-timer">-- min</div>
+          <button class="banner-action" id="breastfeed-banner-action" type="button">
+            End breastfeeding
+          </button>
+        </section>
         <section class="stats">
           <div class="stat-card" aria-label="Next feed time">
             <div class="stat-label">

@@ -30,6 +30,10 @@ const feedBtn = document.getElementById("log-feed");
 const feedMenu = document.getElementById("feed-menu");
 const feedBackdrop = document.getElementById("feed-backdrop");
 const breastfeedBtn = document.getElementById("log-breastfeed");
+const breastfeedBannerEl = document.getElementById("breastfeed-banner");
+const breastfeedBannerTimerEl = document.getElementById("breastfeed-banner-timer");
+const breastfeedBannerMetaEl = document.getElementById("breastfeed-banner-meta");
+const breastfeedBannerActionEl = document.getElementById("breastfeed-banner-action");
 const manualFeedBtn = document.getElementById("log-feed-manual");
 const expressedInput = document.getElementById("expressed-ml");
 const expressedBtn = document.getElementById("log-expressed");
@@ -248,10 +252,37 @@ function getFeedIntervalMinutes() {
 }
 
 function getBreastfeedStorageKey() {
-  if (!activeUser) {
+  return BREASTFEED_TIMER_KEY;
+}
+
+function parseBreastfeedPayload(raw, key) {
+  if (!raw) {
     return null;
   }
-  return `${BREASTFEED_TIMER_KEY}:${activeUser}`;
+  let parsed = null;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (err) {
+    parsed = null;
+  }
+  if (parsed && typeof parsed === "object" && parsed.start_at) {
+    const start = new Date(parsed.start_at);
+    if (Number.isNaN(start.getTime())) {
+      if (key) {
+        window.localStorage.removeItem(key);
+      }
+      return null;
+    }
+    return { start, startedBy: parsed.started_by || null };
+  }
+  const legacyStart = new Date(raw);
+  if (Number.isNaN(legacyStart.getTime())) {
+    if (key) {
+      window.localStorage.removeItem(key);
+    }
+    return null;
+  }
+  return { start: legacyStart, startedBy: null };
 }
 
 function getBreastfeedStart() {
@@ -260,23 +291,32 @@ function getBreastfeedStart() {
     return null;
   }
   const raw = window.localStorage.getItem(key);
-  if (!raw) {
-    return null;
+  if (raw) {
+    return parseBreastfeedPayload(raw, key);
   }
-  const start = new Date(raw);
-  if (Number.isNaN(start.getTime())) {
-    window.localStorage.removeItem(key);
-    return null;
+  if (activeUser) {
+    const legacyKey = `${BREASTFEED_TIMER_KEY}:${activeUser}`;
+    const legacyRaw = window.localStorage.getItem(legacyKey);
+    const legacyParsed = parseBreastfeedPayload(legacyRaw, legacyKey);
+    if (legacyParsed) {
+      setBreastfeedStart(legacyParsed.start, activeUser);
+      window.localStorage.removeItem(legacyKey);
+      return { start: legacyParsed.start, startedBy: activeUser };
+    }
   }
-  return start;
+  return null;
 }
 
-function setBreastfeedStart(start) {
+function setBreastfeedStart(start, startedBy) {
   const key = getBreastfeedStorageKey();
   if (!key) {
     return;
   }
-  window.localStorage.setItem(key, start.toISOString());
+  const payload = {
+    start_at: start.toISOString(),
+    started_by: startedBy || null,
+  };
+  window.localStorage.setItem(key, JSON.stringify(payload));
 }
 
 function clearBreastfeedStart() {
@@ -285,6 +325,9 @@ function clearBreastfeedStart() {
     return;
   }
   window.localStorage.removeItem(key);
+  if (activeUser) {
+    window.localStorage.removeItem(`${BREASTFEED_TIMER_KEY}:${activeUser}`);
+  }
 }
 
 function stopBreastfeedTicker() {
@@ -302,22 +345,56 @@ function startBreastfeedTicker() {
   breastfeedTickerId = window.setInterval(updateBreastfeedButton, 30000);
 }
 
-function updateBreastfeedButton() {
-  if (!breastfeedBtn) {
+function updateBreastfeedBanner(startInfo, durationMinutes) {
+  if (!breastfeedBannerEl || !breastfeedBannerTimerEl || !breastfeedBannerMetaEl) {
     return;
   }
-  const start = getBreastfeedStart();
-  if (start) {
+  if (!startInfo) {
+    breastfeedBannerEl.classList.remove("is-active");
+    breastfeedBannerTimerEl.textContent = "-- min";
+    breastfeedBannerMetaEl.textContent = "Started by --";
+    if (breastfeedBannerActionEl) {
+      breastfeedBannerActionEl.disabled = false;
+      breastfeedBannerActionEl.removeAttribute("title");
+    }
+    return;
+  }
+  const startedBy = startInfo.startedBy || "--";
+  const meta = userValid
+    ? `Started by ${startedBy}`
+    : `Started by ${startedBy} · Choose a user to stop`;
+  breastfeedBannerEl.classList.add("is-active");
+  breastfeedBannerTimerEl.textContent = `${durationMinutes} min`;
+  breastfeedBannerMetaEl.textContent = meta;
+  if (breastfeedBannerActionEl) {
+    breastfeedBannerActionEl.disabled = !userValid;
+    breastfeedBannerActionEl.title = userValid
+      ? "End breastfeeding"
+      : "Choose a user to log the feed";
+  }
+}
+
+function updateBreastfeedButton() {
+  if (!breastfeedBtn) {
+    updateBreastfeedBanner(null, 0);
+    return;
+  }
+  const startInfo = getBreastfeedStart();
+  if (startInfo && startInfo.start) {
+    const start = startInfo.start;
     const durationMinutes = Math.max(
       0,
       Math.round((Date.now() - start.getTime()) / 60000),
     );
     breastfeedBtn.textContent = `End breastfed (${durationMinutes} min)`;
-    breastfeedBtn.title = `Started ${formatTimestamp(start.toISOString())} (${durationMinutes} min)`;
+    const starter = startInfo.startedBy ? ` by ${startInfo.startedBy}` : "";
+    breastfeedBtn.title = `Started${starter} ${formatTimestamp(start.toISOString())} (${durationMinutes} min)`;
+    updateBreastfeedBanner(startInfo, durationMinutes);
     startBreastfeedTicker();
   } else {
     breastfeedBtn.textContent = "Start breastfed";
     breastfeedBtn.removeAttribute("title");
+    updateBreastfeedBanner(null, 0);
     stopBreastfeedTicker();
   }
 }
@@ -456,7 +533,7 @@ function updateUserDisplay() {
         ? `Logging as ${activeUser}`
         : "Choose a user to log.";
     } else if (pageType === "goals") {
-      userMessageEl.textContent = "Goals apply to all feeds logged in the last 24 hours.";
+      userMessageEl.textContent = "Goals stay active until a later-dated entry is logged.";
     } else if (pageType === "timeline") {
       userMessageEl.textContent = "All events";
     } else if (pageType === "milk-express") {
@@ -534,6 +611,9 @@ function initHomeHandlers() {
   }
   if (breastfeedBtn) {
     breastfeedBtn.addEventListener("click", handleBreastfeedToggle);
+  }
+  if (breastfeedBannerActionEl) {
+    breastfeedBannerActionEl.addEventListener("click", handleBreastfeedToggle);
   }
   if (manualFeedBtn) {
     manualFeedBtn.addEventListener("click", () => {
@@ -3956,16 +4036,16 @@ async function handleBreastfeedToggle() {
     setStatus("Choose a user below to start logging.");
     return;
   }
-  const start = getBreastfeedStart();
-  if (!start) {
-    setBreastfeedStart(new Date());
+  const startInfo = getBreastfeedStart();
+  if (!startInfo) {
+    setBreastfeedStart(new Date(), activeUser || null);
     updateBreastfeedButton();
     closeFeedMenu();
     setStatus("Breastfeed started");
     return;
   }
   const now = new Date();
-  const durationMinutes = Math.max(0, Math.round((now - start) / 60000));
+  const durationMinutes = Math.max(0, Math.round((now - startInfo.start) / 60000));
   clearBreastfeedStart();
   updateBreastfeedButton();
   closeFeedMenu();
