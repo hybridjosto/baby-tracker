@@ -1703,6 +1703,58 @@ function isSameDay(a, b) {
     && a.getDate() === b.getDate();
 }
 
+function getDateKeyFromTimestamp(value) {
+  if (!value) {
+    return null;
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+  return formatDateInputValue(parsed);
+}
+
+function selectActiveGoal(goals, lastEntryDateKey) {
+  if (!goals || !goals.length) {
+    return null;
+  }
+  const latestGoal = goals[0];
+  if (!lastEntryDateKey) {
+    return latestGoal;
+  }
+  if (!latestGoal.start_date) {
+    return null;
+  }
+  return latestGoal.start_date >= lastEntryDateKey ? latestGoal : null;
+}
+
+function getGoalDayWindow(dateKey) {
+  const parsed = parseDateInputValue(dateKey);
+  if (!parsed) {
+    return null;
+  }
+  return getSummaryDayWindow(parsed);
+}
+
+function computeFeedTotalMl(entries) {
+  let totalMl = 0;
+  entries.forEach((entry) => {
+    if (entry.type !== "feed") {
+      return;
+    }
+    if (typeof entry.amount_ml === "number" && Number.isFinite(entry.amount_ml)) {
+      totalMl += entry.amount_ml;
+    }
+    if (typeof entry.expressed_ml === "number" && Number.isFinite(entry.expressed_ml)) {
+      totalMl += entry.expressed_ml;
+    }
+    if (typeof entry.formula_ml === "number" && Number.isFinite(entry.formula_ml)) {
+      totalMl += entry.formula_ml;
+    }
+  });
+  return totalMl;
+}
+
 function formatSummaryDateLabel(date) {
   const today = new Date();
   if (isSameDay(date, today)) {
@@ -2747,6 +2799,22 @@ async function loadEntriesWithFallback(params) {
   }
 }
 
+async function loadLatestEntryWithFallback() {
+  const localEntries = await listEntriesLocalSafe({ limit: 1 });
+  const localLatest = localEntries && localEntries.length ? localEntries[0] : null;
+  try {
+    const serverEntries = await fetchEntries({ limit: 1 });
+    try {
+      await applyServerEntries(serverEntries);
+    } catch (err) {
+      // Ignore cache failures and return server data.
+    }
+    return serverEntries && serverEntries.length ? serverEntries[0] : localLatest;
+  } catch (err) {
+    return localLatest;
+  }
+}
+
 function buildQuery(params) {
   const search = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
@@ -2816,7 +2884,6 @@ async function fetchFeedingGoals(params) {
 
 async function loadFeedingGoals(limit) {
   const goals = await fetchFeedingGoals({ limit });
-  activeFeedingGoal = goals[0] || null;
   hasLoadedFeedingGoals = true;
   return goals;
 }
@@ -3580,7 +3647,9 @@ function renderGoalHistory(goals) {
     item.className = "goal-item";
     const label = document.createElement("div");
     label.className = "goal-meta";
-    const badge = index === 0 ? "Active" : "Past";
+    const badge = activeFeedingGoal && goal.id === activeFeedingGoal.id
+      ? "Active"
+      : (index === 0 ? "Latest" : "Past");
     label.textContent = `${badge} · ${formatGoalDateLabel(goal.start_date)}`;
     const amount = document.createElement("div");
     amount.className = "goal-amount";
@@ -4444,6 +4513,11 @@ async function loadGoalHistory() {
   }
   try {
     const goals = await loadFeedingGoals(50);
+    const latestEntry = await loadLatestEntryWithFallback();
+    const lastEntryDateKey = getDateKeyFromTimestamp(
+      latestEntry && latestEntry.timestamp_utc,
+    );
+    activeFeedingGoal = selectActiveGoal(goals, lastEntryDateKey);
     renderGoalHistory(goals);
     renderGoalComparison();
     if (goalStartDateInputEl && !goalStartDateInputEl.value) {
@@ -4486,21 +4560,40 @@ async function loadHomeEntries() {
 
     await syncNow();
 
-    const [entries, goals] = await Promise.all([
+    const [entries, goals, latestEntry] = await Promise.all([
       loadEntriesWithFallback({
         limit: 200,
         since: statsWindow.sinceIso,
         until: statsWindow.untilIso,
       }),
       loadFeedingGoals(1).catch(() => []),
+      loadLatestEntryWithFallback(),
     ]);
-    activeFeedingGoal = goals[0] || null;
+    const lastEntryDateKey = getDateKeyFromTimestamp(
+      latestEntry && latestEntry.timestamp_utc,
+    ) || getDateKeyFromTimestamp(
+      entries.length ? entries[0].timestamp_utc : null,
+    );
+    activeFeedingGoal = selectActiveGoal(goals, lastEntryDateKey);
+    let goalTotalMl = 0;
+    if (activeFeedingGoal && activeFeedingGoal.start_date) {
+      const goalWindow = getGoalDayWindow(activeFeedingGoal.start_date);
+      if (goalWindow) {
+        const goalEntries = await loadEntriesWithFallback({
+          limit: 200,
+          since: goalWindow.sinceIso,
+          until: goalWindow.untilIso,
+        });
+        goalTotalMl = computeFeedTotalMl(goalEntries);
+      }
+    }
     const chartEntries = entries.filter((entry) => {
       const ts = new Date(entry.timestamp_utc);
       return ts >= chartWindow.since && ts <= chartWindow.until;
     });
     renderChart(chartEntries, chartWindow);
     renderStats(entries);
+    latestFeedTotalMl = goalTotalMl;
     renderGoalComparison();
     renderStatsWindow(statsWindow);
     renderLastActivity(entries);

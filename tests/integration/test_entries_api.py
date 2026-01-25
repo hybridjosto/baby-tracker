@@ -1,3 +1,4 @@
+import csv
 import io
 
 
@@ -268,5 +269,32 @@ def test_export_entries_csv_includes_feed_amounts(client):
 
     text = response.get_data(as_text=True)
     lines = [line for line in text.strip().splitlines() if line]
-    assert lines[0] == "date,time,event,duration_min,amount_ml,expressed_ml,formula_ml"
-    assert "2024-02-01,08:30,feed,12.5,80.0,40.0,20.0" in lines[1:]
+    reader = csv.reader(lines)
+    header = next(reader)
+    assert header == [
+        "id",
+        "user_slug",
+        "type",
+        "timestamp_utc",
+        "client_event_id",
+        "notes",
+        "amount_ml",
+        "feed_duration_min",
+        "caregiver_id",
+        "created_at_utc",
+        "updated_at_utc",
+        "expressed_ml",
+        "formula_ml",
+        "deleted_at_utc",
+    ]
+    row = next(reader)
+    row_by_column = dict(zip(header, row, strict=True))
+    assert row_by_column["user_slug"] == "suz"
+    assert row_by_column["type"] == "feed"
+    assert row_by_column["timestamp_utc"] == "2024-02-01T08:30:00+00:00"
+    assert row_by_column["client_event_id"] == "evt-export-1"
+    assert row_by_column["amount_ml"] == "80.0"
+    assert row_by_column["feed_duration_min"] == "12.5"
+    assert row_by_column["expressed_ml"] == "40.0"
+    assert row_by_column["formula_ml"] == "20.0"
+    assert row_by_column["deleted_at_utc"] == ""
