@@ -1,6 +1,6 @@
 from flask import Blueprint, current_app, jsonify, request
 
-from src.app.services.feeding_goals import create_goal, list_goals
+from src.app.services.feeding_goals import create_goal, get_current_goal, list_goals
 
 goals_api = Blueprint("goals_api", __name__, url_prefix="/api")
 
@@ -15,6 +15,15 @@ def list_goals_route():
     try:
         goals = list_goals(_db_path(), limit=limit)
         return jsonify(goals)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+
+@goals_api.get("/feeding-goals/current")
+def current_goal_route():
+    try:
+        goal = get_current_goal(_db_path())
+        return jsonify(goal)
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
 
