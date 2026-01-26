@@ -27,6 +27,7 @@ def init_db(db_path: str) -> None:
         _ensure_entries_deleted_at_column(conn)
         _ensure_settings_table(conn)
         _ensure_feeding_goals_table(conn)
+        _ensure_current_goal_view(conn)
         _ensure_reminders_table(conn)
         _ensure_default_reminders(conn)
         conn.commit()
@@ -211,6 +212,19 @@ def _ensure_feeding_goals_table(conn: sqlite3.Connection) -> None:
         """
         CREATE INDEX IF NOT EXISTS idx_feeding_goals_start_date
             ON feeding_goals (start_date DESC, created_at_utc DESC)
+        """
+    )
+
+
+def _ensure_current_goal_view(conn: sqlite3.Connection) -> None:
+    conn.execute("DROP VIEW IF EXISTS current_goal")
+    conn.execute(
+        """
+        CREATE VIEW current_goal AS
+        SELECT id, goal_ml, start_date, created_at_utc
+        FROM feeding_goals
+        ORDER BY datetime(created_at_utc) DESC, id DESC
+        LIMIT 1
         """
     )
 

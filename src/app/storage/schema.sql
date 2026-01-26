@@ -43,6 +43,12 @@ CREATE TABLE IF NOT EXISTS feeding_goals (
 CREATE INDEX IF NOT EXISTS idx_feeding_goals_start_date
     ON feeding_goals (start_date DESC, created_at_utc DESC);
 
+CREATE VIEW IF NOT EXISTS current_goal AS
+SELECT id, goal_ml, start_date, created_at_utc
+FROM feeding_goals
+ORDER BY datetime(created_at_utc) DESC, id DESC
+LIMIT 1;
+
 CREATE TABLE IF NOT EXISTS reminders (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,

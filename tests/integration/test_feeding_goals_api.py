@@ -21,6 +21,27 @@ def test_create_feeding_goal_then_list(client):
     assert listed[0]["goal_ml"] == 650.0
 
 
+def test_current_goal_selects_latest_by_create_time(client):
+    response = client.get("/api/feeding-goals/current")
+    assert response.status_code == 200
+    assert response.get_json() is None
+
+    first = client.post(
+        "/api/feeding-goals",
+        json={"goal_ml": 500, "start_date": "2024-01-01"},
+    ).get_json()
+    second = client.post(
+        "/api/feeding-goals",
+        json={"goal_ml": 800, "start_date": "2023-12-01"},
+    ).get_json()
+
+    current = client.get("/api/feeding-goals/current")
+    assert current.status_code == 200
+    payload = current.get_json()
+    assert payload["id"] == second["id"]
+    assert payload["goal_ml"] == 800.0
+
+
 def test_create_feeding_goal_rejects_invalid_payload(client):
     response = client.post("/api/feeding-goals", json={"goal_ml": -10})
     assert response.status_code == 400

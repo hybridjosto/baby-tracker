@@ -27,6 +27,17 @@ def list_goals(conn: sqlite3.Connection, limit: int = 50) -> list[dict]:
     return [dict(row) for row in cursor.fetchall()]
 
 
+def get_current_goal(conn: sqlite3.Connection) -> dict | None:
+    cursor = conn.execute(
+        """
+        SELECT id, goal_ml, start_date, created_at_utc
+        FROM current_goal
+        """
+    )
+    row = cursor.fetchone()
+    return dict(row) if row else None
+
+
 def get_goal(conn: sqlite3.Connection, goal_id: int) -> dict | None:
     cursor = conn.execute(
         """

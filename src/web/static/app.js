@@ -1898,26 +1898,6 @@ function getDateKeyFromTimestamp(value) {
   return formatDateInputValue(parsed);
 }
 
-function selectActiveGoal(goals, targetDateKey) {
-  if (!goals || !goals.length) {
-    return null;
-  }
-  const effectiveDateKey = targetDateKey || formatDateInputValue(new Date());
-  if (!effectiveDateKey) {
-    return null;
-  }
-  for (let i = 0; i < goals.length; i += 1) {
-    const goal = goals[i];
-    if (!goal || !goal.start_date) {
-      continue;
-    }
-    if (goal.start_date <= effectiveDateKey) {
-      return goal;
-    }
-  }
-  return null;
-}
-
 function getGoalDayWindow(dateKey) {
   const parsed = parseDateInputValue(dateKey);
   if (!parsed) {
@@ -3075,10 +3055,33 @@ async function fetchFeedingGoals(params) {
   return normalizeGoalsResponse(data);
 }
 
+async function fetchCurrentGoal() {
+  const response = await fetch("/api/feeding-goals/current");
+  if (!response.ok) {
+    let detail = "";
+    try {
+      const err = await response.json();
+      detail = err.error || JSON.stringify(err);
+    } catch (parseError) {
+      detail = await response.text();
+    }
+    throw new Error(detail || `HTTP ${response.status}`);
+  }
+  return response.json();
+}
+
 async function loadFeedingGoals(limit) {
   const goals = await fetchFeedingGoals({ limit });
   hasLoadedFeedingGoals = true;
   return goals;
+}
+
+async function loadCurrentGoal() {
+  try {
+    return await fetchCurrentGoal();
+  } catch (err) {
+    return null;
+  }
 }
 
 function renderChart(entries, windowBounds) {
@@ -4749,8 +4752,8 @@ async function loadGoalHistory() {
   }
   try {
     const goals = await loadFeedingGoals(50);
-    const todayDateKey = formatDateInputValue(new Date());
-    activeFeedingGoal = selectActiveGoal(goals, todayDateKey);
+    const currentGoal = await loadCurrentGoal();
+    activeFeedingGoal = currentGoal;
     renderGoalHistory(goals);
     renderGoalComparison();
     if (goalStartDateInputEl && !goalStartDateInputEl.value) {
@@ -4793,16 +4796,16 @@ async function loadHomeEntries() {
 
     await syncNow();
 
-    const [entries, goals] = await Promise.all([
+    const [entries, goals, currentGoal] = await Promise.all([
       loadEntriesWithFallback({
         limit: 200,
         since: statsWindow.sinceIso,
         until: statsWindow.untilIso,
       }),
       loadFeedingGoals(1).catch(() => []),
+      loadCurrentGoal(),
     ]);
-    const todayDateKey = formatDateInputValue(new Date());
-    activeFeedingGoal = selectActiveGoal(goals, todayDateKey);
+    activeFeedingGoal = currentGoal;
     const chartEntries = entries.filter((entry) => {
       const ts = new Date(entry.timestamp_utc);
       return ts >= chartWindow.since && ts <= chartWindow.until;
