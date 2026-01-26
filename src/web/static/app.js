@@ -9,6 +9,8 @@ const logWindowHours = Number.parseInt(bodyEl.dataset.logWindowHours || "", 10);
 const THEME_KEY = "baby-tracker-theme";
 const USER_KEY = "baby-tracker-user";
 const BREASTFEED_TIMER_KEY = "baby-tracker-breastfeed-start";
+const BREASTFEED_IN_PROGRESS_NOTE = "Breastfeeding (started)";
+const BREASTFEED_COMPLETE_NOTE = "Breastfed";
 const OFFLINE_WINDOW_DAYS = 30;
 const DB_NAME = "baby-tracker";
 const DB_VERSION = 1;
@@ -186,6 +188,7 @@ let editEntryModalInitialized = false;
 let editEntryModalResolver = null;
 let editEntryModalEntry = null;
 let editEntryModalMode = "full";
+let breastfeedHydrated = false;
 
 const CUSTOM_TYPE_RE = /^[A-Za-z0-9][A-Za-z0-9 /-]{0,31}$/;
 const MILK_EXPRESS_TYPE = "milk express";
@@ -273,7 +276,11 @@ function parseBreastfeedPayload(raw, key) {
       }
       return null;
     }
-    return { start, startedBy: parsed.started_by || null };
+    return {
+      start,
+      startedBy: parsed.started_by || null,
+      clientEventId: parsed.client_event_id || null,
+    };
   }
   const legacyStart = new Date(raw);
   if (Number.isNaN(legacyStart.getTime())) {
@@ -282,7 +289,7 @@ function parseBreastfeedPayload(raw, key) {
     }
     return null;
   }
-  return { start: legacyStart, startedBy: null };
+  return { start: legacyStart, startedBy: null, clientEventId: null };
 }
 
 function getBreastfeedStart() {
@@ -299,15 +306,19 @@ function getBreastfeedStart() {
     const legacyRaw = window.localStorage.getItem(legacyKey);
     const legacyParsed = parseBreastfeedPayload(legacyRaw, legacyKey);
     if (legacyParsed) {
-      setBreastfeedStart(legacyParsed.start, activeUser);
+      setBreastfeedStart(legacyParsed.start, activeUser, null);
       window.localStorage.removeItem(legacyKey);
-      return { start: legacyParsed.start, startedBy: activeUser };
+      return {
+        start: legacyParsed.start,
+        startedBy: activeUser,
+        clientEventId: null,
+      };
     }
   }
   return null;
 }
 
-function setBreastfeedStart(start, startedBy) {
+function setBreastfeedStart(start, startedBy, clientEventId) {
   const key = getBreastfeedStorageKey();
   if (!key) {
     return;
@@ -315,6 +326,7 @@ function setBreastfeedStart(start, startedBy) {
   const payload = {
     start_at: start.toISOString(),
     started_by: startedBy || null,
+    client_event_id: clientEventId || null,
   };
   window.localStorage.setItem(key, JSON.stringify(payload));
 }
@@ -396,6 +408,96 @@ function updateBreastfeedButton() {
     breastfeedBtn.removeAttribute("title");
     updateBreastfeedBanner(null, 0);
     stopBreastfeedTicker();
+  }
+}
+
+function isBreastfeedInProgress(entry) {
+  return entry
+    && entry.type === "feed"
+    && entry.notes === BREASTFEED_IN_PROGRESS_NOTE;
+}
+
+function selectActiveBreastfeedEntry(entries) {
+  if (!Array.isArray(entries) || !entries.length) {
+    return null;
+  }
+  let selected = null;
+  let selectedTime = 0;
+  entries.forEach((entry) => {
+    if (!isBreastfeedInProgress(entry)) {
+      return;
+    }
+    const ts = new Date(entry.timestamp_utc);
+    if (Number.isNaN(ts.getTime())) {
+      return;
+    }
+    const time = ts.getTime();
+    if (!selected || time > selectedTime) {
+      selected = entry;
+      selectedTime = time;
+    }
+  });
+  return selected;
+}
+
+function updateBreastfeedStateFromSync(entries) {
+  if (!Array.isArray(entries) || !entries.length) {
+    return;
+  }
+  const activeEntry = selectActiveBreastfeedEntry(entries);
+  const current = getBreastfeedStart();
+  if (activeEntry) {
+    const start = new Date(activeEntry.timestamp_utc);
+    if (!Number.isNaN(start.getTime())) {
+      const startedBy = activeEntry.user_slug || null;
+      const clientEventId = activeEntry.client_event_id || null;
+      if (
+        !current
+        || current.clientEventId !== clientEventId
+        || current.start.getTime() !== start.getTime()
+        || current.startedBy !== startedBy
+      ) {
+        setBreastfeedStart(start, startedBy, clientEventId);
+      }
+      updateBreastfeedButton();
+      return;
+    }
+  }
+  if (current && current.clientEventId) {
+    const completedMatch = entries.find((entry) => {
+      return entry.client_event_id === current.clientEventId
+        && !isBreastfeedInProgress(entry);
+    });
+    if (completedMatch) {
+      clearBreastfeedStart();
+      updateBreastfeedButton();
+    }
+  }
+}
+
+async function hydrateBreastfeedFromLocalEntries() {
+  if (breastfeedHydrated) {
+    return;
+  }
+  breastfeedHydrated = true;
+  if (getBreastfeedStart()) {
+    return;
+  }
+  const entries = await listEntriesLocalSafe({ limit: 200 });
+  if (!entries) {
+    return;
+  }
+  const activeEntry = selectActiveBreastfeedEntry(entries);
+  if (activeEntry) {
+    const start = new Date(activeEntry.timestamp_utc);
+    if (!Number.isNaN(start.getTime())) {
+      setBreastfeedStart(
+        start,
+        activeEntry.user_slug || null,
+        activeEntry.client_event_id || null,
+      );
+      updateBreastfeedButton();
+    }
   }
 }
 
@@ -944,6 +1046,7 @@ function applyUserState() {
   });
   initLinks();
   updateUserDisplay();
+  void hydrateBreastfeedFromLocalEntries();
   updateBreastfeedButton();
   if (userFormEl) {
     userFormEl.hidden = userValid || allowTimeline;
@@ -1488,6 +1591,7 @@ async function syncNow() {
     }
     const data = await response.json();
     await applyServerEntries(data.entries || []);
+    updateBreastfeedStateFromSync(data.entries || []);
     await setSyncCursor(data.cursor);
     await clearOutbox(outbox.map((item) => item.key));
     if (changes.length) {
@@ -2000,6 +2104,9 @@ function renderSummaryStats(entries) {
   let formulaTotal = 0;
   entries.forEach((entry) => {
     if (entry.type === "feed") {
+      if (isBreastfeedInProgress(entry)) {
+        return;
+      }
       feedCount += 1;
       const duration = Number.parseFloat(entry.feed_duration_min);
       if (Number.isFinite(duration)) {
@@ -3657,6 +3764,9 @@ function renderStats(entries) {
   };
   entries.forEach((entry) => {
     if (entry.type === "feed") {
+      if (isBreastfeedInProgress(entry)) {
+        return;
+      }
       feedCount += 1;
       addMl(entry.amount_ml);
       if (typeof entry.expressed_ml === "number" && Number.isFinite(entry.expressed_ml)) {
@@ -4037,6 +4147,35 @@ function parseOptionalNumberInput(inputEl, label) {
   }
   return { value: amount, hasValue: true, valid: true };
 }
+
+async function getBreastfeedEntryForUpdate(startInfo) {
+  if (startInfo && startInfo.clientEventId) {
+    const localEntry = await getEntryLocal(startInfo.clientEventId);
+    if (localEntry) {
+      return localEntry;
+    }
+  }
+  const start = startInfo && startInfo.start ? startInfo.start : new Date();
+  const startIso = start.toISOString();
+  return {
+    client_event_id: startInfo && startInfo.clientEventId
+      ? startInfo.clientEventId
+      : generateId(),
+    user_slug: (startInfo && startInfo.startedBy) || activeUser || null,
+    type: "feed",
+    timestamp_utc: startIso,
+    notes: BREASTFEED_IN_PROGRESS_NOTE,
+    amount_ml: null,
+    expressed_ml: null,
+    formula_ml: null,
+    feed_duration_min: null,
+    caregiver_id: null,
+    created_at_utc: startIso,
+    updated_at_utc: startIso,
+    deleted_at_utc: null,
+  };
+}
+
 async function handleBreastfeedToggle() {
   if (!userValid) {
     setStatus("Choose a user below to start logging.");
@@ -4044,21 +4183,32 @@ async function handleBreastfeedToggle() {
   }
   const startInfo = getBreastfeedStart();
   if (!startInfo) {
-    setBreastfeedStart(new Date(), activeUser || null);
+    const start = new Date();
+    const payload = buildEntryPayload("feed");
+    payload.timestamp_utc = start.toISOString();
+    payload.notes = BREASTFEED_IN_PROGRESS_NOTE;
+    payload.feed_duration_min = null;
+    setBreastfeedStart(start, activeUser || null, payload.client_event_id);
     updateBreastfeedButton();
     closeFeedMenu();
     setStatus("Breastfeed started");
+    await saveEntry(payload);
     return;
   }
   const now = new Date();
   const durationMinutes = Math.max(0, Math.round((now - startInfo.start) / 60000));
+  const entry = await getBreastfeedEntryForUpdate(startInfo);
   clearBreastfeedStart();
   updateBreastfeedButton();
   closeFeedMenu();
-  const payload = buildEntryPayload("feed");
-  payload.feed_duration_min = durationMinutes;
-  payload.notes = "Breastfed";
-  await saveEntry(payload);
+  await commitEntryUpdate(entry, {
+    feed_duration_min: durationMinutes,
+    notes: BREASTFEED_COMPLETE_NOTE,
+  }, {
+    online: "Breastfeed ended (syncing...)",
+    offline: "Breastfeed ended offline",
+    error: "Error: unable to end breastfeeding",
+  });
 }
 
 async function handleMlEntry(inputEl, label) {
