@@ -1,0 +1,15 @@
+{
+  # Tailscale IPs are private; disable auto HTTPS to keep HTTP-only.
+  auto_https off
+}
+
+:8443 {
+  bind {$TAILSCALE_IP}
+
+  @api path /api*
+  handle @api {
+    reverse_proxy 127.0.0.1:8000
+  }
+
+  respond "Not Found" 404
+}
