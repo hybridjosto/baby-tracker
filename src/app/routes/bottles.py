@@ -15,19 +15,18 @@ def _db_path() -> str:
     return current_app.config["DB_PATH"]
 
 
-@bottles_api.get("/users/<user_slug>/bottles")
-def list_bottles_route(user_slug: str):
+@bottles_api.get("/bottles")
+def list_bottles_route():
     try:
-        bottles = list_bottles(_db_path(), user_slug)
+        bottles = list_bottles(_db_path())
         return jsonify(bottles)
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
 
 
-@bottles_api.post("/users/<user_slug>/bottles")
-def create_bottle_route(user_slug: str):
+@bottles_api.post("/bottles")
+def create_bottle_route():
     payload = request.get_json(silent=True) or {}
-    payload["user_slug"] = user_slug
     try:
         bottle = create_bottle(_db_path(), payload)
         return jsonify(bottle), 201

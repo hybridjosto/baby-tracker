@@ -181,7 +181,6 @@ def _ensure_bottles_table(conn: sqlite3.Connection) -> None:
         """
         CREATE TABLE IF NOT EXISTS bottles (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_slug TEXT NOT NULL,
             name TEXT NOT NULL,
             empty_weight_g REAL NOT NULL,
             created_at_utc TEXT NOT NULL,
@@ -193,8 +192,6 @@ def _ensure_bottles_table(conn: sqlite3.Connection) -> None:
     columns = {
         row["name"] for row in conn.execute("PRAGMA table_info(bottles)").fetchall()
     }
-    if "user_slug" not in columns:
-        conn.execute("ALTER TABLE bottles ADD COLUMN user_slug TEXT NOT NULL DEFAULT ''")
     if "name" not in columns:
         conn.execute("ALTER TABLE bottles ADD COLUMN name TEXT NOT NULL DEFAULT ''")
     if "empty_weight_g" not in columns:
@@ -205,9 +202,6 @@ def _ensure_bottles_table(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE bottles ADD COLUMN updated_at_utc TEXT NOT NULL DEFAULT ''")
     if "deleted_at_utc" not in columns:
         conn.execute("ALTER TABLE bottles ADD COLUMN deleted_at_utc TEXT")
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_bottles_user_slug ON bottles (user_slug)"
-    )
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_bottles_updated_at_utc ON bottles (updated_at_utc DESC)"
     )

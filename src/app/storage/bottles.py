@@ -1,43 +1,69 @@
 import sqlite3
 
 
+def _has_user_slug_column(conn: sqlite3.Connection) -> bool:
+    columns = {
+        row["name"] for row in conn.execute("PRAGMA table_info(bottles)").fetchall()
+    }
+    return "user_slug" in columns
+
+
 def create_bottle(conn: sqlite3.Connection, payload: dict) -> dict:
-    cursor = conn.execute(
-        """
-        INSERT INTO bottles (
-            user_slug,
-            name,
-            empty_weight_g,
-            created_at_utc,
-            updated_at_utc,
-            deleted_at_utc
+    if _has_user_slug_column(conn):
+        cursor = conn.execute(
+            """
+            INSERT INTO bottles (
+                user_slug,
+                name,
+                empty_weight_g,
+                created_at_utc,
+                updated_at_utc,
+                deleted_at_utc
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "global",
+                payload["name"],
+                payload["empty_weight_g"],
+                payload["created_at_utc"],
+                payload["updated_at_utc"],
+                payload.get("deleted_at_utc"),
+            ),
         )
-        VALUES (?, ?, ?, ?, ?, ?)
-        """,
-        (
-            payload["user_slug"],
-            payload["name"],
-            payload["empty_weight_g"],
-            payload["created_at_utc"],
-            payload["updated_at_utc"],
-            payload.get("deleted_at_utc"),
-        ),
-    )
+    else:
+        cursor = conn.execute(
+            """
+            INSERT INTO bottles (
+                name,
+                empty_weight_g,
+                created_at_utc,
+                updated_at_utc,
+                deleted_at_utc
+            )
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (
+                payload["name"],
+                payload["empty_weight_g"],
+                payload["created_at_utc"],
+                payload["updated_at_utc"],
+                payload.get("deleted_at_utc"),
+            ),
+        )
     conn.commit()
     return get_bottle(conn, cursor.lastrowid)
 
 
-def list_bottles(
-    conn: sqlite3.Connection, user_slug: str, include_deleted: bool = False
-) -> list[dict]:
-    clauses = ["user_slug = ?"]
-    params: list[object] = [user_slug]
+def list_bottles(conn: sqlite3.Connection, include_deleted: bool = False) -> list[dict]:
+    clauses: list[str] = []
+    params: list[object] = []
     if not include_deleted:
         clauses.append("deleted_at_utc IS NULL")
-    where = f"WHERE {' AND '.join(clauses)}"
+    where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
     cursor = conn.execute(
         f"""
-        SELECT id, user_slug, name, empty_weight_g,
+        SELECT id, name, empty_weight_g,
                created_at_utc, updated_at_utc, deleted_at_utc
         FROM bottles
         {where}
@@ -51,7 +77,7 @@ def list_bottles(
 def get_bottle(conn: sqlite3.Connection, bottle_id: int) -> dict | None:
     cursor = conn.execute(
         """
-        SELECT id, user_slug, name, empty_weight_g,
+        SELECT id, name, empty_weight_g,
                created_at_utc, updated_at_utc, deleted_at_utc
         FROM bottles
         WHERE id = ?

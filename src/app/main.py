@@ -211,7 +211,7 @@ def create_app() -> Flask:
         return render_bottles_page(
             user_slug="",
             user_valid=False,
-            user_message="Choose a user below (example: josh).",
+            user_message="Shared bottle library",
         )
 
     @app.get("/<user_slug>")
@@ -301,8 +301,8 @@ def create_app() -> Flask:
             )
         return render_bottles_page(
             user_slug=normalized,
-            user_valid=True,
-            user_message=f"Logging as {normalized}",
+            user_valid=False,
+            user_message="Shared bottle library",
         )
 
     @app.get("/<user_slug>/log")

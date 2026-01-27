@@ -658,9 +658,7 @@ function updateUserDisplay() {
   } else if (pageType === "timeline") {
     userMessageEl.textContent = "All events";
   } else if (pageType === "bottles") {
-    userMessageEl.textContent = userValid
-      ? `Logging as ${activeUser}`
-      : "Choose a user to manage bottles.";
+    userMessageEl.textContent = "Shared bottle library";
   } else if (pageType === "milk-express") {
     userMessageEl.textContent = "Last 48 hours • All milk express";
   } else {
@@ -1189,10 +1187,6 @@ function initBottlesHandlers() {
   if (bottleFormEl) {
     bottleFormEl.addEventListener("submit", (event) => {
       event.preventDefault();
-      if (!userValid) {
-        setStatus("Choose a user below to save bottles.");
-        return;
-      }
       const name = bottleNameInputEl ? bottleNameInputEl.value.trim() : "";
       const weightValue = bottleWeightInputEl
         ? Number.parseFloat(bottleWeightInputEl.value)
@@ -1205,7 +1199,7 @@ function initBottlesHandlers() {
         setStatus("Empty weight must be a positive number.");
         return;
       }
-      void createBottle(activeUser, {
+      void createBottle({
         name,
         empty_weight_g: weightValue,
       }).then(() => {
@@ -1247,6 +1241,13 @@ function applyUserState() {
     initGoalsHandlers();
     updateUserDisplay();
     loadGoalHistory();
+    return;
+  }
+  if (pageType === "bottles") {
+    initBottlesHandlers();
+    updateUserDisplay();
+    setStatus("");
+    loadBottles();
     return;
   }
   const allowTimeline = pageType === "timeline";
@@ -3281,8 +3282,8 @@ async function fetchFeedingGoals(params) {
   return normalizeGoalsResponse(data);
 }
 
-async function fetchBottles(userSlug) {
-  const response = await fetch(`/api/users/${userSlug}/bottles`);
+async function fetchBottles() {
+  const response = await fetch("/api/bottles");
   if (!response.ok) {
     let detail = "";
     try {
@@ -3297,8 +3298,8 @@ async function fetchBottles(userSlug) {
   return Array.isArray(data) ? data : [];
 }
 
-async function createBottle(userSlug, payload) {
-  const response = await fetch(`/api/users/${userSlug}/bottles`, {
+async function createBottle(payload) {
+  const response = await fetch("/api/bottles", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -5040,15 +5041,8 @@ async function saveFeedingGoal(payload) {
 }
 
 async function loadBottles() {
-  if (!userValid) {
-    bottlesCache = [];
-    renderBottleList([]);
-    renderBottleOptions();
-    updateBottleResult();
-    return;
-  }
   try {
-    const bottles = await fetchBottles(activeUser);
+    const bottles = await fetchBottles();
     bottlesCache = bottles;
     renderBottleList(bottles);
     renderBottleOptions();

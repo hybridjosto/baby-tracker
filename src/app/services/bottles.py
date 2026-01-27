@@ -10,9 +10,6 @@ from src.app.storage.bottles import (
     delete_bottle as repo_delete_bottle,
     get_bottle as repo_get_bottle,
 )
-from src.lib.validation import normalize_user_slug
-
-
 class BottleNotFoundError(Exception):
     pass
 
@@ -43,17 +40,13 @@ def _normalize_weight_g(value: object) -> float:
     return float(value)
 
 
-def list_bottles(db_path: str, user_slug: str) -> list[dict]:
-    normalized = normalize_user_slug(user_slug)
+def list_bottles(db_path: str) -> list[dict]:
     with get_connection(db_path) as conn:
-        return repo_list_bottles(conn, normalized, include_deleted=False)
+        return repo_list_bottles(conn, include_deleted=False)
 
 
 def create_bottle(db_path: str, payload: dict) -> dict:
-    if "user_slug" not in payload:
-        raise ValueError("user_slug is required")
     fields = {
-        "user_slug": normalize_user_slug(payload.get("user_slug")),
         "name": _normalize_name(payload.get("name")),
         "empty_weight_g": _normalize_weight_g(payload.get("empty_weight_g")),
         "created_at_utc": _now_utc_iso(),
