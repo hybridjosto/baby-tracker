@@ -33,6 +33,19 @@ CREATE TABLE IF NOT EXISTS baby_settings (
 
 INSERT OR IGNORE INTO baby_settings (id) VALUES (1);
 
+CREATE TABLE IF NOT EXISTS bottles (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_slug TEXT NOT NULL,
+    name TEXT NOT NULL,
+    empty_weight_g REAL NOT NULL,
+    created_at_utc TEXT NOT NULL,
+    updated_at_utc TEXT NOT NULL,
+    deleted_at_utc TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_bottles_user_slug ON bottles (user_slug);
+CREATE INDEX IF NOT EXISTS idx_bottles_updated_at_utc ON bottles (updated_at_utc DESC);
+
 CREATE TABLE IF NOT EXISTS feeding_goals (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     goal_ml REAL NOT NULL,

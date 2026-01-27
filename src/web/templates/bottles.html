@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Bottle Library</title>
+    <link rel="manifest" href="/static/manifest.json">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    >
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@400,0"
+      rel="stylesheet"
+    >
+    <link rel="stylesheet" href="/static/styles.css">
+    <script>
+      (() => {
+        const stored = localStorage.getItem("baby-tracker-theme");
+        const prefersDark = window.matchMedia
+          && window.matchMedia("(prefers-color-scheme: dark)").matches;
+        const theme = stored || (prefersDark ? "dark" : "light");
+        if (theme === "dark") {
+          document.documentElement.classList.add("dark");
+        }
+      })();
+    </script>
+    <style>
+      .page {
+        max-width: 900px;
+        margin: 0 auto;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+      .card h1 {
+        margin: 0;
+        font-size: 24px;
+      }
+      .nav-row {
+        margin-bottom: 12px;
+      }
+      .subtitle {
+        font-size: 13px;
+        color: var(--text-secondary);
+        margin-top: 6px;
+      }
+      .bottles-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 16px;
+      }
+      .section-title {
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.14em;
+        color: var(--text-secondary);
+        margin-bottom: 10px;
+      }
+      .field {
+        margin-bottom: 12px;
+      }
+      label {
+        display: block;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: var(--text-secondary);
+        margin-bottom: 6px;
+      }
+      input,
+      select {
+        width: 100%;
+        border-radius: 10px;
+        border: 1px solid var(--border-light);
+        padding: 10px 12px;
+        font-size: 15px;
+        background: #ffffff;
+        color: var(--text-primary);
+      }
+      html.dark input,
+      html.dark select {
+        background: rgba(26, 44, 32, 0.9);
+        border-color: var(--border-dark);
+        color: #ffffff;
+      }
+      .inline-row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      .primary-btn {
+        border-radius: 10px;
+        border: none;
+        padding: 10px 14px;
+        background: var(--primary);
+        color: #0f1a12;
+        font-weight: 700;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      .hint {
+        font-size: 12px;
+        color: var(--text-secondary);
+      }
+      .bottle-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .bottle-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 12px;
+        border-radius: 12px;
+        background: var(--surface-soft);
+        border: 1px solid var(--border-light);
+      }
+      html.dark .bottle-row {
+        background: rgba(255, 255, 255, 0.06);
+        border-color: var(--border-dark);
+      }
+      .bottle-meta {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .bottle-name {
+        font-weight: 600;
+      }
+      .bottle-weight {
+        font-size: 12px;
+        color: var(--text-secondary);
+      }
+      .bottle-actions {
+        display: flex;
+        gap: 6px;
+      }
+      .ghost-btn {
+        border-radius: 999px;
+        border: 1px solid var(--border-light);
+        background: transparent;
+        padding: 6px 10px;
+        font-size: 12px;
+        cursor: pointer;
+      }
+      html.dark .ghost-btn {
+        border-color: var(--border-dark);
+        color: #d3e4d7;
+      }
+      .calc-result {
+        margin-top: 12px;
+        padding: 12px;
+        border-radius: 12px;
+        background: var(--surface-muted);
+        font-weight: 600;
+      }
+      html.dark .calc-result {
+        background: rgba(255, 255, 255, 0.08);
+      }
+      .calc-value {
+        font-size: 20px;
+        margin-top: 4px;
+      }
+      .empty-state {
+        font-size: 13px;
+        color: var(--text-secondary);
+        padding: 12px;
+        border-radius: 12px;
+        border: 1px dashed var(--border-light);
+      }
+      html.dark .empty-state {
+        border-color: var(--border-dark);
+      }
+      @media (max-width: 900px) {
+        .bottles-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body data-user="{{ user_slug }}" data-user-valid="{{ 'true' if user_valid else 'false' }}" data-page="bottles">
+    <div class="page">
+      <div class="card">
+        <div class="nav-row">
+          <div>
+            <h1>Bottle Library</h1>
+            <div class="subtitle">Store empty weights and convert total weights into expressed volume.</div>
+          </div>
+          <div class="nav-actions">
+            <a class="nav-icon" id="home-link" href="/" aria-label="Home" title="Home">
+              <span class="material-symbols-outlined">home</span>
+            </a>
+            <a class="nav-icon" id="summary-link" href="/summary" aria-label="Summary" title="Summary">
+              <span class="material-symbols-outlined">query_stats</span>
+            </a>
+            <a class="nav-icon" id="timeline-link" href="/timeline" aria-label="Timeline" title="Timeline">
+              <span class="material-symbols-outlined">history</span>
+            </a>
+            <a class="nav-icon" id="log-link" href="/log" aria-label="Event log" title="Event log">
+              <span class="material-symbols-outlined">list_alt</span>
+            </a>
+            <a class="nav-icon" href="/settings" aria-label="Settings" title="Settings">
+              <span class="material-symbols-outlined">settings</span>
+            </a>
+            <button class="nav-icon" id="theme-toggle" type="button" aria-label="Switch to light mode">
+              <span class="material-symbols-outlined">dark_mode</span>
+            </button>
+          </div>
+        </div>
+        <div class="user-chip" id="user-message">{{ user_message }}</div>
+      </div>
+
+      <div class="bottles-grid">
+        <section class="card">
+          <div class="section-title">Add a bottle</div>
+          <form id="bottle-form">
+            <div class="field">
+              <label for="bottle-name">Bottle name</label>
+              <input
+                id="bottle-name"
+                type="text"
+                placeholder="e.g. Willow 5oz"
+                maxlength="48"
+                autocomplete="off"
+              >
+            </div>
+            <div class="field">
+              <label for="bottle-weight">Empty weight (g)</label>
+              <input
+                id="bottle-weight"
+                type="number"
+                min="1"
+                step="0.1"
+                inputmode="decimal"
+                pattern="[0-9]*[.,]?[0-9]*"
+                placeholder="e.g. 38"
+              >
+            </div>
+            <button class="primary-btn" id="bottle-save" type="submit">Add bottle</button>
+            <div class="hint" id="bottle-form-hint">Weights are stored in grams.</div>
+          </form>
+        </section>
+
+        <section class="card">
+          <div class="section-title">Quick weigh</div>
+          <div class="field">
+            <label for="bottle-select">Bottle</label>
+            <select id="bottle-select">
+              <option value="">Select a bottle</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="bottle-total-weight">Bottle + milk (g)</label>
+            <input
+              id="bottle-total-weight"
+              type="number"
+              min="0"
+              step="0.1"
+              inputmode="decimal"
+              pattern="[0-9]*[.,]?[0-9]*"
+              placeholder="Total weight on the scale"
+            >
+          </div>
+          <div class="hint">Assumes 1 g ≈ 1 ml.</div>
+          <div class="calc-result" id="bottle-result">
+            Expressed milk
+            <div class="calc-value" id="bottle-result-value">-- ml</div>
+          </div>
+        </section>
+      </div>
+
+      <section class="card">
+        <div class="section-title">Saved bottles</div>
+        <div class="bottle-list" id="bottle-list"></div>
+        <div class="empty-state" id="bottle-empty" hidden>No bottles saved yet.</div>
+      </section>
+
+      <div class="status" id="status"></div>
+
+      <form class="user-setup" id="user-form" hidden>
+        <label for="user-input">User</label>
+        <div class="user-row">
+          <input
+            class="user-input"
+            id="user-input"
+            type="text"
+            inputmode="latin-prose"
+            autocapitalize="none"
+            autocomplete="off"
+            placeholder="Name (e.g. josh)"
+          >
+          <button class="user-btn" id="user-save" type="submit">Use</button>
+        </div>
+        <div class="user-hint">Saved on this device.</div>
+      </form>
+    </div>
+    <script src="/static/app.js"></script>
+  </body>
+</html>

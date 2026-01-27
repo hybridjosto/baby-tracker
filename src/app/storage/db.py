@@ -26,6 +26,7 @@ def init_db(db_path: str) -> None:
         _ensure_feed_amount_columns(conn)
         _ensure_entries_deleted_at_column(conn)
         _ensure_settings_table(conn)
+        _ensure_bottles_table(conn)
         _ensure_feeding_goals_table(conn)
         _ensure_current_goal_view(conn)
         _ensure_reminders_table(conn)
@@ -173,6 +174,43 @@ def _ensure_settings_table(conn: sqlite3.Connection) -> None:
             """,
             (now,),
         )
+
+
+def _ensure_bottles_table(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS bottles (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_slug TEXT NOT NULL,
+            name TEXT NOT NULL,
+            empty_weight_g REAL NOT NULL,
+            created_at_utc TEXT NOT NULL,
+            updated_at_utc TEXT NOT NULL,
+            deleted_at_utc TEXT
+        )
+        """
+    )
+    columns = {
+        row["name"] for row in conn.execute("PRAGMA table_info(bottles)").fetchall()
+    }
+    if "user_slug" not in columns:
+        conn.execute("ALTER TABLE bottles ADD COLUMN user_slug TEXT NOT NULL DEFAULT ''")
+    if "name" not in columns:
+        conn.execute("ALTER TABLE bottles ADD COLUMN name TEXT NOT NULL DEFAULT ''")
+    if "empty_weight_g" not in columns:
+        conn.execute("ALTER TABLE bottles ADD COLUMN empty_weight_g REAL NOT NULL DEFAULT 0")
+    if "created_at_utc" not in columns:
+        conn.execute("ALTER TABLE bottles ADD COLUMN created_at_utc TEXT NOT NULL DEFAULT ''")
+    if "updated_at_utc" not in columns:
+        conn.execute("ALTER TABLE bottles ADD COLUMN updated_at_utc TEXT NOT NULL DEFAULT ''")
+    if "deleted_at_utc" not in columns:
+        conn.execute("ALTER TABLE bottles ADD COLUMN deleted_at_utc TEXT")
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_bottles_user_slug ON bottles (user_slug)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_bottles_updated_at_utc ON bottles (updated_at_utc DESC)"
+    )
 
 
 def _ensure_reminders_table(conn: sqlite3.Connection) -> None:
