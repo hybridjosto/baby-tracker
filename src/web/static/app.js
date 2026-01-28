@@ -20,7 +20,15 @@ const STORE_META = "meta";
 const META_DEVICE_ID = "device_id";
 const META_SYNC_CURSOR = "sync_cursor";
 const USER_RE = /^[a-z0-9-]{1,24}$/;
-const RESERVED_USER_SLUGS = new Set(["timeline", "summary", "log", "settings", "goals", "milk-express"]);
+const RESERVED_USER_SLUGS = new Set([
+  "timeline",
+  "summary",
+  "log",
+  "settings",
+  "goals",
+  "milk-express",
+  "bottles",
+]);
 const themeToggleBtn = document.getElementById("theme-toggle");
 const userFormEl = document.getElementById("user-form");
 const userInputEl = document.getElementById("user-input");
@@ -53,6 +61,7 @@ const logLinkEl = document.getElementById("log-link");
 const homeLinkEl = document.getElementById("home-link");
 const summaryLinkEl = document.getElementById("summary-link");
 const milkExpressLinkEl = document.getElementById("milk-express-link");
+const bottlesLinkEl = document.getElementById("bottles-link");
 const refreshBtn = document.getElementById("refresh-btn");
 const csvFormEl = document.getElementById("csv-upload-form");
 const csvFileEl = document.getElementById("csv-file");
@@ -170,6 +179,16 @@ const goalStartDateInputEl = document.getElementById("goal-start-date");
 const goalHistoryEl = document.getElementById("goal-history");
 const goalEmptyEl = document.getElementById("goal-empty");
 const goalsLinkEl = document.getElementById("goals-link");
+
+const bottleFormEl = document.getElementById("bottle-form");
+const bottleNameInputEl = document.getElementById("bottle-name");
+const bottleWeightInputEl = document.getElementById("bottle-weight");
+const bottleFormHintEl = document.getElementById("bottle-form-hint");
+const bottleListEl = document.getElementById("bottle-list");
+const bottleEmptyEl = document.getElementById("bottle-empty");
+const bottleSelectEl = document.getElementById("bottle-select");
+const bottleTotalWeightEl = document.getElementById("bottle-total-weight");
+const bottleResultValueEl = document.getElementById("bottle-result-value");
 
 let babyDob = null;
 let feedIntervalMinutes = null;
@@ -636,11 +655,13 @@ function updateUserDisplay() {
         : "Choose a user to log.";
     } else if (pageType === "goals") {
       userMessageEl.textContent = "Goals stay active until a later-dated entry is logged.";
-    } else if (pageType === "timeline") {
-      userMessageEl.textContent = "All events";
-    } else if (pageType === "milk-express") {
-      userMessageEl.textContent = "Last 48 hours • All milk express";
-    } else {
+  } else if (pageType === "timeline") {
+    userMessageEl.textContent = "All events";
+  } else if (pageType === "bottles") {
+    userMessageEl.textContent = "Shared bottle library";
+  } else if (pageType === "milk-express") {
+    userMessageEl.textContent = "Last 48 hours • All milk express";
+  } else {
       userMessageEl.textContent = userValid
         ? "All events"
         : "All events. Choose a user to log.";
@@ -680,6 +701,8 @@ let milkExpressSparklineMode = "all";
 let milkExpressAllEntries = [];
 let milkExpressAllLoading = null;
 let goalsInitialized = false;
+let bottlesInitialized = false;
+let bottlesCache = [];
 let hasLoadedFeedingGoals = false;
 let activeFeedingGoal = null;
 let latestFeedTotalMl = 0;
@@ -1012,6 +1035,199 @@ function initGoalsHandlers() {
   }
 }
 
+function formatWeightG(value) {
+  if (!Number.isFinite(value) || value <= 0) {
+    return "0 g";
+  }
+  const rounded = Math.round(value * 10) / 10;
+  return Number.isInteger(rounded) ? `${rounded} g` : `${rounded.toFixed(1)} g`;
+}
+
+function renderBottleOptions() {
+  if (!bottleSelectEl) {
+    return;
+  }
+  bottleSelectEl.innerHTML = "";
+  const defaultOption = document.createElement("option");
+  defaultOption.value = "";
+  defaultOption.textContent = "Select a bottle";
+  bottleSelectEl.appendChild(defaultOption);
+  bottlesCache.forEach((bottle) => {
+    const option = document.createElement("option");
+    option.value = String(bottle.id);
+    option.textContent = `${bottle.name} · ${formatWeightG(bottle.empty_weight_g)}`;
+    bottleSelectEl.appendChild(option);
+  });
+  bottleSelectEl.disabled = !bottlesCache.length;
+}
+
+function updateBottleResult() {
+  if (!bottleResultValueEl) {
+    return;
+  }
+  if (!bottleSelectEl || !bottleTotalWeightEl) {
+    bottleResultValueEl.textContent = "-- ml";
+    return;
+  }
+  const selectedId = Number.parseInt(bottleSelectEl.value, 10);
+  const bottle = bottlesCache.find((item) => item.id === selectedId);
+  const totalWeight = Number.parseFloat(bottleTotalWeightEl.value);
+  if (!bottle || !Number.isFinite(totalWeight) || totalWeight <= 0) {
+    bottleResultValueEl.textContent = "-- ml";
+    return;
+  }
+  const expressed = Math.max(0, totalWeight - bottle.empty_weight_g);
+  bottleResultValueEl.textContent = formatMl(expressed);
+}
+
+function renderBottleList(bottles) {
+  if (!bottleListEl || !bottleEmptyEl) {
+    return;
+  }
+  bottleListEl.innerHTML = "";
+  if (!bottles.length) {
+    bottleEmptyEl.hidden = false;
+    return;
+  }
+  bottleEmptyEl.hidden = true;
+  bottles.forEach((bottle) => {
+    const row = document.createElement("div");
+    row.className = "bottle-row";
+
+    const meta = document.createElement("div");
+    meta.className = "bottle-meta";
+    const name = document.createElement("div");
+    name.className = "bottle-name";
+    name.textContent = bottle.name;
+    const weight = document.createElement("div");
+    weight.className = "bottle-weight";
+    weight.textContent = `Empty weight: ${formatWeightG(bottle.empty_weight_g)}`;
+    meta.appendChild(name);
+    meta.appendChild(weight);
+
+    const actions = document.createElement("div");
+    actions.className = "bottle-actions";
+
+    const useBtn = document.createElement("button");
+    useBtn.type = "button";
+    useBtn.className = "ghost-btn";
+    useBtn.textContent = "Use";
+    useBtn.addEventListener("click", () => {
+      if (bottleSelectEl) {
+        bottleSelectEl.value = String(bottle.id);
+      }
+      updateBottleResult();
+      if (bottleTotalWeightEl) {
+        bottleTotalWeightEl.focus();
+      }
+    });
+
+    const editBtn = document.createElement("button");
+    editBtn.type = "button";
+    editBtn.className = "ghost-btn";
+    editBtn.textContent = "Edit";
+    editBtn.addEventListener("click", () => {
+      const nextName = window.prompt("Bottle name", bottle.name || "");
+      if (nextName === null) {
+        return;
+      }
+      const nextWeight = window.prompt(
+        "Empty weight (g)",
+        String(bottle.empty_weight_g ?? ""),
+      );
+      if (nextWeight === null) {
+        return;
+      }
+      const trimmed = nextName.trim();
+      const weightValue = Number.parseFloat(nextWeight);
+      if (!trimmed) {
+        setStatus("Bottle name is required.");
+        return;
+      }
+      if (!Number.isFinite(weightValue) || weightValue <= 0) {
+        setStatus("Empty weight must be a positive number.");
+        return;
+      }
+      void updateBottle(bottle.id, {
+        name: trimmed,
+        empty_weight_g: weightValue,
+      }).then(() => {
+        void loadBottles();
+      });
+    });
+
+    const deleteBtn = document.createElement("button");
+    deleteBtn.type = "button";
+    deleteBtn.className = "ghost-btn";
+    deleteBtn.textContent = "Delete";
+    deleteBtn.addEventListener("click", () => {
+      if (!window.confirm(`Delete "${bottle.name}"?`)) {
+        return;
+      }
+      void deleteBottle(bottle.id).then(() => {
+        void loadBottles();
+      });
+    });
+
+    actions.appendChild(useBtn);
+    actions.appendChild(editBtn);
+    actions.appendChild(deleteBtn);
+
+    row.appendChild(meta);
+    row.appendChild(actions);
+    bottleListEl.appendChild(row);
+  });
+}
+
+function initBottlesHandlers() {
+  if (bottlesInitialized || pageType !== "bottles") {
+    return;
+  }
+  bottlesInitialized = true;
+  if (bottleFormEl) {
+    bottleFormEl.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const name = bottleNameInputEl ? bottleNameInputEl.value.trim() : "";
+      const weightValue = bottleWeightInputEl
+        ? Number.parseFloat(bottleWeightInputEl.value)
+        : Number.NaN;
+      if (!name) {
+        setStatus("Bottle name is required.");
+        return;
+      }
+      if (!Number.isFinite(weightValue) || weightValue <= 0) {
+        setStatus("Empty weight must be a positive number.");
+        return;
+      }
+      void createBottle({
+        name,
+        empty_weight_g: weightValue,
+      }).then(() => {
+        if (bottleNameInputEl) {
+          bottleNameInputEl.value = "";
+        }
+        if (bottleWeightInputEl) {
+          bottleWeightInputEl.value = "";
+        }
+        if (bottleFormHintEl) {
+          bottleFormHintEl.textContent = "Bottle saved.";
+        }
+        void loadBottles();
+      });
+    });
+  }
+  if (bottleSelectEl) {
+    bottleSelectEl.addEventListener("change", () => {
+      updateBottleResult();
+    });
+  }
+  if (bottleTotalWeightEl) {
+    bottleTotalWeightEl.addEventListener("input", () => {
+      updateBottleResult();
+    });
+  }
+}
+
 function applyUserState() {
   if (pageType === "settings") {
     initSettingsHandlers();
@@ -1025,6 +1241,13 @@ function applyUserState() {
     initGoalsHandlers();
     updateUserDisplay();
     loadGoalHistory();
+    return;
+  }
+  if (pageType === "bottles") {
+    initBottlesHandlers();
+    updateUserDisplay();
+    setStatus("");
+    loadBottles();
     return;
   }
   const allowTimeline = pageType === "timeline";
@@ -1076,6 +1299,10 @@ function applyUserState() {
   if (pageType === "milk-express") {
     initMilkExpressLedgerHandlers();
     loadMilkExpressLedger();
+  }
+  if (pageType === "bottles") {
+    initBottlesHandlers();
+    loadBottles();
   }
 }
 
@@ -3055,6 +3282,74 @@ async function fetchFeedingGoals(params) {
   return normalizeGoalsResponse(data);
 }
 
+async function fetchBottles() {
+  const response = await fetch("/api/bottles");
+  if (!response.ok) {
+    let detail = "";
+    try {
+      const err = await response.json();
+      detail = err.error || JSON.stringify(err);
+    } catch (parseError) {
+      detail = await response.text();
+    }
+    throw new Error(detail || `HTTP ${response.status}`);
+  }
+  const data = await response.json();
+  return Array.isArray(data) ? data : [];
+}
+
+async function createBottle(payload) {
+  const response = await fetch("/api/bottles", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    let detail = "";
+    try {
+      const err = await response.json();
+      detail = err.error || JSON.stringify(err);
+    } catch (parseError) {
+      detail = await response.text();
+    }
+    throw new Error(detail || `HTTP ${response.status}`);
+  }
+  return response.json();
+}
+
+async function updateBottle(bottleId, payload) {
+  const response = await fetch(`/api/bottles/${bottleId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    let detail = "";
+    try {
+      const err = await response.json();
+      detail = err.error || JSON.stringify(err);
+    } catch (parseError) {
+      detail = await response.text();
+    }
+    throw new Error(detail || `HTTP ${response.status}`);
+  }
+  return response.json();
+}
+
+async function deleteBottle(bottleId) {
+  const response = await fetch(`/api/bottles/${bottleId}`, { method: "DELETE" });
+  if (!response.ok) {
+    let detail = "";
+    try {
+      const err = await response.json();
+      detail = err.error || JSON.stringify(err);
+    } catch (parseError) {
+      detail = await response.text();
+    }
+    throw new Error(detail || `HTTP ${response.status}`);
+  }
+}
+
 async function fetchCurrentGoal() {
   const response = await fetch("/api/feeding-goals/current");
   if (!response.ok) {
@@ -4745,6 +5040,19 @@ async function saveFeedingGoal(payload) {
   }
 }
 
+async function loadBottles() {
+  try {
+    const bottles = await fetchBottles();
+    bottlesCache = bottles;
+    renderBottleList(bottles);
+    renderBottleOptions();
+    updateBottleResult();
+    setStatus("");
+  } catch (err) {
+    setStatus(`Failed to load bottles: ${err.message || "unknown error"}`);
+  }
+}
+
 async function loadGoalHistory() {
   const shouldShowLoading = pageType === "goals" && !hasLoadedFeedingGoals;
   if (shouldShowLoading) {
@@ -4973,6 +5281,10 @@ function initLinks() {
   if (milkExpressLinkEl) {
     milkExpressLinkEl.classList.remove("disabled");
     milkExpressLinkEl.href = "/milk-express";
+  }
+  if (bottlesLinkEl) {
+    bottlesLinkEl.classList.remove("disabled");
+    bottlesLinkEl.href = "/bottles";
   }
   if (goalsLinkEl) {
     goalsLinkEl.classList.remove("disabled");
