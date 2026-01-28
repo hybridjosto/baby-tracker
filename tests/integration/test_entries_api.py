@@ -113,6 +113,77 @@ def test_list_entries_filters_by_type(client):
     assert {entry["id"] for entry in entries} == {feed["id"]}
 
 
+def test_list_feed_amount_entries_output_filters_and_formats_date(client):
+    client.post(
+        "/api/users/suz/entries",
+        json={
+            "type": "feed",
+            "client_event_id": "evt-feed-output-1",
+            "timestamp_utc": "2024-03-01T05:06:00+00:00",
+            "expressed_ml": 0,
+            "formula_ml": 20,
+        },
+    )
+    client.post(
+        "/api/users/suz/entries",
+        json={
+            "type": "feed",
+            "client_event_id": "evt-feed-output-2",
+            "timestamp_utc": "2024-03-02T05:06:00+00:00",
+            "expressed_ml": 10,
+        },
+    )
+    client.post(
+        "/api/users/suz/entries",
+        json={
+            "type": "wee",
+            "client_event_id": "evt-feed-output-3",
+            "timestamp_utc": "2024-03-03T05:06:00+00:00",
+            "expressed_ml": 5,
+            "formula_ml": 5,
+        },
+    )
+
+    response = client.get("/api/entries/feeds/output")
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["count"] == 1
+    assert payload["entries"] == [
+        {"date": "2024 0301", "expressed_ml": 0.0, "formula_ml": 20.0}
+    ]
+
+
+def test_list_user_feed_amount_entries_output_filters_by_user(client):
+    client.post(
+        "/api/users/suz/entries",
+        json={
+            "type": "feed",
+            "client_event_id": "evt-feed-user-1",
+            "timestamp_utc": "2024-04-01T10:00:00+00:00",
+            "expressed_ml": 30,
+            "formula_ml": 15,
+        },
+    )
+    client.post(
+        "/api/users/rob/entries",
+        json={
+            "type": "feed",
+            "client_event_id": "evt-feed-user-2",
+            "timestamp_utc": "2024-04-02T10:00:00+00:00",
+            "expressed_ml": 40,
+            "formula_ml": 10,
+        },
+    )
+
+    response = client.get("/api/users/suz/entries/feeds/output")
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["count"] == 1
+    assert payload["entries"] == [
+        {"date": "2024 0401", "expressed_ml": 30.0, "formula_ml": 15.0}
+    ]
+
+
 def test_create_entry_duplicate_client_event_returns_409(client):
     response = client.post(
         "/api/users/suz/entries",
