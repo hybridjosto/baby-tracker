@@ -113,6 +113,47 @@ def list_entries(
         )
 
 
+def list_feed_amount_entries(
+    db_path: str,
+    limit: int = 50,
+    user_slug: str | None = None,
+    since_utc: str | None = None,
+    until_utc: str | None = None,
+) -> list[dict]:
+    entries = list_entries(
+        db_path,
+        limit=limit,
+        user_slug=user_slug,
+        since_utc=since_utc,
+        until_utc=until_utc,
+        entry_type="feed",
+    )
+    filtered: list[dict] = []
+    for entry in entries:
+        if entry.get("expressed_ml") is None or entry.get("formula_ml") is None:
+            continue
+        filtered.append(
+            {
+                "date": _format_entry_date(entry.get("timestamp_utc")),
+                "expressed_ml": entry.get("expressed_ml"),
+                "formula_ml": entry.get("formula_ml"),
+            }
+        )
+    return filtered
+
+
+def _format_entry_date(timestamp_utc: str | None) -> str:
+    if not timestamp_utc:
+        return ""
+    cleaned = timestamp_utc.strip()
+    if cleaned.endswith("Z"):
+        cleaned = cleaned[:-1] + "+00:00"
+    parsed = datetime.fromisoformat(cleaned)
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc).strftime("%Y %m%d")
+
+
 def export_entries_csv(db_path: str, user_slug: str | None = None) -> str:
     normalized_slug = normalize_user_slug(user_slug) if user_slug else None
     with get_connection(db_path) as conn:
