@@ -28,6 +28,9 @@ CREATE TABLE IF NOT EXISTS baby_settings (
     overnight_gap_min_hours REAL,
     overnight_gap_max_hours REAL,
     behind_target_mode TEXT,
+    entry_webhook_url TEXT,
+    default_user_slug TEXT,
+    pushcut_feed_due_url TEXT,
     updated_at_utc TEXT NOT NULL DEFAULT (datetime('now'))
 );
 

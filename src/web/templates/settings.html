@@ -194,6 +194,36 @@
             <div class="hint" id="custom-type-empty">No custom types yet.</div>
           </div>
           <div class="field">
+            <label for="entry-webhook-input">Entry webhook URL</label>
+            <input
+              id="entry-webhook-input"
+              type="url"
+              name="entry_webhook_url"
+              placeholder="https://example.com/webhook"
+            >
+            <div class="hint">POSTed when a new entry is created.</div>
+          </div>
+          <div class="field">
+            <label for="default-user-input">Default user slug</label>
+            <input
+              id="default-user-input"
+              type="text"
+              name="default_user_slug"
+              placeholder="default"
+            >
+            <div class="hint">Used when logging via Pushcut without a user.</div>
+          </div>
+          <div class="field">
+            <label for="pushcut-feed-due-input">Pushcut feed-due URL</label>
+            <input
+              id="pushcut-feed-due-input"
+              type="url"
+              name="pushcut_feed_due_url"
+              placeholder="https://api.pushcut.io/..."
+            >
+            <div class="hint">Endpoint to trigger the feed due notification.</div>
+          </div>
+          <div class="field">
             <label>Export events</label>
             <div class="inline-row">
               <button class="add-btn" id="export-csv" type="button">Download CSV</button>

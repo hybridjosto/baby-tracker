@@ -7,6 +7,8 @@ from src.app.routes.entries import entries_api
 from src.app.routes.bottles import bottles_api
 from src.app.routes.goals import goals_api
 from src.app.routes.settings import settings_api
+from src.app.routes.feed import feed_api
+from src.app.routes.pushcut import pushcut_api
 from src.app.storage.db import init_db
 from src.lib.logging import configure_logging
 from src.lib.validation import normalize_user_slug, validate_entry_type
@@ -33,6 +35,8 @@ def create_app() -> Flask:
     app.register_blueprint(bottles_api)
     app.register_blueprint(goals_api)
     app.register_blueprint(settings_api)
+    app.register_blueprint(pushcut_api)
+    app.register_blueprint(feed_api)
 
     def render_log_page(
         user_slug: str,
