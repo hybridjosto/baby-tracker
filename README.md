@@ -52,6 +52,7 @@ sudo systemctl restart baby-tracker.service
 Configure these settings in the UI (Settings page) or via `/api/settings`:
 - `default_user_slug`: used when `user_slug` is not provided to `/api/feed/log`
 - `pushcut_feed_due_url`: Pushcut URL to receive feed-due notifications
+ - `feed_interval_min`: minutes between feeds (drives next-feed calculation)
 
 Endpoints:
 - `POST /api/feed/log` logs a feed with `formula_ml` set to the amount
@@ -64,6 +65,14 @@ Endpoints:
 - `POST /api/push/feed-due` forwards a Pushcut notification payload
   - JSON body: `{"title":"Feed due","body":"Time for a feed."}`
   - If empty, defaults to the payload above.
+
+## Feed-Due Timer
+The server can automatically send a feed-due Pushcut notification when the
+next-feed time is reached. It uses `feed_interval_min`, the latest feed entry,
+and `default_user_slug` (if set).
+
+Controls:
+- `BABY_TRACKER_FEED_DUE_POLL_SECONDS` (default: 60). Set to `0` to disable.
 
 ## Backfill expressed/formula amounts
 If you previously logged expressed/formula amounts in notes, run the one-off script to

@@ -11,6 +11,7 @@ class AppConfig:
     discord_webhook_url: str | None
     tls_cert_path: Path | None
     tls_key_path: Path | None
+    feed_due_poll_seconds: int
 
 
 def load_config() -> AppConfig:
@@ -22,6 +23,11 @@ def load_config() -> AppConfig:
     tls_key_path_raw = os.getenv("BABY_TRACKER_TLS_KEY_PATH")
     tls_cert_path = Path(tls_cert_path_raw) if tls_cert_path_raw else None
     tls_key_path = Path(tls_key_path_raw) if tls_key_path_raw else None
+    poll_raw = os.getenv("BABY_TRACKER_FEED_DUE_POLL_SECONDS", "60")
+    try:
+        feed_due_poll_seconds = int(poll_raw)
+    except ValueError as exc:
+        raise ValueError("BABY_TRACKER_FEED_DUE_POLL_SECONDS must be an integer") from exc
 
     if (tls_cert_path is None) != (tls_key_path is None):
         raise ValueError(
@@ -38,4 +44,5 @@ def load_config() -> AppConfig:
         discord_webhook_url=discord_webhook_url,
         tls_cert_path=tls_cert_path,
         tls_key_path=tls_key_path,
+        feed_due_poll_seconds=feed_due_poll_seconds,
     )
