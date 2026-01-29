@@ -9,6 +9,8 @@ class AppConfig:
     host: str
     port: int
     discord_webhook_url: str | None
+    tls_cert_path: Path | None
+    tls_key_path: Path | None
 
 
 def load_config() -> AppConfig:
@@ -16,9 +18,24 @@ def load_config() -> AppConfig:
     host = os.getenv("BABY_TRACKER_HOST", "0.0.0.0")
     port = int(os.getenv("BABY_TRACKER_PORT", "8000"))
     discord_webhook_url = os.getenv("BABY_TRACKER_DISCORD_WEBHOOK_URL")
+    tls_cert_path_raw = os.getenv("BABY_TRACKER_TLS_CERT_PATH")
+    tls_key_path_raw = os.getenv("BABY_TRACKER_TLS_KEY_PATH")
+    tls_cert_path = Path(tls_cert_path_raw) if tls_cert_path_raw else None
+    tls_key_path = Path(tls_key_path_raw) if tls_key_path_raw else None
+
+    if (tls_cert_path is None) != (tls_key_path is None):
+        raise ValueError(
+            "Both BABY_TRACKER_TLS_CERT_PATH and BABY_TRACKER_TLS_KEY_PATH must be set"
+        )
+    if tls_cert_path and not tls_cert_path.exists():
+        raise FileNotFoundError(f"TLS cert not found: {tls_cert_path}")
+    if tls_key_path and not tls_key_path.exists():
+        raise FileNotFoundError(f"TLS key not found: {tls_key_path}")
     return AppConfig(
         db_path=db_path,
         host=host,
         port=port,
         discord_webhook_url=discord_webhook_url,
+        tls_cert_path=tls_cert_path,
+        tls_key_path=tls_key_path,
     )

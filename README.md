@@ -15,6 +15,24 @@ pytest
 ruff check .
 ```
 
+## HTTPS with Tailscale
+
+If you want HTTPS on your Tailscale domain, generate a cert on the host:
+
+```sh
+sudo tailscale cert rpi.tail458584.ts.net
+```
+
+That command writes `.crt` and `.key` files. Start the app with the TLS paths:
+
+```sh
+BABY_TRACKER_TLS_CERT_PATH=/home/josh/baby-tracker/rpi.tail458584.ts.net.crt \
+BABY_TRACKER_TLS_KEY_PATH=/home/josh/baby-tracker/rpi.tail458584.ts.net.key \
+uv run python -m src.app.main
+```
+
+If you run via systemd, add the same env vars to the service and restart.
+
 ## Offline Mode
 - The PWA caches the app shell for offline access.
 - Entries are stored locally for the last 30 days and sync automatically when online.
