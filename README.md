@@ -31,7 +31,16 @@ BABY_TRACKER_TLS_KEY_PATH=/home/josh/baby-tracker/rpi.tail458584.ts.net.key \
 uv run python -m src.app.main
 ```
 
-If you run via systemd, add the same env vars to the service and restart.
+If you run via systemd, add the same env vars to the service and restart. A ready-to-use
+drop-in lives at `docs/systemd/baby-tracker.service.d/10-tls.conf`. Copy it to:
+
+```sh
+sudo mkdir -p /etc/systemd/system/baby-tracker.service.d
+sudo cp /home/josh/baby-tracker/docs/systemd/baby-tracker.service.d/10-tls.conf \\
+  /etc/systemd/system/baby-tracker.service.d/10-tls.conf
+sudo systemctl daemon-reload
+sudo systemctl restart baby-tracker.service
+```
 
 ## Offline Mode
 - The PWA caches the app shell for offline access.
