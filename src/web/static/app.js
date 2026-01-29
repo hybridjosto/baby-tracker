@@ -168,6 +168,9 @@ const dobInputEl = document.getElementById("dob-input");
 const ageOutputEl = document.getElementById("age-output");
 const intervalInputEl = document.getElementById("interval-input");
 const customTypeInputEl = document.getElementById("custom-type-input");
+const entryWebhookInputEl = document.getElementById("entry-webhook-input");
+const defaultUserInputEl = document.getElementById("default-user-input");
+const pushcutFeedDueInputEl = document.getElementById("pushcut-feed-due-input");
 const customTypeAddBtn = document.getElementById("custom-type-add");
 const customTypeListEl = document.getElementById("custom-type-list");
 const customTypeHintEl = document.getElementById("custom-type-hint");
@@ -989,6 +992,24 @@ function initSettingsHandlers() {
         event.preventDefault();
         handleAdd();
       }
+    });
+  }
+  if (entryWebhookInputEl) {
+    entryWebhookInputEl.addEventListener("change", () => {
+      const value = entryWebhookInputEl.value;
+      void saveBabySettings({ entry_webhook_url: value || null });
+    });
+  }
+  if (defaultUserInputEl) {
+    defaultUserInputEl.addEventListener("change", () => {
+      const value = defaultUserInputEl.value;
+      void saveBabySettings({ default_user_slug: value || null });
+    });
+  }
+  if (pushcutFeedDueInputEl) {
+    pushcutFeedDueInputEl.addEventListener("change", () => {
+      const value = pushcutFeedDueInputEl.value;
+      void saveBabySettings({ pushcut_feed_due_url: value || null });
     });
   }
   if (settingsFormEl) {
@@ -5318,6 +5339,15 @@ async function loadBabySettings() {
         ? String(feedIntervalMinutes / 60)
         : "";
     }
+    if (entryWebhookInputEl) {
+      entryWebhookInputEl.value = data.entry_webhook_url || "";
+    }
+    if (defaultUserInputEl) {
+      defaultUserInputEl.value = data.default_user_slug || "";
+    }
+    if (pushcutFeedDueInputEl) {
+      pushcutFeedDueInputEl.value = data.pushcut_feed_due_url || "";
+    }
     applyCustomEventTypes();
     updateAgeDisplay();
     updateNextFeed();
@@ -5344,6 +5374,15 @@ async function saveBabySettings(patch) {
     customEventTypes = Array.isArray(data.custom_event_types)
       ? data.custom_event_types
       : [];
+    if (entryWebhookInputEl) {
+      entryWebhookInputEl.value = data.entry_webhook_url || "";
+    }
+    if (defaultUserInputEl) {
+      defaultUserInputEl.value = data.default_user_slug || "";
+    }
+    if (pushcutFeedDueInputEl) {
+      pushcutFeedDueInputEl.value = data.pushcut_feed_due_url || "";
+    }
     applyCustomEventTypes();
     updateAgeDisplay();
     updateNextFeed();

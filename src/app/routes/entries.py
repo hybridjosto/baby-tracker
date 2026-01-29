@@ -6,12 +6,15 @@ from src.app.services.entries import (
     create_entry,
     delete_entry,
     export_entries_csv,
+    build_entry_summary_text,
+    get_entry_summary,
     import_entries_csv,
     list_feed_amount_entries,
     list_entries,
     sync_entries,
     update_entry,
 )
+from src.app.services.webhooks import send_entry_webhook
 from src.lib.validation import normalize_user_slug
 
 entries_api = Blueprint("entries_api", __name__, url_prefix="/api")
@@ -76,11 +79,21 @@ def list_feed_amount_entries_output_route():
         return jsonify({"error": str(exc)}), 400
 
 
+@entries_api.get("/entries/summary")
+def get_entries_summary_route():
+    try:
+        summary = get_entry_summary(_db_path())
+        return jsonify({"items": summary, "summary": build_entry_summary_text(summary)})
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+
 @entries_api.post("/entries")
 def create_entry_route():
     payload = request.get_json(silent=True) or {}
     try:
         entry = create_entry(_db_path(), payload)
+        send_entry_webhook(_db_path(), entry)
         return jsonify(entry), 201
     except DuplicateEntryError as exc:
         return jsonify({"error": "duplicate", "entry": exc.entry}), 409
@@ -151,6 +164,7 @@ def create_user_entry_route(user_slug: str):
     payload["user_slug"] = user_slug
     try:
         entry = create_entry(_db_path(), payload)
+        send_entry_webhook(_db_path(), entry)
         return jsonify(entry), 201
     except DuplicateEntryError as exc:
         return jsonify({"error": "duplicate", "entry": exc.entry}), 409

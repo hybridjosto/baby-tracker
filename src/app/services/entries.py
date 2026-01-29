@@ -15,6 +15,7 @@ from src.app.storage.entries import (
     update_entry as repo_update_entry,
     upsert_entry_by_client_event_id as repo_upsert_entry_by_client_event_id,
 )
+from src.app.services.settings import get_settings
 from src.lib.validation import (
     normalize_user_slug,
     validate_entry_payload,
@@ -111,6 +112,84 @@ def list_entries(
             entry_type=normalized_type,
             include_deleted=False,
         )
+
+
+def get_latest_entry_by_type(
+    db_path: str, entry_type: str, user_slug: str | None = None
+) -> dict | None:
+    validate_entry_type(entry_type)
+    entries = list_entries(
+        db_path,
+        limit=1,
+        user_slug=user_slug,
+        entry_type=entry_type,
+    )
+    return entries[0] if entries else None
+
+
+def get_next_feed_time(db_path: str, user_slug: str | None = None) -> dict:
+    settings = get_settings(db_path)
+    feed_interval_min = settings.get("feed_interval_min")
+    latest_feed = get_latest_entry_by_type(db_path, "feed", user_slug=user_slug)
+    if not latest_feed or not isinstance(feed_interval_min, int):
+        return {"timestamp_utc": None, "source_entry_id": None}
+    last_timestamp = latest_feed.get("timestamp_utc")
+    if not isinstance(last_timestamp, str) or not last_timestamp.strip():
+        return {"timestamp_utc": None, "source_entry_id": None}
+    cleaned = last_timestamp.strip()
+    if cleaned.endswith("Z"):
+        cleaned = cleaned[:-1] + "+00:00"
+    parsed = datetime.fromisoformat(cleaned)
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    next_dt = parsed.astimezone(timezone.utc) + timedelta(minutes=feed_interval_min)
+    return {"timestamp_utc": next_dt.isoformat(), "source_entry_id": latest_feed["id"]}
+
+
+def get_entry_summary(db_path: str, user_slug: str | None = None) -> list[dict]:
+    last_feed = get_latest_entry_by_type(db_path, "feed", user_slug=user_slug)
+    last_wee = get_latest_entry_by_type(db_path, "wee", user_slug=user_slug)
+    last_poo = get_latest_entry_by_type(db_path, "poo", user_slug=user_slug)
+    next_feed = get_next_feed_time(db_path, user_slug=user_slug)
+    items = [
+        {"title": "Last feed", "date_time": _format_summary_dt(last_feed)},
+        {"title": "Last wee", "date_time": _format_summary_dt(last_wee)},
+        {"title": "Last poo", "date_time": _format_summary_dt(last_poo)},
+        {
+            "title": "Next feed",
+            "date_time": _format_timestamp_value(next_feed.get("timestamp_utc")),
+        },
+    ]
+    return items
+
+
+def build_entry_summary_text(items: list[dict]) -> str:
+    parts: list[str] = []
+    for item in items:
+        title = item.get("title") or ""
+        date_time = item.get("date_time") or "--"
+        parts.append(f"{title}: {date_time}")
+    return " · ".join(parts)
+
+
+def _format_summary_dt(entry: dict | None) -> str | None:
+    if not entry:
+        return None
+    return _format_timestamp_value(entry.get("timestamp_utc"))
+
+
+def _format_timestamp_value(value: str | None) -> str | None:
+    if not value:
+        return None
+    cleaned = value.strip()
+    if not cleaned:
+        return None
+    if cleaned.endswith("Z"):
+        cleaned = cleaned[:-1] + "+00:00"
+    parsed = datetime.fromisoformat(cleaned)
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M")
 
 
 def list_feed_amount_entries(

@@ -21,6 +21,23 @@ ruff check .
 - Conflict resolution uses last-write-wins (latest sync wins).
 - If something looks stuck, clear site data in your browser to reset the cache.
 
+## Pushcut Feed Logging
+Configure these settings in the UI (Settings page) or via `/api/settings`:
+- `default_user_slug`: used when `user_slug` is not provided to `/api/feed/log`
+- `pushcut_feed_due_url`: Pushcut URL to receive feed-due notifications
+
+Endpoints:
+- `POST /api/feed/log` logs a feed with `formula_ml` set to the amount
+  - Query params: `amount` (required), `user_slug` (optional)
+  - JSON body (optional): `{"amount": 90, "user_slug": "suz"}`
+  - Examples:
+    - `https://<host>:<port>/api/feed/log?amount=70`
+    - `https://<host>:<port>/api/feed/log?amount=90`
+    - `https://<host>:<port>/api/feed/log?amount=110`
+- `POST /api/push/feed-due` forwards a Pushcut notification payload
+  - JSON body: `{"title":"Feed due","body":"Time for a feed."}`
+  - If empty, defaults to the payload above.
+
 ## Backfill expressed/formula amounts
 If you previously logged expressed/formula amounts in notes, run the one-off script to
 populate `expressed_ml`/`formula_ml` columns (notes are left unchanged).

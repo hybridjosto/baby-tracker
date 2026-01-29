@@ -1,5 +1,6 @@
 import csv
 import io
+import json
 
 
 def test_create_user_entry_allows_wee(client):
@@ -40,6 +41,60 @@ def test_create_milk_express_entry_accepts_metrics(client):
     assert payload["expressed_ml"] == 120.5
     assert payload["feed_duration_min"] == 15
     assert payload["notes"] == "first pump"
+
+
+def test_create_entry_sends_webhook_payload(client, monkeypatch):
+    captured: dict = {}
+
+    class DummyResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc_value, traceback):
+            return False
+
+    def fake_urlopen(req, timeout=0):
+        captured["url"] = req.full_url
+        captured["data"] = req.data
+        return DummyResponse()
+
+    from src.app.services import webhooks as webhooks_module
+
+    monkeypatch.setattr(webhooks_module.request, "urlopen", fake_urlopen)
+
+    settings_response = client.patch(
+        "/api/settings",
+        json={"entry_webhook_url": "https://example.com/entry-hook"},
+    )
+    assert settings_response.status_code == 200
+
+    response = client.post(
+        "/api/users/suz/entries",
+        json={"type": "feed", "client_event_id": "evt-hook-1"},
+    )
+    assert response.status_code == 201
+    entry = response.get_json()
+    assert captured["url"] == "https://example.com/entry-hook"
+    assert json.loads(captured["data"].decode("utf-8")) == entry
+
+
+def test_create_entry_skips_webhook_without_url(client, monkeypatch):
+    called = {"count": 0}
+
+    def fake_urlopen(req, timeout=0):
+        called["count"] += 1
+        raise AssertionError("urlopen should not be called without webhook URL")
+
+    from src.app.services import webhooks as webhooks_module
+
+    monkeypatch.setattr(webhooks_module.request, "urlopen", fake_urlopen)
+
+    response = client.post(
+        "/api/users/suz/entries",
+        json={"type": "feed", "client_event_id": "evt-hook-2"},
+    )
+    assert response.status_code == 201
+    assert called["count"] == 0
 
 
 def test_list_entries_returns_all_users(client):
@@ -151,6 +206,73 @@ def test_list_feed_amount_entries_output_filters_and_formats_date(client):
     assert payload["entries"] == [
         {"date": "2024 0301", "expressed_ml": 0.0, "formula_ml": 20.0}
     ]
+
+
+def test_entries_summary_returns_null_when_missing(client):
+    response = client.get("/api/entries/summary")
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload == {
+        "items": [
+            {"title": "Last feed", "date_time": None},
+            {"title": "Last wee", "date_time": None},
+            {"title": "Last poo", "date_time": None},
+            {"title": "Next feed", "date_time": None},
+        ],
+        "summary": "Last feed: -- · Last wee: -- · Last poo: -- · Next feed: --",
+    }
+
+
+def test_entries_summary_returns_latest_entries(client):
+    client.patch("/api/settings", json={"feed_interval_min": 180})
+    client.post(
+        "/api/users/suz/entries",
+        json={
+            "type": "feed",
+            "client_event_id": "evt-last-feed-1",
+            "timestamp_utc": "2024-01-01T00:00:00+00:00",
+        },
+    )
+    client.post(
+        "/api/users/suz/entries",
+        json={
+            "type": "feed",
+            "client_event_id": "evt-last-feed-2",
+            "timestamp_utc": "2024-01-02T00:00:00+00:00",
+        },
+    )
+    client.post(
+        "/api/users/suz/entries",
+        json={
+            "type": "wee",
+            "client_event_id": "evt-last-wee-1",
+            "timestamp_utc": "2024-01-03T00:00:00+00:00",
+        },
+    )
+    client.post(
+        "/api/users/suz/entries",
+        json={
+            "type": "poo",
+            "client_event_id": "evt-last-poo-1",
+            "timestamp_utc": "2024-01-04T00:00:00+00:00",
+        },
+    )
+
+    response = client.get("/api/entries/summary")
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload == {
+        "items": [
+            {"title": "Last feed", "date_time": "2024-01-02 00:00"},
+            {"title": "Last wee", "date_time": "2024-01-03 00:00"},
+            {"title": "Last poo", "date_time": "2024-01-04 00:00"},
+            {"title": "Next feed", "date_time": "2024-01-02 03:00"},
+        ],
+        "summary": (
+            "Last feed: 2024-01-02 00:00 · Last wee: 2024-01-03 00:00 · "
+            "Last poo: 2024-01-04 00:00 · Next feed: 2024-01-02 03:00"
+        ),
+    }
 
 
 def test_list_user_feed_amount_entries_output_filters_by_user(client):
