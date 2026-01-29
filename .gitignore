@@ -176,3 +176,5 @@ __marimo__/
 data/
 baby-tracker/
 .worktrees/
+rpi.tail*.ts.net.crt
+rpi.tail*.ts.net.key
