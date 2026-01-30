@@ -10,6 +10,7 @@ from src.app.routes.goals import goals_api
 from src.app.routes.settings import settings_api
 from src.app.routes.feed import feed_api
 from src.app.routes.pushcut import pushcut_api
+from src.app.routes.home_kpis import home_kpis_api
 from src.app.storage.db import init_db
 from src.app.services.feed_due import start_feed_due_scheduler
 from src.lib.logging import configure_logging
@@ -39,6 +40,7 @@ def create_app() -> Flask:
     app.register_blueprint(settings_api)
     app.register_blueprint(pushcut_api)
     app.register_blueprint(feed_api)
+    app.register_blueprint(home_kpis_api)
     if not os.getenv("PYTEST_CURRENT_TEST"):
         start_feed_due_scheduler(app, config.feed_due_poll_seconds)
 
