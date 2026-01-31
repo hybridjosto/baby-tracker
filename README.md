@@ -74,6 +74,14 @@ and `default_user_slug` (if set).
 Controls:
 - `BABY_TRACKER_FEED_DUE_POLL_SECONDS` (default: 60). Set to `0` to disable.
 
+Manual smoke test:
+Use this to send a one-off Pushcut notification via pytest. It creates a due
+feed entry and calls the feed-due dispatcher.
+```sh
+RUN_PUSHCUT_SMOKE=1 PUSHCUT_URL="https://api.pushcut.io/..." \
+uv run pytest tests/manual/test_feed_due_timer_smoke.py
+```
+
 ## Backfill expressed/formula amounts
 If you previously logged expressed/formula amounts in notes, run the one-off script to
 populate `expressed_ml`/`formula_ml` columns (notes are left unchanged).
