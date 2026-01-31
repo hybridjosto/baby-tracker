@@ -66,17 +66,15 @@ def _compute_feed_total(entries: list[dict]) -> float:
     for entry in entries:
         if entry.get("notes") == BREASTFEED_IN_PROGRESS_NOTE:
             continue
-        expressed = entry.get("expressed_ml")
-        formula = entry.get("formula_ml")
         amount = entry.get("amount_ml")
+        if isinstance(amount, (int, float)) and math.isfinite(amount):
+            total += float(amount)
+        expressed = entry.get("expressed_ml")
         if isinstance(expressed, (int, float)) and math.isfinite(expressed):
             total += float(expressed)
+        formula = entry.get("formula_ml")
         if isinstance(formula, (int, float)) and math.isfinite(formula):
             total += float(formula)
-        if (expressed is None and formula is None) and isinstance(
-            amount, (int, float)
-        ) and math.isfinite(amount):
-            total += float(amount)
     return total
 
 
