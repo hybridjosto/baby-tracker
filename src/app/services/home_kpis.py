@@ -1,13 +1,21 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+import json
+import logging
 import math
+import threading
+import time
+from urllib import request as urllib_request
+
+from flask import Flask
 
 from src.app.services.entries import get_next_feed_time, list_entries
 from src.app.services.feeding_goals import get_current_goal
 from src.app.services.settings import get_settings
 
 BREASTFEED_IN_PROGRESS_NOTE = "Breastfeeding (started)"
+logger = logging.getLogger(__name__)
 
 
 def _now_utc() -> datetime:
@@ -97,3 +105,57 @@ def build_home_kpis(db_path: str, user_slug: str | None = None) -> dict:
             "input2": f"Goal (24h): {goal_text}",
         },
     }
+
+
+def _send_home_kpis(webhook_url: str, payload: dict) -> bool:
+    data = json.dumps(payload).encode("utf-8")
+    req = urllib_request.Request(
+        webhook_url,
+        data=data,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib_request.urlopen(req, timeout=5):
+            return True
+    except Exception:
+        logger.exception("Home KPIs webhook delivery failed")
+        return False
+
+
+def dispatch_home_kpis(
+    db_path: str,
+    user_slug: str | None = None,
+    send_fn=None,
+) -> dict:
+    settings = get_settings(db_path)
+    webhook_url = settings.get("home_kpis_webhook_url")
+    if not webhook_url:
+        return {"sent": False, "reason": "missing_webhook_url"}
+    payload = build_home_kpis(db_path, user_slug=user_slug)
+    sender = send_fn or _send_home_kpis
+    if sender(webhook_url, payload):
+        return {"sent": True, "payload": payload}
+    return {"sent": False, "reason": "push_failed"}
+
+
+def start_home_kpis_scheduler(app: Flask, poll_seconds: int) -> None:
+    if poll_seconds <= 0:
+        return
+
+    def _loop() -> None:
+        while True:
+            try:
+                with app.app_context():
+                    dispatch_home_kpis(app.config["DB_PATH"])
+            except Exception:
+                logger.exception("Home KPIs scheduler failed")
+            time.sleep(poll_seconds)
+
+    thread = threading.Thread(
+        target=_loop,
+        daemon=True,
+        name="home-kpis-scheduler",
+    )
+    thread.start()
+    app.extensions["home_kpis_scheduler"] = thread

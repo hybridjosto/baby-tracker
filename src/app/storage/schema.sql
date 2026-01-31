@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS baby_settings (
     entry_webhook_url TEXT,
     default_user_slug TEXT,
     pushcut_feed_due_url TEXT,
+    home_kpis_webhook_url TEXT,
     feed_due_last_entry_id INTEGER,
     feed_due_last_sent_at_utc TEXT,
     updated_at_utc TEXT NOT NULL DEFAULT (datetime('now'))

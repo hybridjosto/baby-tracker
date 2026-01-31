@@ -110,6 +110,20 @@ def _normalize_entry_webhook_url(value: object) -> str | None:
     return trimmed
 
 
+def _normalize_home_kpis_webhook_url(value: object) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError("home_kpis_webhook_url must be http(s) URL")
+    trimmed = value.strip()
+    if not trimmed:
+        return None
+    parsed = urlparse(trimmed)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise ValueError("home_kpis_webhook_url must be http(s) URL")
+    return trimmed
+
+
 def _normalize_default_user_slug(value: object) -> str | None:
     if value is None:
         return None
@@ -155,6 +169,10 @@ def update_settings(db_path: str, payload: dict) -> dict:
     if "entry_webhook_url" in payload:
         fields["entry_webhook_url"] = _normalize_entry_webhook_url(
             payload["entry_webhook_url"]
+        )
+    if "home_kpis_webhook_url" in payload:
+        fields["home_kpis_webhook_url"] = _normalize_home_kpis_webhook_url(
+            payload["home_kpis_webhook_url"]
         )
     if "default_user_slug" in payload:
         fields["default_user_slug"] = _normalize_default_user_slug(

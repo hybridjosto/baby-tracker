@@ -12,6 +12,7 @@ class AppConfig:
     tls_cert_path: Path | None
     tls_key_path: Path | None
     feed_due_poll_seconds: int
+    home_kpis_poll_seconds: int
 
 
 def load_config() -> AppConfig:
@@ -28,6 +29,13 @@ def load_config() -> AppConfig:
         feed_due_poll_seconds = int(poll_raw)
     except ValueError as exc:
         raise ValueError("BABY_TRACKER_FEED_DUE_POLL_SECONDS must be an integer") from exc
+    kpis_raw = os.getenv("BABY_TRACKER_HOME_KPIS_POLL_SECONDS", "900")
+    try:
+        home_kpis_poll_seconds = int(kpis_raw)
+    except ValueError as exc:
+        raise ValueError(
+            "BABY_TRACKER_HOME_KPIS_POLL_SECONDS must be an integer"
+        ) from exc
 
     if (tls_cert_path is None) != (tls_key_path is None):
         raise ValueError(
@@ -45,4 +53,5 @@ def load_config() -> AppConfig:
         tls_cert_path=tls_cert_path,
         tls_key_path=tls_key_path,
         feed_due_poll_seconds=feed_due_poll_seconds,
+        home_kpis_poll_seconds=home_kpis_poll_seconds,
     )

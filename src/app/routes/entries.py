@@ -15,6 +15,7 @@ from src.app.services.entries import (
     update_entry,
 )
 from src.app.services.webhooks import send_entry_webhook
+from src.app.services.home_kpis import dispatch_home_kpis
 from src.lib.validation import normalize_user_slug
 
 entries_api = Blueprint("entries_api", __name__, url_prefix="/api")
@@ -94,6 +95,7 @@ def create_entry_route():
     try:
         entry = create_entry(_db_path(), payload)
         send_entry_webhook(_db_path(), entry)
+        dispatch_home_kpis(_db_path(), user_slug=entry.get("user_slug"))
         return jsonify(entry), 201
     except DuplicateEntryError as exc:
         return jsonify({"error": "duplicate", "entry": exc.entry}), 409
@@ -165,6 +167,7 @@ def create_user_entry_route(user_slug: str):
     try:
         entry = create_entry(_db_path(), payload)
         send_entry_webhook(_db_path(), entry)
+        dispatch_home_kpis(_db_path(), user_slug=entry.get("user_slug"))
         return jsonify(entry), 201
     except DuplicateEntryError as exc:
         return jsonify({"error": "duplicate", "entry": exc.entry}), 409
