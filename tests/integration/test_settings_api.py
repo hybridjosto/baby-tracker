@@ -13,6 +13,7 @@ def test_get_settings_defaults(client):
     assert payload["entry_webhook_url"] is None
     assert payload["default_user_slug"] is None
     assert payload["pushcut_feed_due_url"] is None
+    assert payload["home_kpis_webhook_url"] is None
 
 
 def test_patch_settings_updates_values(client):
@@ -23,6 +24,7 @@ def test_patch_settings_updates_values(client):
             "feed_interval_min": 180,
             "custom_event_types": ["room/body temp", "Outdoor Temp"],
             "entry_webhook_url": "https://example.com/entries",
+            "home_kpis_webhook_url": "https://example.com/kpis",
             "default_user_slug": "suz",
             "pushcut_feed_due_url": "https://pushcut.example.com/feed",
         },
@@ -33,6 +35,7 @@ def test_patch_settings_updates_values(client):
     assert payload["feed_interval_min"] == 180
     assert payload["custom_event_types"] == ["room/body temp", "Outdoor Temp"]
     assert payload["entry_webhook_url"] == "https://example.com/entries"
+    assert payload["home_kpis_webhook_url"] == "https://example.com/kpis"
     assert payload["default_user_slug"] == "suz"
     assert payload["pushcut_feed_due_url"] == "https://pushcut.example.com/feed"
 
@@ -42,6 +45,7 @@ def test_patch_settings_updates_values(client):
     assert payload["feed_interval_min"] == 180
     assert payload["custom_event_types"] == ["room/body temp", "Outdoor Temp"]
     assert payload["entry_webhook_url"] == "https://example.com/entries"
+    assert payload["home_kpis_webhook_url"] == "https://example.com/kpis"
     assert payload["default_user_slug"] == "suz"
     assert payload["pushcut_feed_due_url"] == "https://pushcut.example.com/feed"
 
@@ -60,6 +64,11 @@ def test_patch_settings_rejects_invalid_values(client):
 
     response = client.patch(
         "/api/settings", json={"entry_webhook_url": "ftp://example.com"}
+    )
+    assert response.status_code == 400
+
+    response = client.patch(
+        "/api/settings", json={"home_kpis_webhook_url": "ftp://example.com"}
     )
     assert response.status_code == 400
 

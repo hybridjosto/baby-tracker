@@ -37,7 +37,8 @@ def get_settings(conn: sqlite3.Connection) -> dict:
                feed_goal_min, feed_goal_max,
                overnight_gap_min_hours, overnight_gap_max_hours,
                behind_target_mode, entry_webhook_url,
-               default_user_slug, pushcut_feed_due_url
+               default_user_slug, pushcut_feed_due_url,
+               home_kpis_webhook_url
         FROM baby_settings
         WHERE id = 1
         """
@@ -55,6 +56,7 @@ def get_settings(conn: sqlite3.Connection) -> dict:
             "entry_webhook_url": None,
             "default_user_slug": None,
             "pushcut_feed_due_url": None,
+            "home_kpis_webhook_url": None,
         }
     data = dict(row)
     data["custom_event_types"] = _parse_custom_event_types(data.get("custom_event_types"))
@@ -77,6 +79,7 @@ def update_settings(conn: sqlite3.Connection, fields: dict) -> dict:
         "entry_webhook_url",
         "default_user_slug",
         "pushcut_feed_due_url",
+        "home_kpis_webhook_url",
         "updated_at_utc",
     ):
         if key in fields:

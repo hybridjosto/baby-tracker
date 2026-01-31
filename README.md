@@ -82,6 +82,13 @@ RUN_PUSHCUT_SMOKE=1 PUSHCUT_URL="https://api.pushcut.io/..." \
 uv run pytest tests/manual/test_feed_due_timer_smoke.py
 ```
 
+## Home KPIs Webhook
+Configure `home_kpis_webhook_url` in Settings to POST a KPI payload whenever
+a new entry is created and on a schedule.
+
+Controls:
+- `BABY_TRACKER_HOME_KPIS_POLL_SECONDS` (default: 900). Set to `0` to disable.
+
 ## Backfill expressed/formula amounts
 If you previously logged expressed/formula amounts in notes, run the one-off script to
 populate `expressed_ml`/`formula_ml` columns (notes are left unchanged).

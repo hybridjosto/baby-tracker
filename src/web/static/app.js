@@ -169,6 +169,7 @@ const ageOutputEl = document.getElementById("age-output");
 const intervalInputEl = document.getElementById("interval-input");
 const customTypeInputEl = document.getElementById("custom-type-input");
 const entryWebhookInputEl = document.getElementById("entry-webhook-input");
+const homeKpisWebhookInputEl = document.getElementById("home-kpis-webhook-input");
 const defaultUserInputEl = document.getElementById("default-user-input");
 const pushcutFeedDueInputEl = document.getElementById("pushcut-feed-due-input");
 const customTypeAddBtn = document.getElementById("custom-type-add");
@@ -998,6 +999,12 @@ function initSettingsHandlers() {
     entryWebhookInputEl.addEventListener("change", () => {
       const value = entryWebhookInputEl.value;
       void saveBabySettings({ entry_webhook_url: value || null });
+    });
+  }
+  if (homeKpisWebhookInputEl) {
+    homeKpisWebhookInputEl.addEventListener("change", () => {
+      const value = homeKpisWebhookInputEl.value;
+      void saveBabySettings({ home_kpis_webhook_url: value || null });
     });
   }
   if (defaultUserInputEl) {
@@ -5342,6 +5349,9 @@ async function loadBabySettings() {
     if (entryWebhookInputEl) {
       entryWebhookInputEl.value = data.entry_webhook_url || "";
     }
+    if (homeKpisWebhookInputEl) {
+      homeKpisWebhookInputEl.value = data.home_kpis_webhook_url || "";
+    }
     if (defaultUserInputEl) {
       defaultUserInputEl.value = data.default_user_slug || "";
     }
@@ -5376,6 +5386,9 @@ async function saveBabySettings(patch) {
       : [];
     if (entryWebhookInputEl) {
       entryWebhookInputEl.value = data.entry_webhook_url || "";
+    }
+    if (homeKpisWebhookInputEl) {
+      homeKpisWebhookInputEl.value = data.home_kpis_webhook_url || "";
     }
     if (defaultUserInputEl) {
       defaultUserInputEl.value = data.default_user_slug || "";
