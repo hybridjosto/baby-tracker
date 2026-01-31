@@ -74,6 +74,13 @@ and `default_user_slug` (if set).
 Controls:
 - `BABY_TRACKER_FEED_DUE_POLL_SECONDS` (default: 60). Set to `0` to disable.
 
+## Home KPIs Webhook
+Configure `home_kpis_webhook_url` in Settings to POST a KPI payload whenever
+a new entry is created and on a schedule.
+
+Controls:
+- `BABY_TRACKER_HOME_KPIS_POLL_SECONDS` (default: 900). Set to `0` to disable.
+
 ## Backfill expressed/formula amounts
 If you previously logged expressed/formula amounts in notes, run the one-off script to
 populate `expressed_ml`/`formula_ml` columns (notes are left unchanged).
