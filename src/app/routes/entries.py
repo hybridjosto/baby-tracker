@@ -95,7 +95,7 @@ def create_entry_route():
     try:
         entry = create_entry(_db_path(), payload)
         send_entry_webhook(_db_path(), entry)
-        dispatch_home_kpis(_db_path(), user_slug=entry.get("user_slug"))
+        dispatch_home_kpis(_db_path())
         return jsonify(entry), 201
     except DuplicateEntryError as exc:
         return jsonify({"error": "duplicate", "entry": exc.entry}), 409
@@ -167,7 +167,7 @@ def create_user_entry_route(user_slug: str):
     try:
         entry = create_entry(_db_path(), payload)
         send_entry_webhook(_db_path(), entry)
-        dispatch_home_kpis(_db_path(), user_slug=entry.get("user_slug"))
+        dispatch_home_kpis(_db_path())
         return jsonify(entry), 201
     except DuplicateEntryError as exc:
         return jsonify({"error": "duplicate", "entry": exc.entry}), 409

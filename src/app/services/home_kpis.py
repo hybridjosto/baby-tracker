@@ -79,22 +79,19 @@ def _compute_feed_total(entries: list[dict]) -> float:
 
 
 def build_home_kpis(db_path: str, user_slug: str | None = None) -> dict:
-    settings = get_settings(db_path)
-    resolved_user = user_slug or settings.get("default_user_slug")
-
     now = _now_utc()
     window_start = now - timedelta(hours=24)
     feeds = list_entries(
         db_path,
         limit=200,
-        user_slug=resolved_user,
+        user_slug=user_slug,
         since_utc=window_start.isoformat(),
         until_utc=now.isoformat(),
         entry_type="feed",
     )
     feed_total_ml = _compute_feed_total(feeds)
 
-    next_feed = get_next_feed_time(db_path, user_slug=resolved_user)
+    next_feed = get_next_feed_time(db_path, user_slug=user_slug)
     next_timestamp = _parse_utc(next_feed.get("timestamp_utc"))
     next_feed_text = _format_time_until(next_timestamp, now)
 
