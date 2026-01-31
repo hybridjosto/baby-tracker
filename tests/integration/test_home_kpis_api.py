@@ -11,6 +11,7 @@ def test_home_kpis_defaults_when_empty(client):
             "input0": "Next feed due: --",
             "input1": "Feed total (24h): 0 ml",
             "input2": "Goal (24h): --",
+            "input3": "Goal % (24h): --",
         },
     }
 
@@ -90,7 +91,8 @@ def test_home_kpis_returns_feed_total_goal_and_due(client, monkeypatch):
         "content": "Homepage KPIs",
         "inputs": {
             "input0": "Next feed due: due now",
-            "input1": "Feed total (24h): 210 ml",
-            "input2": "Goal (24h): 720 ml",
+            "input1": "Feed total (24h): 90 ml",
+            "input2": "Goal (24h): 90 ml / 720 ml",
+            "input3": "Goal % (24h): 12%",
         },
     }

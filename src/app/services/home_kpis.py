@@ -66,10 +66,17 @@ def _compute_feed_total(entries: list[dict]) -> float:
     for entry in entries:
         if entry.get("notes") == BREASTFEED_IN_PROGRESS_NOTE:
             continue
-        for key in ("amount_ml", "expressed_ml", "formula_ml"):
-            value = entry.get(key)
-            if isinstance(value, (int, float)) and math.isfinite(value):
-                total += float(value)
+        expressed = entry.get("expressed_ml")
+        formula = entry.get("formula_ml")
+        amount = entry.get("amount_ml")
+        if isinstance(expressed, (int, float)) and math.isfinite(expressed):
+            total += float(expressed)
+        if isinstance(formula, (int, float)) and math.isfinite(formula):
+            total += float(formula)
+        if (expressed is None and formula is None) and isinstance(
+            amount, (int, float)
+        ) and math.isfinite(amount):
+            total += float(amount)
     return total
 
 
@@ -95,14 +102,26 @@ def build_home_kpis(db_path: str, user_slug: str | None = None) -> dict:
 
     current_goal = get_current_goal(db_path)
     goal_ml = current_goal.get("goal_ml") if current_goal else None
-    goal_text = "--" if goal_ml is None else _format_ml(float(goal_ml))
+    if goal_ml is None:
+        goal_value = None
+    else:
+        goal_value = float(goal_ml)
+    goal_text = "--" if goal_value is None else _format_ml(goal_value)
+    if goal_value and goal_value > 0:
+        percent = round((feed_total_ml / goal_value) * 100)
+        percent_text = f"{percent}%"
+        goal_detail = f"{_format_ml(feed_total_ml)} / {goal_text}"
+    else:
+        percent_text = "--"
+        goal_detail = "--"
 
     return {
         "content": "Homepage KPIs",
         "inputs": {
             "input0": f"Next feed due: {next_feed_text}",
             "input1": f"Feed total (24h): {_format_ml(feed_total_ml)}",
-            "input2": f"Goal (24h): {goal_text}",
+            "input2": f"Goal (24h): {goal_detail}",
+            "input3": f"Goal % (24h): {percent_text}",
         },
     }
 

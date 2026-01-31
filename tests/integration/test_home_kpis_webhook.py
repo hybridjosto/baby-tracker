@@ -59,5 +59,6 @@ def test_entry_creation_sends_home_kpis_webhook(client, monkeypatch):
             "input0": "Next feed due: in 30m",
             "input1": "Feed total (24h): 100 ml",
             "input2": "Goal (24h): --",
+            "input3": "Goal % (24h): --",
         },
     }
