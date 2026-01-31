@@ -356,9 +356,11 @@ def create_app() -> Flask:
     return app
 
 
+application = create_app()
+
+
 if __name__ == "__main__":
     cfg = load_config()
-    application = create_app()
     ssl_context = None
     if cfg.tls_cert_path and cfg.tls_key_path:
         ssl_context = (str(cfg.tls_cert_path), str(cfg.tls_key_path))

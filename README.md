@@ -26,13 +26,14 @@ sudo tailscale cert rpi.tail458584.ts.net
 That command writes `.crt` and `.key` files. Start the app with the TLS paths:
 
 ```sh
-BABY_TRACKER_TLS_CERT_PATH=/home/josh/baby-tracker/rpi.tail458584.ts.net.crt \
-BABY_TRACKER_TLS_KEY_PATH=/home/josh/baby-tracker/rpi.tail458584.ts.net.key \
-uv run python -m src.app.main
+uv run gunicorn "src.app.main:application" --bind 0.0.0.0:8000 --workers 1 --threads 1
 ```
 
-If you run via systemd, add the same env vars to the service and restart. A ready-to-use
-drop-in lives at `docs/systemd/baby-tracker.service.d/10-tls.conf`. Copy it to:
+Terminate TLS with Tailscale serve and forward HTTPS to the Gunicorn HTTP listener
+(`http://127.0.0.1:8000`, or whatever you set for `BABY_TRACKER_PORT`).
+
+If you run via systemd, update the service and restart. A ready-to-use
+drop-in for TLS env vars lives at `docs/systemd/baby-tracker.service.d/10-tls.conf`. Copy it to:
 
 ```sh
 sudo mkdir -p /etc/systemd/system/baby-tracker.service.d
