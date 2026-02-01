@@ -5,6 +5,8 @@ let userValid = bodyEl.dataset.userValid === "true";
 const pageType = bodyEl.dataset.page || "home";
 const logFilterType = bodyEl.dataset.logType || "";
 const logWindowHours = Number.parseInt(bodyEl.dataset.logWindowHours || "", 10);
+const basePath = bodyEl.dataset.basePath || "";
+const buildUrl = (path) => `${basePath}${path}`;
 
 const THEME_KEY = "baby-tracker-theme";
 const USER_KEY = "baby-tracker-user";
@@ -1544,7 +1546,7 @@ async function handleCsvUpload(event) {
   formData.append("file", file);
   setStatus("Uploading CSV...");
   try {
-    const response = await fetch(`/api/users/${activeUser}/entries/import`, {
+    const response = await fetch(buildUrl(`/api/users/${activeUser}/entries/import`), {
       method: "POST",
       body: formData,
     });
@@ -1572,7 +1574,7 @@ async function handleCsvExport() {
   }
   setStatus("Preparing CSV...");
   try {
-    const response = await fetch(`/api/users/${activeUser}/entries/export`);
+    const response = await fetch(buildUrl(`/api/users/${activeUser}/entries/export`));
     if (!response.ok) {
       let detail = "";
       try {
@@ -1845,7 +1847,7 @@ async function syncNow() {
       setStatus("Syncing...");
     }
 
-    const response = await fetch("/api/sync/entries", {
+    const response = await fetch(buildUrl("/api/sync/entries"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ device_id: deviceId, cursor, changes }),
@@ -3364,7 +3366,7 @@ function buildQuery(params) {
 
 async function fetchEntries(params) {
   const response = await fetch(
-    `/api/entries${buildQuery(params)}`,
+    buildUrl(`/api/entries${buildQuery(params)}`),
   );
   if (!response.ok) {
     let detail = "";
@@ -3403,7 +3405,7 @@ async function fetchAllEntriesUntil(untilIso) {
 }
 
 async function fetchFeedingGoals(params) {
-  const response = await fetch(`/api/feeding-goals${buildQuery(params || {})}`);
+  const response = await fetch(buildUrl(`/api/feeding-goals${buildQuery(params || {})}`));
   if (!response.ok) {
     let detail = "";
     try {
@@ -3419,7 +3421,7 @@ async function fetchFeedingGoals(params) {
 }
 
 async function fetchBottles() {
-  const response = await fetch("/api/bottles");
+  const response = await fetch(buildUrl("/api/bottles"));
   if (!response.ok) {
     let detail = "";
     try {
@@ -3435,7 +3437,7 @@ async function fetchBottles() {
 }
 
 async function createBottle(payload) {
-  const response = await fetch("/api/bottles", {
+  const response = await fetch(buildUrl("/api/bottles"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -3454,7 +3456,7 @@ async function createBottle(payload) {
 }
 
 async function updateBottle(bottleId, payload) {
-  const response = await fetch(`/api/bottles/${bottleId}`, {
+  const response = await fetch(buildUrl(`/api/bottles/${bottleId}`), {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -3473,7 +3475,7 @@ async function updateBottle(bottleId, payload) {
 }
 
 async function deleteBottle(bottleId) {
-  const response = await fetch(`/api/bottles/${bottleId}`, { method: "DELETE" });
+  const response = await fetch(buildUrl(`/api/bottles/${bottleId}`), { method: "DELETE" });
   if (!response.ok) {
     let detail = "";
     try {
@@ -3487,7 +3489,7 @@ async function deleteBottle(bottleId) {
 }
 
 async function fetchCurrentGoal() {
-  const response = await fetch("/api/feeding-goals/current");
+  const response = await fetch(buildUrl("/api/feeding-goals/current"));
   if (!response.ok) {
     let detail = "";
     try {
@@ -4372,9 +4374,9 @@ function renderLastByType(entries) {
 
 function buildLogTypeUrl(type) {
   if (!type) {
-    return "/log";
+    return buildUrl("/log");
   }
-  return `/log/${type}`;
+  return buildUrl(`/log/${type}`);
 }
 
 function handleStatCardNavigate(event) {
@@ -4439,7 +4441,7 @@ async function saveEntry(payload) {
     }
   } catch (err) {
     try {
-      const response = await fetch(`/api/users/${activeUser}/entries`, {
+      const response = await fetch(buildUrl(`/api/users/${activeUser}/entries`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -5150,7 +5152,7 @@ async function deleteEntry(entry) {
 async function saveFeedingGoal(payload) {
   setStatus("Saving goal...");
   try {
-    const response = await fetch("/api/feeding-goals", {
+    const response = await fetch(buildUrl("/api/feeding-goals"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -5406,37 +5408,37 @@ async function loadLogEntries() {
 function initLinks() {
   if (logLinkEl) {
     logLinkEl.classList.remove("disabled");
-    logLinkEl.href = "/log";
+    logLinkEl.href = buildUrl("/log");
   }
   if (homeLinkEl) {
     homeLinkEl.classList.remove("disabled");
-    homeLinkEl.href = "/";
+    homeLinkEl.href = buildUrl("/");
   }
   if (summaryLinkEl) {
     summaryLinkEl.classList.remove("disabled");
-    summaryLinkEl.href = "/summary";
+    summaryLinkEl.href = buildUrl("/summary");
   }
   if (milkExpressLinkEl) {
     milkExpressLinkEl.classList.remove("disabled");
-    milkExpressLinkEl.href = "/milk-express";
+    milkExpressLinkEl.href = buildUrl("/milk-express");
   }
   if (bottlesLinkEl) {
     bottlesLinkEl.classList.remove("disabled");
-    bottlesLinkEl.href = "/bottles";
+    bottlesLinkEl.href = buildUrl("/bottles");
   }
   if (goalsLinkEl) {
     goalsLinkEl.classList.remove("disabled");
-    goalsLinkEl.href = "/goals";
+    goalsLinkEl.href = buildUrl("/goals");
   }
   if (timelineLinkEl) {
     timelineLinkEl.classList.remove("disabled");
-    timelineLinkEl.href = "/timeline";
+    timelineLinkEl.href = buildUrl("/timeline");
   }
 }
 
 async function loadBabySettings() {
   try {
-    const response = await fetch("/api/settings");
+    const response = await fetch(buildUrl("/api/settings"));
     if (!response.ok) {
       return;
     }
@@ -5478,7 +5480,7 @@ async function loadBabySettings() {
 
 async function saveBabySettings(patch) {
   try {
-    const response = await fetch("/api/settings", {
+    const response = await fetch(buildUrl("/api/settings"), {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(patch),
@@ -5525,7 +5527,9 @@ void loadBabySettings();
 initializeUser();
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch((err) => {
+    navigator.serviceWorker
+      .register(buildUrl("/sw.js"), { scope: buildUrl("/") })
+      .catch((err) => {
       console.warn("Service worker registration failed", err);
     });
   });

@@ -1,0 +1,13 @@
+services:
+  baby-tracker:
+    build: .
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      BABY_TRACKER_BASE_PATH: /baby
+      BABY_TRACKER_DB_PATH: /data/baby-tracker.sqlite
+      BABY_TRACKER_HOST: 0.0.0.0
+      BABY_TRACKER_PORT: 8000
+    volumes:
+      - ./data:/data
+    restart: unless-stopped

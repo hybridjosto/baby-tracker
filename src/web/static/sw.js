@@ -1,16 +1,16 @@
 const CACHE_NAME = "baby-tracker-shell-v2";
 const PRECACHE_URLS = [
-  "/",
-  "/log",
-  "/summary",
-  "/timeline",
-  "/goals",
-  "/settings",
-  "/sw.js",
-  "/static/app.js",
-  "/static/styles.css",
-  "/static/manifest.json",
-  "/apple-touch-icon.png",
+  "./",
+  "./log",
+  "./summary",
+  "./timeline",
+  "./goals",
+  "./settings",
+  "./sw.js",
+  "./static/app.js",
+  "./static/styles.css",
+  "./static/manifest.json",
+  "./apple-touch-icon.png",
 ];
 
 self.addEventListener("install", (event) => {
@@ -33,12 +33,12 @@ self.addEventListener("fetch", (event) => {
   const request = event.request;
   if (request.mode === "navigate") {
     event.respondWith(
-      fetch(request).catch(() => caches.match(request).then((resp) => resp || caches.match("/"))),
+      fetch(request).catch(() => caches.match(request).then((resp) => resp || caches.match("./"))),
     );
     return;
   }
   const url = new URL(request.url);
-  if (url.pathname.startsWith("/static/") || url.pathname === "/apple-touch-icon.png") {
+  if (url.pathname.includes("/static/") || url.pathname.endsWith("/apple-touch-icon.png")) {
     event.respondWith(
       caches.match(request).then((cached) => cached || fetch(request)),
     );

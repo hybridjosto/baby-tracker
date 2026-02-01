@@ -4,8 +4,8 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Event Timeline</title>
-    <link rel="manifest" href="/static/manifest.json">
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+    <link rel="manifest" href="{{ base_path }}/static/manifest.json">
+    <link rel="apple-touch-icon" href="{{ base_path }}/apple-touch-icon.png">
     <link
       href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700&display=swap"
       rel="stylesheet"
@@ -14,7 +14,7 @@
       href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@400,0"
       rel="stylesheet"
     >
-    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="stylesheet" href="{{ base_path }}/static/styles.css">
     <script>
       (() => {
         const stored = localStorage.getItem("baby-tracker-theme");
@@ -390,7 +390,7 @@
       }
     </style>
   </head>
-  <body data-user="{{ user_slug }}" data-user-valid="{{ 'true' if user_valid else 'false' }}" data-page="{{ page }}">
+  <body data-user="{{ user_slug }}" data-user-valid="{{ 'true' if user_valid else 'false' }}" data-page="{{ page }}" data-base-path="{{ base_path }}">
     <div class="page">
       <header class="page-header">
         <div>
@@ -405,16 +405,16 @@
           <a class="nav-icon" id="log-link" href="#" aria-label="Event log" title="Event log">
             <span class="material-symbols-outlined">list_alt</span>
           </a>
-          <a class="nav-icon" id="summary-link" href="/summary" aria-label="Summary" title="Summary">
+          <a class="nav-icon" id="summary-link" href="{{ base_path }}/summary" aria-label="Summary" title="Summary">
             <span class="material-symbols-outlined">query_stats</span>
           </a>
-          <a class="nav-icon" id="bottles-link" href="/bottles" aria-label="Bottle library" title="Bottle library">
+          <a class="nav-icon" id="bottles-link" href="{{ base_path }}/bottles" aria-label="Bottle library" title="Bottle library">
             <span class="material-symbols-outlined">local_drink</span>
           </a>
           <button class="nav-icon" id="refresh-btn" type="button" aria-label="Refresh timeline" title="Refresh timeline">
             <span class="material-symbols-outlined">refresh</span>
           </button>
-          <a class="nav-icon" href="/settings" aria-label="Settings" title="Settings">
+          <a class="nav-icon" href="{{ base_path }}/settings" aria-label="Settings" title="Settings">
             <span class="material-symbols-outlined">settings</span>
           </a>
           <button class="nav-icon" id="theme-toggle" type="button" aria-label="Switch to light mode">
@@ -434,6 +434,6 @@
 
       <!-- Timeline shows all users; no user filtering UI. -->
     </div>
-    <script src="/static/app.js"></script>
+    <script src="{{ base_path }}/static/app.js"></script>
   </body>
 </html>
