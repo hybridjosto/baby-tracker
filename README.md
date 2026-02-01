@@ -130,6 +130,10 @@ Example sync response:
 }
 ```
 
+## Local-only API via Caddy + Tailscale
+Use Caddy to expose just the `/api` endpoints over your tailnet while keeping the
+Flask app bound to localhost. See `docs/tailscale-caddy.md`.
+
 ## Pushcut Feed Logging
 Configure these settings in the UI (Settings page) or via `/api/settings`:
 - `default_user_slug`: used when `user_slug` is not provided to `/api/feed/log`

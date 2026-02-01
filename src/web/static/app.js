@@ -204,6 +204,7 @@ const bottleEmptyEl = document.getElementById("bottle-empty");
 const bottleSelectEl = document.getElementById("bottle-select");
 const bottleTotalWeightEl = document.getElementById("bottle-total-weight");
 const bottleResultValueEl = document.getElementById("bottle-result-value");
+const bottleLogMilkBtnEl = document.getElementById("bottle-log-milk");
 
 let babyDob = null;
 let feedIntervalMinutes = null;
@@ -718,6 +719,7 @@ let milkExpressAllLoading = null;
 let goalsInitialized = false;
 let bottlesInitialized = false;
 let bottlesCache = [];
+let bottleExpressedMl = null;
 let hasLoadedFeedingGoals = false;
 let activeFeedingGoal = null;
 let latestFeedTotalMl = 0;
@@ -1106,6 +1108,8 @@ function updateBottleResult() {
   }
   if (!bottleSelectEl || !bottleTotalWeightEl) {
     bottleResultValueEl.textContent = "-- ml";
+    bottleExpressedMl = null;
+    updateBottleLogButton();
     return;
   }
   const selectedId = Number.parseInt(bottleSelectEl.value, 10);
@@ -1113,10 +1117,27 @@ function updateBottleResult() {
   const totalWeight = Number.parseFloat(bottleTotalWeightEl.value);
   if (!bottle || !Number.isFinite(totalWeight) || totalWeight <= 0) {
     bottleResultValueEl.textContent = "-- ml";
+    bottleExpressedMl = null;
+    updateBottleLogButton();
     return;
   }
   const expressed = Math.max(0, totalWeight - bottle.empty_weight_g);
   bottleResultValueEl.textContent = formatMl(expressed);
+  bottleExpressedMl = expressed;
+  updateBottleLogButton();
+}
+
+function updateBottleLogButton() {
+  if (!bottleLogMilkBtnEl) {
+    return;
+  }
+  const canLog = userValid && Number.isFinite(bottleExpressedMl) && bottleExpressedMl > 0;
+  toggleDisabled(bottleLogMilkBtnEl, !canLog);
+  if (canLog) {
+    bottleLogMilkBtnEl.removeAttribute("disabled");
+  } else {
+    bottleLogMilkBtnEl.setAttribute("disabled", "true");
+  }
 }
 
 function renderBottleList(bottles) {
@@ -1265,6 +1286,25 @@ function initBottlesHandlers() {
       updateBottleResult();
     });
   }
+  if (bottleLogMilkBtnEl) {
+    bottleLogMilkBtnEl.addEventListener("click", async () => {
+      if (!userValid) {
+        setStatus("Choose a user below to start logging.");
+        return;
+      }
+      if (!Number.isFinite(bottleExpressedMl) || bottleExpressedMl <= 0) {
+        setStatus("Enter a bottle and total weight first.");
+        return;
+      }
+      const payload = buildEntryPayload(MILK_EXPRESS_TYPE);
+      payload.expressed_ml = Math.round(bottleExpressedMl * 10) / 10;
+      await saveEntry(payload);
+      if (bottleTotalWeightEl) {
+        bottleTotalWeightEl.value = "";
+      }
+      updateBottleResult();
+    });
+  }
 }
 
 function applyUserState() {
@@ -1286,6 +1326,7 @@ function applyUserState() {
     initBottlesHandlers();
     updateUserDisplay();
     setStatus("");
+    updateBottleLogButton();
     loadBottles();
     return;
   }
