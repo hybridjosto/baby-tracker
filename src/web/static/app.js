@@ -4895,11 +4895,7 @@ function openEditEntryModal(entry, mode = "full") {
     editEntryNotesEl.value = entry.notes ?? "";
   }
   updateEditEntryFieldVisibility(entry.type);
-  if (mode === "time") {
-    editEntryTimeEl?.focus();
-  } else {
-    editEntryTypeEl?.focus();
-  }
+  editEntryTimeEl?.focus();
   return new Promise((resolve) => {
     editEntryModalResolver = resolve;
   });
