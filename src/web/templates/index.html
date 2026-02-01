@@ -171,6 +171,117 @@
         color: var(--text-secondary);
         text-align: center;
       }
+      .latest-card {
+        margin-top: 14px;
+        background: #ffffff;
+        border-radius: 18px;
+        padding: 14px;
+        border: 1px solid #e5ebe6;
+        box-shadow: 0 8px 18px rgba(0, 0, 0, 0.08);
+        display: grid;
+        gap: 12px;
+      }
+      html.dark .latest-card {
+        background: var(--card-dark);
+        border-color: rgba(255, 255, 255, 0.06);
+      }
+      .latest-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+      .latest-title {
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.18em;
+        color: var(--text-secondary);
+        font-weight: 700;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .latest-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: #13ec5b;
+        box-shadow: 0 0 12px rgba(19, 236, 91, 0.5);
+      }
+      .latest-meta {
+        font-size: 12px;
+        color: var(--text-secondary);
+        text-align: right;
+      }
+      .latest-body {
+        display: grid;
+        gap: 10px;
+      }
+      .latest-type {
+        font-size: 18px;
+        font-weight: 700;
+        text-transform: capitalize;
+      }
+      .latest-time {
+        font-size: 13px;
+        color: var(--text-secondary);
+      }
+      .latest-details {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .latest-chip {
+        font-size: 11px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        border: 1px solid #e3e8e4;
+        background: #f7faf8;
+        font-weight: 600;
+      }
+      html.dark .latest-chip {
+        border-color: rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.06);
+      }
+      .latest-notes {
+        font-size: 12px;
+        color: var(--text-secondary);
+        background: var(--surface-soft);
+        padding: 10px 12px;
+        border-radius: 12px;
+        border: 1px dashed var(--border-light);
+      }
+      html.dark .latest-notes {
+        border-color: var(--border-dark);
+        background: rgba(26, 44, 32, 0.7);
+      }
+      .latest-actions {
+        display: flex;
+        gap: 8px;
+        justify-content: flex-end;
+      }
+      .latest-actions button {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        padding: 6px 10px;
+        border-radius: 10px;
+        border: 1px solid var(--border-light);
+        background: var(--surface-muted);
+        cursor: pointer;
+      }
+      html.dark .latest-actions button {
+        border-color: var(--border-dark);
+        background: rgba(255, 255, 255, 0.08);
+        color: #d3e4d7;
+      }
+      .latest-empty {
+        font-size: 13px;
+        color: var(--text-secondary);
+        text-align: center;
+        padding: 12px 8px;
+      }
       .chart-card {
         margin-top: 16px;
         background: #ffffff;
@@ -243,6 +354,147 @@
         justify-content: center;
         font-size: 13px;
         color: var(--text-secondary);
+      }
+      .edit-modal-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 26, 18, 0.45);
+        backdrop-filter: blur(6px);
+        z-index: 30;
+        display: none;
+      }
+      .edit-modal-backdrop.open {
+        display: block;
+      }
+      .edit-modal {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        padding: 16px;
+        z-index: 31;
+      }
+      .edit-modal[hidden] {
+        display: none;
+      }
+      .edit-modal-card {
+        width: min(100%, 420px);
+        max-width: calc(100vw - 32px);
+        border-radius: 16px;
+        border: 1px solid var(--border-light);
+        background: var(--card-light);
+        padding: 16px;
+        display: grid;
+        gap: 12px;
+        box-shadow: var(--shadow-soft);
+        overflow: hidden;
+      }
+      html.dark .edit-modal-card {
+        border-color: var(--border-dark);
+        background: var(--card-dark);
+        box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+      }
+      .edit-modal-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .edit-modal-eyebrow {
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.2em;
+        color: var(--text-secondary);
+      }
+      .edit-modal-title {
+        font-size: 20px;
+        margin: 2px 0 0 0;
+      }
+      .edit-modal-close {
+        border: none;
+        background: transparent;
+        cursor: pointer;
+        color: var(--text-secondary);
+        font-size: 20px;
+        line-height: 1;
+      }
+      .edit-field {
+        display: grid;
+        gap: 6px;
+        min-width: 0;
+      }
+      .edit-field label {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: var(--text-secondary);
+      }
+      .edit-field input,
+      .edit-field select,
+      .edit-field textarea {
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        border-radius: 10px;
+        border: 1px solid var(--border-light);
+        padding: 10px 12px;
+        font-size: 16px;
+        background: #ffffff;
+        color: var(--text-primary);
+        box-sizing: border-box;
+        font-family: inherit;
+        display: block;
+      }
+      .edit-field input[type="datetime-local"] {
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        appearance: none;
+      }
+      html.dark .edit-field input,
+      html.dark .edit-field select,
+      html.dark .edit-field textarea {
+        border-color: var(--border-dark);
+        background: rgba(16, 24, 18, 0.9);
+        color: #f3f6f4;
+      }
+      .edit-field textarea {
+        min-height: 72px;
+        resize: vertical;
+      }
+      .edit-number-grid {
+        display: grid;
+        gap: 10px;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      }
+      .edit-modal-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+      .edit-modal-actions button {
+        border-radius: 10px;
+        border: 1px solid var(--border-light);
+        padding: 10px 12px;
+        font-weight: 700;
+        cursor: pointer;
+        background: var(--surface-soft);
+        color: var(--text-primary);
+      }
+      html.dark .edit-modal-actions button {
+        border-color: var(--border-dark);
+        background: rgba(255, 255, 255, 0.08);
+        color: #f3f6f4;
+      }
+      .edit-modal-actions .primary {
+        background: var(--primary);
+        border-color: transparent;
+        color: #0f1a12;
+      }
+      .edit-modal.is-time-only .edit-field--type,
+      .edit-modal.is-time-only .edit-field--numbers,
+      .edit-modal.is-time-only .edit-field--notes {
+        display: none;
       }
       .last-events {
         margin-top: 12px;
@@ -889,6 +1141,35 @@
         </section>
         <div class="stats-range skeleton-text skeleton-wide" id="stat-window">Rolling 24h: --</div>
 
+        <section class="latest-card" aria-live="polite">
+          <div class="latest-header">
+            <div class="latest-title">
+              <span class="latest-dot" aria-hidden="true"></span>
+              Latest event
+            </div>
+            <div class="latest-meta" id="latest-relative">--</div>
+          </div>
+          <div class="latest-body" id="latest-body">
+            <div>
+              <div class="latest-type skeleton-text skeleton-mid" id="latest-type">--</div>
+              <div class="latest-time skeleton-text skeleton-wide" id="latest-time">--</div>
+            </div>
+            <div class="latest-details" id="latest-details"></div>
+            <div class="latest-notes" id="latest-notes" hidden></div>
+            <div class="latest-actions">
+              <button id="latest-edit" type="button">
+                <span class="material-symbols-outlined" aria-hidden="true">edit</span>
+                Edit
+              </button>
+              <button id="latest-delete" type="button">
+                <span class="material-symbols-outlined" aria-hidden="true">delete</span>
+                Delete
+              </button>
+            </div>
+          </div>
+          <div class="latest-empty" id="latest-empty" hidden>No entries yet.</div>
+        </section>
+
         <section class="chart-card">
           <div class="chart-header">
             <h3>Last 6 Hours</h3>
@@ -943,6 +1224,70 @@
             <div class="user-hint">Saved on this device.</div>
           </form>
         </section>
+
+        <div class="edit-modal-backdrop" id="edit-entry-backdrop" hidden></div>
+        <div class="edit-modal" id="edit-entry-modal" role="dialog" aria-modal="true" aria-hidden="true" hidden>
+          <form class="edit-modal-card" id="edit-entry-form" novalidate>
+            <div class="edit-modal-header">
+              <div>
+                <div class="edit-modal-eyebrow">Event log</div>
+                <div class="edit-modal-title">Edit entry</div>
+              </div>
+              <button class="edit-modal-close" id="edit-entry-close" type="button" aria-label="Close">✕</button>
+            </div>
+            <div class="edit-field edit-field--type">
+              <label for="edit-entry-type">Type</label>
+              <select id="edit-entry-type"></select>
+            </div>
+            <div class="edit-field">
+              <label for="edit-entry-time">Date &amp; time</label>
+              <input id="edit-entry-time" type="datetime-local" step="60">
+            </div>
+            <div class="edit-number-grid edit-field--numbers">
+              <div class="edit-field">
+                <label for="edit-entry-duration">Duration (minutes)</label>
+                <input
+                  id="edit-entry-duration"
+                  type="number"
+                  min="0"
+                  step="1"
+                  inputmode="decimal"
+                  pattern="[0-9]*[.,]?[0-9]*"
+                >
+              </div>
+              <div class="edit-field">
+                <label for="edit-entry-expressed">Expressed (ml)</label>
+                <input
+                  id="edit-entry-expressed"
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  inputmode="decimal"
+                  pattern="[0-9]*[.,]?[0-9]*"
+                >
+              </div>
+              <div class="edit-field">
+                <label for="edit-entry-formula">Formula (ml)</label>
+                <input
+                  id="edit-entry-formula"
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  inputmode="decimal"
+                  pattern="[0-9]*[.,]?[0-9]*"
+                >
+              </div>
+            </div>
+            <div class="edit-field edit-field--notes">
+              <label for="edit-entry-notes">Comment</label>
+              <textarea id="edit-entry-notes" placeholder="Optional notes"></textarea>
+            </div>
+            <div class="edit-modal-actions">
+              <button type="button" id="edit-entry-cancel">Cancel</button>
+              <button class="primary" id="edit-entry-save" type="submit">Save</button>
+            </div>
+          </form>
+        </div>
       </main>
 
       <div class="nappy-backdrop" id="nappy-backdrop" aria-hidden="true"></div>
