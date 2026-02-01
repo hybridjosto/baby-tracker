@@ -38,7 +38,7 @@ def _parse_utc(value: str | None) -> datetime | None:
 
 def _build_pushcut_payload(payload: dict | None = None) -> dict:
     if not payload:
-        return {"title": "Feed due", "body": "Time for a feed."}
+        return {"title": "Feed due", "body": "Time for a feed.", "sound": "default", "badge": 1}
     title = payload.get("title")
     body = payload.get("body")
     if isinstance(title, str) and title.strip():
