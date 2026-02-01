@@ -30,18 +30,18 @@ def create_app() -> Flask:
         __name__,
         template_folder=str(template_dir),
         static_folder=str(static_dir),
-        static_url_path="/static",
+        static_url_path=f"{config.base_path}/static",
     )
     app.config.update(DB_PATH=str(config.db_path))
 
     init_db(app.config["DB_PATH"])
-    app.register_blueprint(entries_api)
-    app.register_blueprint(bottles_api)
-    app.register_blueprint(goals_api)
-    app.register_blueprint(settings_api)
-    app.register_blueprint(pushcut_api)
-    app.register_blueprint(feed_api)
-    app.register_blueprint(home_kpis_api)
+    app.register_blueprint(entries_api, url_prefix=f"{config.base_path}")
+    app.register_blueprint(bottles_api, url_prefix=f"{config.base_path}")
+    app.register_blueprint(goals_api, url_prefix=f"{config.base_path}")
+    app.register_blueprint(settings_api, url_prefix=f"{config.base_path}")
+    app.register_blueprint(pushcut_api, url_prefix=f"{config.base_path}")
+    app.register_blueprint(feed_api, url_prefix=f"{config.base_path}")
+    app.register_blueprint(home_kpis_api, url_prefix=f"{config.base_path}")
     if not os.getenv("PYTEST_CURRENT_TEST"):
         start_feed_due_scheduler(app, config.feed_due_poll_seconds)
         start_home_kpis_scheduler(app, config.home_kpis_poll_seconds)
@@ -72,11 +72,12 @@ def create_app() -> Flask:
                 log_subtitle=log_subtitle,
                 log_type=entry_type or "",
                 log_window_hours=log_window_hours,
+                base_path=config.base_path,
             ),
             status_code,
         )
 
-    @app.get("/")
+    @app.get(f"{config.base_path}/")
     def index():
         return render_template(
             "index.html",
@@ -84,9 +85,10 @@ def create_app() -> Flask:
             user_valid=False,
             user_message="Choose a user below (example: josh).",
             page="home",
+            base_path=config.base_path,
         )
 
-    @app.get("/log")
+    @app.get(f"{config.base_path}/log")
     def log_index():
         return render_log_page(
             user_slug="",
@@ -94,7 +96,7 @@ def create_app() -> Flask:
             user_message="Choose a user below (example: josh).",
         )
 
-    @app.get("/log/<entry_type>")
+    @app.get(f"{config.base_path}/log/<entry_type>")
     def log_type_index(entry_type: str):
         try:
             validate_entry_type(entry_type)
@@ -112,19 +114,23 @@ def create_app() -> Flask:
             entry_type=entry_type,
         )
 
-    @app.get("/settings")
+    @app.get(f"{config.base_path}/settings")
     def settings():
-        return render_template("settings.html", page="settings")
+        return render_template("settings.html", page="settings", base_path=config.base_path)
 
-    @app.get("/goals")
+    @app.get(f"{config.base_path}/goals")
     def goals():
-        return render_template("goals.html", page="goals")
+        return render_template("goals.html", page="goals", base_path=config.base_path)
 
-    @app.get("/sw.js")
+    @app.get(f"{config.base_path}/sw.js")
     def service_worker():
         response = send_from_directory(app.static_folder, "sw.js")
-        response.headers["Service-Worker-Allowed"] = "/"
+        response.headers["Service-Worker-Allowed"] = f"{config.base_path}/"
         return response
+
+    @app.get(f"{config.base_path}/apple-touch-icon.png")
+    def apple_touch_icon():
+        return send_from_directory(app_root, "apple-touch-icon.png")
 
     def render_summary_page(
         user_slug: str,
@@ -139,6 +145,7 @@ def create_app() -> Flask:
                 user_valid=user_valid,
                 user_message=user_message,
                 page="summary",
+                base_path=config.base_path,
             ),
             status_code,
         )
@@ -156,6 +163,7 @@ def create_app() -> Flask:
                 user_valid=user_valid,
                 user_message=user_message,
                 page="timeline",
+                base_path=config.base_path,
             ),
             status_code,
         )
@@ -173,6 +181,7 @@ def create_app() -> Flask:
                 user_valid=user_valid,
                 user_message=user_message,
                 page="milk-express",
+                base_path=config.base_path,
             ),
             status_code,
         )
@@ -190,11 +199,12 @@ def create_app() -> Flask:
                 user_valid=user_valid,
                 user_message=user_message,
                 page="bottles",
+                base_path=config.base_path,
             ),
             status_code,
         )
 
-    @app.get("/summary")
+    @app.get(f"{config.base_path}/summary")
     def summary():
         return render_summary_page(
             user_slug="",
@@ -202,7 +212,7 @@ def create_app() -> Flask:
             user_message="Choose a user below (example: josh).",
         )
 
-    @app.get("/timeline")
+    @app.get(f"{config.base_path}/timeline")
     def timeline():
         return render_timeline_page(
             user_slug="",
@@ -210,7 +220,7 @@ def create_app() -> Flask:
             user_message="Choose a user below (example: josh).",
         )
 
-    @app.get("/milk-express")
+    @app.get(f"{config.base_path}/milk-express")
     def milk_express():
         return render_milk_express_page(
             user_slug="",
@@ -218,7 +228,7 @@ def create_app() -> Flask:
             user_message="Choose a user below (example: josh).",
         )
 
-    @app.get("/bottles")
+    @app.get(f"{config.base_path}/bottles")
     def bottles():
         return render_bottles_page(
             user_slug="",
@@ -226,7 +236,7 @@ def create_app() -> Flask:
             user_message="Shared bottle library",
         )
 
-    @app.get("/<user_slug>")
+    @app.get(f"{config.base_path}/<user_slug>")
     def user_home(user_slug: str):
         try:
             normalized = normalize_user_slug(user_slug)
@@ -238,6 +248,7 @@ def create_app() -> Flask:
                     user_valid=False,
                     user_message=str(exc),
                     page="home",
+                    base_path=config.base_path,
                 ),
                 400,
             )
@@ -247,9 +258,10 @@ def create_app() -> Flask:
             user_valid=True,
             user_message=f"Logging as {normalized}",
             page="home",
+            base_path=config.base_path,
         )
 
-    @app.get("/<user_slug>/summary")
+    @app.get(f"{config.base_path}/<user_slug>/summary")
     def user_summary(user_slug: str):
         try:
             normalized = normalize_user_slug(user_slug)
@@ -266,7 +278,7 @@ def create_app() -> Flask:
             user_message=f"Logging as {normalized}",
         )
 
-    @app.get("/<user_slug>/timeline")
+    @app.get(f"{config.base_path}/<user_slug>/timeline")
     def user_timeline(user_slug: str):
         try:
             normalized = normalize_user_slug(user_slug)
@@ -283,7 +295,7 @@ def create_app() -> Flask:
             user_message=f"Logging as {normalized}",
         )
 
-    @app.get("/<user_slug>/milk-express")
+    @app.get(f"{config.base_path}/<user_slug>/milk-express")
     def user_milk_express(user_slug: str):
         try:
             normalized = normalize_user_slug(user_slug)
@@ -300,7 +312,7 @@ def create_app() -> Flask:
             user_message=f"Logging as {normalized}",
         )
 
-    @app.get("/<user_slug>/bottles")
+    @app.get(f"{config.base_path}/<user_slug>/bottles")
     def user_bottles(user_slug: str):
         try:
             normalized = normalize_user_slug(user_slug)
@@ -317,7 +329,7 @@ def create_app() -> Flask:
             user_message="Shared bottle library",
         )
 
-    @app.get("/<user_slug>/log")
+    @app.get(f"{config.base_path}/<user_slug>/log")
     def user_log(user_slug: str):
         try:
             normalized = normalize_user_slug(user_slug)
@@ -334,7 +346,7 @@ def create_app() -> Flask:
             user_message=f"Logging as {normalized}",
         )
 
-    @app.get("/<user_slug>/log/<entry_type>")
+    @app.get(f"{config.base_path}/<user_slug>/log/<entry_type>")
     def user_log_type(user_slug: str, entry_type: str):
         try:
             normalized = normalize_user_slug(user_slug)

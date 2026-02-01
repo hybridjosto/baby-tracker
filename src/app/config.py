@@ -8,6 +8,7 @@ class AppConfig:
     db_path: Path
     host: str
     port: int
+    base_path: str
     discord_webhook_url: str | None
     tls_cert_path: Path | None
     tls_key_path: Path | None
@@ -19,6 +20,7 @@ def load_config() -> AppConfig:
     db_path = Path(os.getenv("BABY_TRACKER_DB_PATH", "./data/baby-tracker.sqlite"))
     host = os.getenv("BABY_TRACKER_HOST", "0.0.0.0")
     port = int(os.getenv("BABY_TRACKER_PORT", "8000"))
+    base_path = _normalize_base_path(os.getenv("BABY_TRACKER_BASE_PATH", ""))
     discord_webhook_url = os.getenv("BABY_TRACKER_DISCORD_WEBHOOK_URL")
     tls_cert_path_raw = os.getenv("BABY_TRACKER_TLS_CERT_PATH")
     tls_key_path_raw = os.getenv("BABY_TRACKER_TLS_KEY_PATH")
@@ -49,9 +51,19 @@ def load_config() -> AppConfig:
         db_path=db_path,
         host=host,
         port=port,
+        base_path=base_path,
         discord_webhook_url=discord_webhook_url,
         tls_cert_path=tls_cert_path,
         tls_key_path=tls_key_path,
         feed_due_poll_seconds=feed_due_poll_seconds,
         home_kpis_poll_seconds=home_kpis_poll_seconds,
     )
+
+
+def _normalize_base_path(raw: str) -> str:
+    raw = raw.strip()
+    if not raw or raw == "/":
+        return ""
+    if not raw.startswith("/"):
+        raw = f"/{raw}"
+    return raw.rstrip("/")

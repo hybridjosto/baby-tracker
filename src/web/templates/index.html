@@ -4,8 +4,8 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Baby Activity</title>
-    <link rel="manifest" href="/static/manifest.json">
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+    <link rel="manifest" href="{{ base_path }}/static/manifest.json">
+    <link rel="apple-touch-icon" href="{{ base_path }}/apple-touch-icon.png">
     <script>
       (() => {
         const stored = localStorage.getItem("baby-tracker-theme");
@@ -25,7 +25,7 @@
       href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@400,0"
       rel="stylesheet"
     >
-    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="stylesheet" href="{{ base_path }}/static/styles.css">
     <style>
       :root {
         --action-height: 80px;
@@ -1040,7 +1040,7 @@
       }
     </style>
   </head>
-  <body data-user="{{ user_slug }}" data-user-valid="{{ 'true' if user_valid else 'false' }}" data-page="{{ page }}">
+  <body data-user="{{ user_slug }}" data-user-valid="{{ 'true' if user_valid else 'false' }}" data-page="{{ page }}" data-base-path="{{ base_path }}">
     <div class="app">
       <header>
         <div class="avatar" id="user-chip">{{ user_slug[:2]|upper if user_slug else 'BT' }}</div>
@@ -1052,13 +1052,13 @@
           <button class="icon-btn" id="refresh-btn" type="button" aria-label="Refresh data" title="Refresh data">
             <span class="material-symbols-outlined">refresh</span>
           </button>
-          <a class="icon-btn" id="goals-link" href="/goals" aria-label="Feeding goals">
+          <a class="icon-btn" id="goals-link" href="{{ base_path }}/goals" aria-label="Feeding goals">
             <span class="material-symbols-outlined">track_changes</span>
           </a>
-          <a class="icon-btn" id="summary-link" href="/summary" aria-label="Summary">
+          <a class="icon-btn" id="summary-link" href="{{ base_path }}/summary" aria-label="Summary">
             <span class="material-symbols-outlined">query_stats</span>
           </a>
-          <a class="icon-btn" href="/settings" aria-label="Settings">
+          <a class="icon-btn" href="{{ base_path }}/settings" aria-label="Settings">
             <span class="material-symbols-outlined">settings</span>
           </a>
           <button class="icon-btn" id="theme-toggle" type="button" aria-label="Switch to light mode">
@@ -1112,7 +1112,7 @@
             </div>
             <div class="stat-value skeleton-text skeleton-mid" id="stat-goal-progress">--</div>
             <div class="stat-sub skeleton-text skeleton-wide" id="stat-goal-detail">Set a 24h goal</div>
-            <a class="stat-link" href="/goals" aria-label="Edit feeding goals">
+            <a class="stat-link" href="{{ base_path }}/goals" aria-label="Edit feeding goals">
               Edit goals
               <span class="material-symbols-outlined" style="font-size: 14px;">arrow_forward</span>
             </a>
@@ -1367,6 +1367,6 @@
         </div>
       </div>
     </div>
-    <script src="/static/app.js"></script>
+    <script src="{{ base_path }}/static/app.js"></script>
   </body>
 </html>
