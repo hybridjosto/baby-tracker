@@ -98,6 +98,38 @@ sudo systemctl restart baby-tracker.service
 - If something looks stuck, clear site data in your browser to reset the cache.
 - Sync API: `POST /api/sync/entries` with `{ device_id, cursor, changes }`.
 
+Example sync payload:
+```json
+{
+  "device_id": "ios-6c3f5c",
+  "cursor": "2026-01-31T18:30:00+00:00",
+  "changes": [
+    {
+      "action": "upsert",
+      "entry": {
+        "client_event_id": "local-abc123",
+        "user_slug": "josh",
+        "type": "feed",
+        "timestamp_utc": "2026-01-31T18:45:00+00:00",
+        "formula_ml": 90
+      }
+    },
+    {
+      "action": "delete",
+      "client_event_id": "local-def456"
+    }
+  ]
+}
+```
+
+Example sync response:
+```json
+{
+  "cursor": "2026-01-31T19:00:00+00:00",
+  "entries": []
+}
+```
+
 ## Pushcut Feed Logging
 Configure these settings in the UI (Settings page) or via `/api/settings`:
 - `default_user_slug`: used when `user_slug` is not provided to `/api/feed/log`
