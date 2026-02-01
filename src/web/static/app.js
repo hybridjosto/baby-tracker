@@ -148,6 +148,15 @@ const nextFeedEl = document.getElementById("next-feed");
 const nextFeedShortcutEl = document.getElementById("next-feed-shortcut");
 const lastWeeEl = document.getElementById("last-wee");
 const lastPooEl = document.getElementById("last-poo");
+const latestBodyEl = document.getElementById("latest-body");
+const latestEmptyEl = document.getElementById("latest-empty");
+const latestTypeEl = document.getElementById("latest-type");
+const latestTimeEl = document.getElementById("latest-time");
+const latestRelativeEl = document.getElementById("latest-relative");
+const latestDetailsEl = document.getElementById("latest-details");
+const latestNotesEl = document.getElementById("latest-notes");
+const latestEditBtn = document.getElementById("latest-edit");
+const latestDeleteBtn = document.getElementById("latest-delete");
 const statCardEls = document.querySelectorAll(".stat-card[data-log-type]");
 
 const timelineLinkEl = document.getElementById("timeline-link");
@@ -2323,6 +2332,105 @@ function formatMilkExpressDetails(entry) {
     parts.push(formatDurationMinutes(minutes));
   }
   return parts.join(" • ");
+}
+
+function formatEntryTypeLabel(type) {
+  const normalized = normalizeEntryType(type);
+  if (!normalized) {
+    return "Event";
+  }
+  return normalized
+    .split(" ")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
+function renderLatestEntry(entry) {
+  if (
+    !latestBodyEl
+    || !latestEmptyEl
+    || !latestTypeEl
+    || !latestTimeEl
+    || !latestRelativeEl
+    || !latestDetailsEl
+  ) {
+    return;
+  }
+  if (!entry) {
+    latestBodyEl.hidden = true;
+    latestEmptyEl.hidden = false;
+    latestRelativeEl.textContent = "--";
+    if (latestEditBtn) {
+      latestEditBtn.disabled = true;
+    }
+    if (latestDeleteBtn) {
+      latestDeleteBtn.disabled = true;
+    }
+    return;
+  }
+  latestBodyEl.hidden = false;
+  latestEmptyEl.hidden = true;
+  latestTypeEl.textContent = formatEntryTypeLabel(entry.type);
+  latestTimeEl.textContent = formatTimestamp(entry.timestamp_utc);
+  latestRelativeEl.textContent = formatRelativeTime(entry.timestamp_utc);
+  latestTypeEl.classList.remove("skeleton-text", "skeleton-mid");
+  latestTimeEl.classList.remove("skeleton-text", "skeleton-wide");
+
+  latestDetailsEl.innerHTML = "";
+  const details = [];
+  if (entry.type === "feed") {
+    if (entry.amount_ml !== null && entry.amount_ml !== undefined) {
+      details.push({ label: "Amount", value: formatMl(entry.amount_ml) });
+    }
+    if (entry.expressed_ml !== null && entry.expressed_ml !== undefined) {
+      details.push({ label: "Expressed", value: formatMl(entry.expressed_ml) });
+    }
+    if (entry.formula_ml !== null && entry.formula_ml !== undefined) {
+      details.push({ label: "Formula", value: formatMl(entry.formula_ml) });
+    }
+    if (entry.feed_duration_min !== null && entry.feed_duration_min !== undefined) {
+      details.push({
+        label: "Duration",
+        value: formatDurationMinutes(entry.feed_duration_min),
+      });
+    }
+  } else if (isMilkExpressType(entry.type)) {
+    const { ml, minutes } = getMilkExpressAmounts(entry);
+    if (Number.isFinite(ml) && ml > 0) {
+      details.push({ label: "Expressed", value: formatMl(ml) });
+    }
+    if (Number.isFinite(minutes) && minutes > 0) {
+      details.push({ label: "Duration", value: formatDurationMinutes(minutes) });
+    }
+  } else if (entry.feed_duration_min !== null && entry.feed_duration_min !== undefined) {
+    details.push({
+      label: "Duration",
+      value: formatDurationMinutes(entry.feed_duration_min),
+    });
+  }
+  details.forEach(({ label, value }) => {
+    const chip = document.createElement("span");
+    chip.className = "latest-chip";
+    chip.textContent = `${label} ${value}`;
+    latestDetailsEl.appendChild(chip);
+  });
+
+  if (latestNotesEl) {
+    if (entry.notes) {
+      latestNotesEl.textContent = entry.notes;
+      latestNotesEl.hidden = false;
+    } else {
+      latestNotesEl.hidden = true;
+    }
+  }
+  if (latestEditBtn) {
+    latestEditBtn.disabled = false;
+    latestEditBtn.onclick = () => editEntry(entry);
+  }
+  if (latestDeleteBtn) {
+    latestDeleteBtn.disabled = false;
+    latestDeleteBtn.onclick = () => deleteEntry(entry);
+  }
 }
 
 function renderSummaryStats(entries) {
@@ -4787,11 +4895,7 @@ function openEditEntryModal(entry, mode = "full") {
     editEntryNotesEl.value = entry.notes ?? "";
   }
   updateEditEntryFieldVisibility(entry.type);
-  if (mode === "time") {
-    editEntryTimeEl?.focus();
-  } else {
-    editEntryTypeEl?.focus();
-  }
+  editEntryTimeEl?.focus();
   return new Promise((resolve) => {
     editEntryModalResolver = resolve;
   });
@@ -5129,10 +5233,14 @@ async function loadHomeEntries() {
       renderLastActivity(cachedEntries);
       renderLastByType(cachedEntries);
     }
+    const cachedLatest = await listEntriesLocalSafe({ limit: 1 });
+    if (cachedLatest) {
+      renderLatestEntry(cachedLatest[0] || null);
+    }
 
     await syncNow();
 
-    const [entries, goals, currentGoal] = await Promise.all([
+    const [entries, goals, currentGoal, latestEntry] = await Promise.all([
       loadEntriesWithFallback({
         limit: 200,
         since: statsWindow.sinceIso,
@@ -5140,6 +5248,7 @@ async function loadHomeEntries() {
       }),
       loadFeedingGoals(1).catch(() => []),
       loadCurrentGoal(),
+      loadLatestEntryWithFallback(),
     ]);
     activeFeedingGoal = currentGoal;
     const chartEntries = entries.filter((entry) => {
@@ -5152,6 +5261,7 @@ async function loadHomeEntries() {
     renderStatsWindow(statsWindow);
     renderLastActivity(entries);
     renderLastByType(entries);
+    renderLatestEntry(latestEntry || null);
   } catch (err) {
     setStatus(`Failed to load entries: ${err.message || "unknown error"}`);
   } finally {
