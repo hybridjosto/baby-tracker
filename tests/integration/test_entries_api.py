@@ -115,11 +115,6 @@ def test_list_entries_returns_all_users(client):
         },
     ).get_json()
 
-    response = client.get("/api/users/any/entries")
-    assert response.status_code == 200
-    entries = response.get_json()
-    assert {entry["id"] for entry in entries} == {first["id"], second["id"]}
-
     response = client.get("/api/entries")
     assert response.status_code == 200
     entries = response.get_json()
@@ -275,7 +270,7 @@ def test_entries_summary_returns_latest_entries(client):
     }
 
 
-def test_list_user_feed_amount_entries_output_filters_by_user(client):
+def test_list_feed_amount_entries_output_returns_all_users(client):
     client.post(
         "/api/users/suz/entries",
         json={
@@ -297,13 +292,28 @@ def test_list_user_feed_amount_entries_output_filters_by_user(client):
         },
     )
 
-    response = client.get("/api/users/suz/entries/feeds/output")
+    response = client.get("/api/entries/feeds/output")
     assert response.status_code == 200
     payload = response.get_json()
-    assert payload["count"] == 1
+    assert payload["count"] == 2
     assert payload["entries"] == [
-        {"date": "2024 0401", "expressed_ml": 30.0, "formula_ml": 15.0}
+        {"date": "2024 0402", "expressed_ml": 40.0, "formula_ml": 10.0},
+        {"date": "2024 0401", "expressed_ml": 30.0, "formula_ml": 15.0},
     ]
+
+
+def test_user_scoped_output_routes_removed(client):
+    response = client.get("/api/users/suz/entries")
+    assert response.status_code == 405
+
+    response = client.get("/api/users/suz/entries/output")
+    assert response.status_code == 404
+
+    response = client.get("/api/users/suz/entries/feeds/output")
+    assert response.status_code == 404
+
+    response = client.get("/api/users/suz/entries/export")
+    assert response.status_code == 404
 
 
 def test_create_entry_duplicate_client_event_returns_409(client):
@@ -456,7 +466,19 @@ def test_export_entries_csv_includes_feed_amounts(client):
             "formula_ml": 20,
         },
     )
-    response = client.get("/api/users/suz/entries/export")
+    client.post(
+        "/api/users/rob/entries",
+        json={
+            "type": "feed",
+            "client_event_id": "evt-export-2",
+            "timestamp_utc": "2024-02-02T08:30:00+00:00",
+            "feed_duration_min": 10,
+            "amount_ml": 60,
+            "expressed_ml": 20,
+            "formula_ml": 10,
+        },
+    )
+    response = client.get("/api/entries/export")
     assert response.status_code == 200
     assert response.mimetype == "text/csv"
 
@@ -480,14 +502,19 @@ def test_export_entries_csv_includes_feed_amounts(client):
         "formula_ml",
         "deleted_at_utc",
     ]
-    row = next(reader)
-    row_by_column = dict(zip(header, row, strict=True))
-    assert row_by_column["user_slug"] == "suz"
-    assert row_by_column["type"] == "feed"
-    assert row_by_column["timestamp_utc"] == "2024-02-01T08:30:00+00:00"
-    assert row_by_column["client_event_id"] == "evt-export-1"
-    assert row_by_column["amount_ml"] == "80.0"
-    assert row_by_column["feed_duration_min"] == "12.5"
-    assert row_by_column["expressed_ml"] == "40.0"
-    assert row_by_column["formula_ml"] == "20.0"
-    assert row_by_column["deleted_at_utc"] == ""
+    rows = list(reader)
+    assert len(rows) == 2
+    rows_by_id = {
+        row_map["client_event_id"]: row_map
+        for row_map in (dict(zip(header, row, strict=True)) for row in rows)
+    }
+    assert set(rows_by_id.keys()) == {"evt-export-1", "evt-export-2"}
+    assert rows_by_id["evt-export-1"]["user_slug"] == "suz"
+    assert rows_by_id["evt-export-1"]["type"] == "feed"
+    assert rows_by_id["evt-export-1"]["timestamp_utc"] == "2024-02-01T08:30:00+00:00"
+    assert rows_by_id["evt-export-1"]["amount_ml"] == "80.0"
+    assert rows_by_id["evt-export-1"]["feed_duration_min"] == "12.5"
+    assert rows_by_id["evt-export-1"]["expressed_ml"] == "40.0"
+    assert rows_by_id["evt-export-1"]["formula_ml"] == "20.0"
+    assert rows_by_id["evt-export-1"]["deleted_at_utc"] == ""
+    assert rows_by_id["evt-export-2"]["user_slug"] == "rob"

@@ -16,7 +16,6 @@ from src.app.services.entries import (
 )
 from src.app.services.webhooks import send_entry_webhook
 from src.app.services.home_kpis import dispatch_home_kpis
-from src.lib.validation import normalize_user_slug
 
 entries_api = Blueprint("entries_api", __name__, url_prefix="/api")
 
@@ -80,6 +79,19 @@ def list_feed_amount_entries_output_route():
         return jsonify({"error": str(exc)}), 400
 
 
+@entries_api.get("/entries/export")
+def export_entries_route():
+    try:
+        csv_text = export_entries_csv(_db_path())
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    response = Response(csv_text, mimetype="text/csv")
+    response.headers["Content-Disposition"] = (
+        'attachment; filename="baby-tracker-events-all-users.csv"'
+    )
+    return response
+
+
 @entries_api.get("/entries/summary")
 def get_entries_summary_route():
     try:
@@ -99,63 +111,6 @@ def create_entry_route():
         return jsonify(entry), 201
     except DuplicateEntryError as exc:
         return jsonify({"error": "duplicate", "entry": exc.entry}), 409
-    except ValueError as exc:
-        return jsonify({"error": str(exc)}), 400
-
-
-@entries_api.get("/users/<user_slug>/entries")
-def list_user_entries_route(user_slug: str):
-    limit = request.args.get("limit", default=50, type=int)
-    since_utc = request.args.get("since")
-    until_utc = request.args.get("until")
-    entry_type = request.args.get("type")
-    try:
-        entries = list_entries(
-            _db_path(),
-            limit=limit,
-            since_utc=since_utc,
-            until_utc=until_utc,
-            entry_type=entry_type,
-        )
-        return jsonify(entries)
-    except ValueError as exc:
-        return jsonify({"error": str(exc)}), 400
-
-
-@entries_api.get("/users/<user_slug>/entries/output")
-def list_user_entries_output_route(user_slug: str):
-    limit = request.args.get("limit", default=50, type=int)
-    since_utc = request.args.get("since")
-    until_utc = request.args.get("until")
-    entry_type = request.args.get("type")
-    try:
-        entries = list_entries(
-            _db_path(),
-            limit=limit,
-            user_slug=user_slug,
-            since_utc=since_utc,
-            until_utc=until_utc,
-            entry_type=entry_type,
-        )
-        return jsonify({"entries": entries, "count": len(entries)})
-    except ValueError as exc:
-        return jsonify({"error": str(exc)}), 400
-
-
-@entries_api.get("/users/<user_slug>/entries/feeds/output")
-def list_user_feed_amount_entries_output_route(user_slug: str):
-    limit = request.args.get("limit", default=50, type=int)
-    since_utc = request.args.get("since")
-    until_utc = request.args.get("until")
-    try:
-        entries = list_feed_amount_entries(
-            _db_path(),
-            limit=limit,
-            user_slug=user_slug,
-            since_utc=since_utc,
-            until_utc=until_utc,
-        )
-        return jsonify({"entries": entries, "count": len(entries)})
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
 
@@ -183,20 +138,6 @@ def import_user_entries_route(user_slug: str):
         return jsonify(result), 201
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
-
-
-@entries_api.get("/users/<user_slug>/entries/export")
-def export_user_entries_route(user_slug: str):
-    try:
-        normalized_slug = normalize_user_slug(user_slug)
-        csv_text = export_entries_csv(_db_path(), user_slug=normalized_slug)
-    except ValueError as exc:
-        return jsonify({"error": str(exc)}), 400
-    response = Response(csv_text, mimetype="text/csv")
-    response.headers["Content-Disposition"] = (
-        f'attachment; filename="baby-tracker-events-{normalized_slug}.csv"'
-    )
-    return response
 
 
 @entries_api.patch("/entries/<int:entry_id>")
