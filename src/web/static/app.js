@@ -183,6 +183,7 @@ const entryWebhookInputEl = document.getElementById("entry-webhook-input");
 const homeKpisWebhookInputEl = document.getElementById("home-kpis-webhook-input");
 const defaultUserInputEl = document.getElementById("default-user-input");
 const pushcutFeedDueInputEl = document.getElementById("pushcut-feed-due-input");
+const testFeedDueNotificationBtn = document.getElementById("test-feed-due-notification");
 const customTypeAddBtn = document.getElementById("custom-type-add");
 const customTypeListEl = document.getElementById("custom-type-list");
 const customTypeHintEl = document.getElementById("custom-type-hint");
@@ -1043,6 +1044,11 @@ function initSettingsHandlers() {
     });
     toggleDisabled(exportCsvBtn, !userValid);
   }
+  if (testFeedDueNotificationBtn) {
+    testFeedDueNotificationBtn.addEventListener("click", () => {
+      void handleTestFeedDueNotification();
+    });
+  }
 }
 
 function initGoalsHandlers() {
@@ -1615,7 +1621,7 @@ async function handleCsvExport() {
   }
   setStatus("Preparing CSV...");
   try {
-    const response = await fetch(buildUrl(`/api/users/${activeUser}/entries/export`));
+    const response = await fetch(buildUrl("/api/entries/export"));
     if (!response.ok) {
       let detail = "";
       try {
@@ -1640,6 +1646,29 @@ async function handleCsvExport() {
     setStatus("CSV downloaded");
   } catch (error) {
     setStatus("Error: network issue exporting CSV");
+  }
+}
+
+async function handleTestFeedDueNotification() {
+  setStatus("Sending test notification...");
+  try {
+    const response = await fetch(buildUrl("/api/push/feed-due"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: "Feed due (test)",
+        body: "This is a test notification from Baby Tracker settings.",
+      }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const detail = payload.error || response.status;
+      setStatus(`Error: ${detail}`);
+      return;
+    }
+    setStatus("Test feed-due notification sent");
+  } catch (error) {
+    setStatus("Error: network issue sending test notification");
   }
 }
 

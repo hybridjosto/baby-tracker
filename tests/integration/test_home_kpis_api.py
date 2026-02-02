@@ -96,3 +96,38 @@ def test_home_kpis_returns_feed_total_goal_and_due(client, monkeypatch):
             "input3": "Goal % (24h): 154%",
         },
     }
+
+
+def test_home_kpis_ignores_user_slug_query_and_aggregates(client, monkeypatch):
+    fixed_now = datetime(2026, 1, 1, 1, 0, tzinfo=timezone.utc)
+
+    from src.app.services import home_kpis as home_kpis_module
+
+    monkeypatch.setattr(home_kpis_module, "_now_utc", lambda: fixed_now)
+
+    settings_response = client.patch("/api/settings", json={"feed_interval_min": 120})
+    assert settings_response.status_code == 200
+
+    client.post(
+        "/api/users/suz/entries",
+        json={
+            "type": "feed",
+            "client_event_id": "evt-kpi-agg-1",
+            "timestamp_utc": "2026-01-01T00:30:00+00:00",
+            "amount_ml": 100,
+        },
+    )
+    client.post(
+        "/api/users/rob/entries",
+        json={
+            "type": "feed",
+            "client_event_id": "evt-kpi-agg-2",
+            "timestamp_utc": "2026-01-01T00:40:00+00:00",
+            "amount_ml": 50,
+        },
+    )
+
+    response = client.get("/api/home-kpis?user_slug=suz")
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["inputs"]["input1"] == "Feed total (24h): 150 ml"
