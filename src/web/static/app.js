@@ -81,6 +81,8 @@ const summaryExpressedEl = document.getElementById("summary-expressed-amount");
 const summaryExpressedAvgEl = document.getElementById("summary-expressed-avg");
 const summaryFormulaEl = document.getElementById("summary-formula-amount");
 const summaryFormulaAvgEl = document.getElementById("summary-formula-avg");
+const summaryTotalIntakeEl = document.getElementById("summary-total-intake-amount");
+const summaryTotalIntakeAvgEl = document.getElementById("summary-total-intake-avg");
 const milkExpressCountEl = document.getElementById("milk-express-count");
 const milkExpressTotalsEl = document.getElementById("milk-express-totals");
 const milkExpressListEl = document.getElementById("milk-express-list");
@@ -2481,6 +2483,7 @@ function renderSummaryStats(entries) {
     !summaryFeedDurationEl
     || !summaryExpressedEl
     || !summaryFormulaEl
+    || !summaryTotalIntakeEl
   ) {
     return;
   }
@@ -2508,9 +2511,11 @@ function renderSummaryStats(entries) {
       }
     }
   });
+  const totalIntake = expressedTotal + formulaTotal;
   summaryFeedDurationEl.textContent = formatDurationMinutes(durationTotal);
   summaryExpressedEl.textContent = formatMl(expressedTotal);
   summaryFormulaEl.textContent = formatMl(formulaTotal);
+  summaryTotalIntakeEl.textContent = formatMl(totalIntake);
   if (summaryFeedDurationAvgEl) {
     summaryFeedDurationAvgEl.textContent = `Avg / feed: ${formatAverageDuration(
       durationTotal,
@@ -2526,6 +2531,12 @@ function renderSummaryStats(entries) {
   if (summaryFormulaAvgEl) {
     summaryFormulaAvgEl.textContent = `Avg / feed: ${formatAverageMl(
       formulaTotal,
+      feedCount,
+    )}`;
+  }
+  if (summaryTotalIntakeAvgEl) {
+    summaryTotalIntakeAvgEl.textContent = `Avg / feed: ${formatAverageMl(
+      totalIntake,
       feedCount,
     )}`;
   }
