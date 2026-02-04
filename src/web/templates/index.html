@@ -621,8 +621,9 @@
       }
       .bottom-bar {
         position: fixed;
-        left: 50%;
-        transform: translateX(-50%);
+        left: 0;
+        right: 0;
+        margin: 0 auto;
         bottom: 0;
         width: 100%;
         max-width: 420px;
@@ -804,15 +805,17 @@
         display: grid;
       }
       .feed-menu {
-        position: absolute;
-        bottom: calc(var(--action-height) + 12px);
+        position: fixed;
+        top: 50%;
         left: 50%;
-        transform: translateX(-50%);
+        transform: translate(-50%, -50%);
         display: none;
         grid-template-columns: 1fr;
         gap: 10px;
         padding: 12px;
-        min-width: 220px;
+        width: min(92vw, 360px);
+        max-height: 80vh;
+        overflow-y: auto;
         background: #f2f6f3;
         border: 1px solid #d6ded8;
         border-radius: 18px;
@@ -1327,42 +1330,42 @@
               <span class="material-symbols-outlined" style="color: var(--primary); font-size: 30px;">water_drop</span>
               Feed
             </button>
-            <div class="feed-menu" id="feed-menu" aria-hidden="true">
-              <button class="feed-option" id="log-breastfeed" type="button">Start breastfed</button>
-              <button class="feed-option" id="log-feed-manual" type="button">Log feed</button>
-              <div class="feed-input">
-                <label for="expressed-ml">Expressed (ml)</label>
-                <div class="feed-input-row">
-                  <input
-                    class="feed-input-field"
-                    id="expressed-ml"
-                    type="number"
-                    min="0"
-                    step="0.1"
-                    inputmode="decimal"
-                    pattern="[0-9]*[.,]?[0-9]*"
-                    placeholder="0"
-                  >
-                  <button class="feed-option" id="log-expressed" type="button">Log</button>
-                </div>
-              </div>
-              <div class="feed-input">
-                <label for="formula-ml">Formula (ml)</label>
-                <div class="feed-input-row">
-                  <input
-                    class="feed-input-field"
-                    id="formula-ml"
-                    type="number"
-                    min="0"
-                    step="0.1"
-                    inputmode="decimal"
-                    pattern="[0-9]*[.,]?[0-9]*"
-                    placeholder="0"
-                  >
-                  <button class="feed-option" id="log-formula" type="button">Log</button>
-                </div>
-              </div>
-            </div>
+          </div>
+        </div>
+      </div>
+      <div class="feed-menu" id="feed-menu" aria-hidden="true">
+        <button class="feed-option" id="log-breastfeed" type="button">Start breastfed</button>
+        <button class="feed-option" id="log-feed-manual" type="button">Log feed</button>
+        <div class="feed-input">
+          <label for="expressed-ml">Expressed (ml)</label>
+          <div class="feed-input-row">
+            <input
+              class="feed-input-field"
+              id="expressed-ml"
+              type="number"
+              min="0"
+              step="0.1"
+              inputmode="decimal"
+              pattern="[0-9]*[.,]?[0-9]*"
+              placeholder="0"
+            >
+            <button class="feed-option" id="log-expressed" type="button">Log</button>
+          </div>
+        </div>
+        <div class="feed-input">
+          <label for="formula-ml">Formula (ml)</label>
+          <div class="feed-input-row">
+            <input
+              class="feed-input-field"
+              id="formula-ml"
+              type="number"
+              min="0"
+              step="0.1"
+              inputmode="decimal"
+              pattern="[0-9]*[.,]?[0-9]*"
+              placeholder="0"
+            >
+            <button class="feed-option" id="log-formula" type="button">Log</button>
           </div>
         </div>
       </div>
