@@ -122,6 +122,18 @@ const timelineTrackEl = document.getElementById("timeline-track");
 const timelineEmptyEl = document.getElementById("timeline-empty");
 const timelineLoadingEl = document.getElementById("timeline-loading");
 const timelineSentinelEl = document.getElementById("timeline-sentinel");
+const rulerWrapEl = document.getElementById("ruler-wrap");
+const rulerBodyEl = document.getElementById("ruler-body");
+const rulerCanvasEl = document.getElementById("ruler-canvas");
+const rulerReadoutEl = document.getElementById("ruler-readout");
+const rulerTotalEl = document.getElementById("ruler-total");
+const rulerDetailEl = document.getElementById("ruler-detail");
+const rulerGoalEl = document.getElementById("ruler-goal");
+const rulerStartEl = document.getElementById("ruler-start");
+const rulerEndEl = document.getElementById("ruler-end");
+const rulerEmptyEl = document.getElementById("ruler-empty");
+const rulerSnapToggleEl = document.getElementById("ruler-snap-toggle");
+const rulerNowBtnEl = document.getElementById("ruler-now-btn");
 
 const chartSvg = document.getElementById("history-chart");
 const chartEmptyEl = document.getElementById("chart-empty");
@@ -708,6 +720,7 @@ let logInitialized = false;
 let settingsInitialized = false;
 let summaryInitialized = false;
 let timelineInitialized = false;
+let rulerInitialized = false;
 let nextFeedTimer = null;
 let refreshTimer = null;
 let summaryDate = null;
@@ -734,6 +747,19 @@ let timelineLoading = false;
 let timelineObserver = null;
 const timelineDayMap = new Map();
 const timelineHourMap = new Map();
+const RULER_DAYS_BACK = 7;
+const RULER_WINDOW_MS = 24 * 60 * 60 * 1000;
+const RULER_BUCKET_MS = 30 * 60 * 1000;
+let rulerGoalMl = 700;
+let rulerEntries = [];
+let rulerAnchorTs = Date.now();
+let rulerDragStartX = 0;
+let rulerDragStartAnchor = 0;
+let rulerDragging = false;
+let rulerStretch = 0;
+let rulerMinTs = null;
+let rulerMaxTs = null;
+let rulerSnapToFeeds = true;
 
 function initHomeHandlers() {
   if (homeInitialized || pageType !== "home") {
@@ -2201,6 +2227,372 @@ function computeWindow(hours) {
     sinceIso: since.toISOString(),
     untilIso: until.toISOString(),
   };
+}
+
+function getCssVar(name, fallback) {
+  const value = window.getComputedStyle(document.documentElement).getPropertyValue(name);
+  if (!value) {
+    return fallback;
+  }
+  const trimmed = value.trim();
+  return trimmed ? trimmed : fallback;
+}
+
+function normalizeFeedEntry(entry) {
+  if (!entry || entry.type !== "feed") {
+    return null;
+  }
+  if (activeUser && entry.user_slug && entry.user_slug !== activeUser) {
+    return null;
+  }
+  const timestamp = new Date(entry.timestamp_utc);
+  if (Number.isNaN(timestamp.getTime())) {
+    return null;
+  }
+  const expressed = Number.isFinite(entry.expressed_ml) ? entry.expressed_ml : 0;
+  const formula = Number.isFinite(entry.formula_ml) ? entry.formula_ml : 0;
+  if (!expressed && !formula) {
+    return null;
+  }
+  return {
+    ts: timestamp.getTime(),
+    expressed,
+    formula,
+  };
+}
+
+function buildRulerBuckets() {
+  const buckets = new Map();
+  rulerEntries.forEach((entry) => {
+    const bucketTs = Math.round(entry.ts / RULER_BUCKET_MS) * RULER_BUCKET_MS;
+    const key = bucketTs.toString();
+    if (!buckets.has(key)) {
+      buckets.set(key, { ts: bucketTs, expressed: 0, formula: 0 });
+    }
+    const bucket = buckets.get(key);
+    bucket.expressed += entry.expressed;
+    bucket.formula += entry.formula;
+  });
+  return Array.from(buckets.values());
+}
+
+function computeRulerWindow(anchor, stretch = 0) {
+  const windowMs = RULER_WINDOW_MS * (1 + stretch);
+  const start = anchor - windowMs;
+  let expressed = 0;
+  let formula = 0;
+  rulerEntries.forEach((entry) => {
+    if (entry.ts >= start && entry.ts <= anchor) {
+      expressed += entry.expressed;
+      formula += entry.formula;
+    }
+  });
+  return {
+    start,
+    end: anchor,
+    expressed,
+    formula,
+    total: expressed + formula,
+    windowMs,
+  };
+}
+
+function nearestRulerFeedTs(ts) {
+  if (!rulerEntries.length) {
+    return ts;
+  }
+  let nearest = rulerEntries[0].ts;
+  let minDiff = Math.abs(ts - nearest);
+  rulerEntries.forEach((entry) => {
+    const diff = Math.abs(ts - entry.ts);
+    if (diff < minDiff) {
+      minDiff = diff;
+      nearest = entry.ts;
+    }
+  });
+  return nearest;
+}
+
+function clampRulerAnchor() {
+  if (!Number.isFinite(rulerMinTs) || !Number.isFinite(rulerMaxTs)) {
+    return;
+  }
+  const minAnchor = rulerMinTs + RULER_WINDOW_MS;
+  const maxAnchor = rulerMaxTs;
+  if (rulerAnchorTs < minAnchor) {
+    rulerAnchorTs = minAnchor;
+  }
+  if (rulerAnchorTs > maxAnchor) {
+    rulerAnchorTs = maxAnchor;
+  }
+}
+
+function resizeRulerCanvas() {
+  if (!rulerCanvasEl) {
+    return;
+  }
+  const rect = rulerCanvasEl.getBoundingClientRect();
+  rulerCanvasEl.width = rect.width * window.devicePixelRatio;
+  rulerCanvasEl.height = rect.height * window.devicePixelRatio;
+  drawRuler();
+}
+
+function updateRulerReadout(data, anchorX) {
+  if (!rulerReadoutEl) {
+    return;
+  }
+  if (rulerTotalEl) {
+    rulerTotalEl.textContent = formatMl(data.total);
+  }
+  if (rulerDetailEl) {
+    rulerDetailEl.textContent = `Expressed ${formatMl(data.expressed)} · Formula ${formatMl(data.formula)}`;
+  }
+  const goalValue = Number.isFinite(rulerGoalMl) && rulerGoalMl > 0 ? rulerGoalMl : 0;
+  const goalPct = goalValue ? Math.min(200, Math.round((data.total / goalValue) * 100)) : 0;
+  if (rulerGoalEl) {
+    rulerGoalEl.textContent = `${goalPct}% of ${goalValue || "--"} ml goal`;
+  }
+  if (rulerStartEl) {
+    rulerStartEl.textContent = formatTimestamp(new Date(data.start).toISOString());
+  }
+  if (rulerEndEl) {
+    rulerEndEl.textContent = formatTimestamp(new Date(data.end).toISOString());
+  }
+  if (!rulerBodyEl) {
+    return;
+  }
+  const rect = rulerBodyEl.getBoundingClientRect();
+  const minX = 90;
+  const maxX = rect.width - 90;
+  const clamped = Math.max(minX, Math.min(maxX, anchorX));
+  rulerReadoutEl.style.left = `${clamped}px`;
+}
+
+function drawRuler() {
+  if (!rulerCanvasEl || !rulerEntries || !rulerEntries.length) {
+    if (rulerCanvasEl) {
+      const ctx = rulerCanvasEl.getContext("2d");
+      if (ctx) {
+        ctx.clearRect(0, 0, rulerCanvasEl.width, rulerCanvasEl.height);
+      }
+    }
+    if (rulerEmptyEl) {
+      rulerEmptyEl.style.display = "flex";
+    }
+    if (rulerReadoutEl) {
+      rulerReadoutEl.style.display = "none";
+    }
+    return;
+  }
+  if (rulerEmptyEl) {
+    rulerEmptyEl.style.display = "none";
+  }
+  if (rulerReadoutEl) {
+    rulerReadoutEl.style.display = "block";
+  }
+  const ctx = rulerCanvasEl.getContext("2d");
+  if (!ctx) {
+    return;
+  }
+  const data = computeRulerWindow(rulerAnchorTs, rulerStretch);
+  const { width, height } = rulerCanvasEl;
+  const scale = window.devicePixelRatio;
+  ctx.clearRect(0, 0, width, height);
+
+  const padding = 18 * scale;
+  const trackY = height * 0.62;
+  const trackWidth = width - padding * 2;
+  const trackHeight = 6 * scale;
+  const minTs = rulerMinTs || Date.now() - RULER_DAYS_BACK * 24 * 60 * 60 * 1000;
+  const maxTs = rulerMaxTs || Date.now();
+  const span = Math.max(1, maxTs - minTs);
+
+  const expressedColor = getCssVar("--ruler-expressed", "#13ec5b");
+  const formulaColor = getCssVar("--ruler-formula", "#f8b13c");
+  const trackColor = getCssVar("--ruler-track", "#e0e7e1");
+  const windowColor = getCssVar("--ruler-window", "rgba(19, 236, 91, 0.12)");
+  const anchorColor = getCssVar("--ruler-anchor", "#0f1a12");
+
+  ctx.fillStyle = trackColor;
+  ctx.fillRect(padding, trackY, trackWidth, trackHeight);
+
+  const windowStartRatio = (data.start - minTs) / span;
+  const windowEndRatio = (data.end - minTs) / span;
+  const windowX = padding + windowStartRatio * trackWidth;
+  const windowW = (windowEndRatio - windowStartRatio) * trackWidth;
+  ctx.fillStyle = windowColor;
+  ctx.fillRect(windowX, trackY - 26 * scale, windowW, trackHeight + 52 * scale);
+
+  const buckets = buildRulerBuckets().filter((bucket) => (
+    bucket.ts >= minTs && bucket.ts <= maxTs
+  ));
+
+  buckets.forEach((bucket) => {
+    const ratio = (bucket.ts - minTs) / span;
+    const x = padding + ratio * trackWidth;
+    const baseHeight = 10 * scale;
+    const expressedH = baseHeight + Math.min(38 * scale, bucket.expressed * 0.34 * scale);
+    const formulaH = baseHeight + Math.min(30 * scale, bucket.formula * 0.3 * scale);
+
+    if (bucket.formula > 0) {
+      ctx.strokeStyle = formulaColor;
+      ctx.lineWidth = 3 * scale;
+      ctx.beginPath();
+      ctx.moveTo(x, trackY + baseHeight * 0.2);
+      ctx.lineTo(x, trackY + formulaH);
+      ctx.stroke();
+    }
+
+    if (bucket.expressed > 0) {
+      ctx.strokeStyle = expressedColor;
+      ctx.lineWidth = 3 * scale;
+      ctx.beginPath();
+      ctx.moveTo(x, trackY - baseHeight * 0.2);
+      ctx.lineTo(x, trackY - expressedH);
+      ctx.stroke();
+    }
+  });
+
+  const anchorRatio = (data.end - minTs) / span;
+  const anchorX = padding + anchorRatio * trackWidth;
+  ctx.strokeStyle = anchorColor;
+  ctx.lineWidth = 2 * scale;
+  ctx.beginPath();
+  ctx.moveTo(anchorX, trackY - 40 * scale);
+  ctx.lineTo(anchorX, trackY + 48 * scale);
+  ctx.stroke();
+
+  updateRulerReadout(data, anchorX / scale);
+}
+
+async function loadRulerFeeds({ reset } = {}) {
+  if (!rulerCanvasEl) {
+    return;
+  }
+  if (reset) {
+    rulerEntries = [];
+  }
+  const windowHours = RULER_DAYS_BACK * 24;
+  const window = computeWindow(windowHours);
+  rulerMinTs = window.since.getTime();
+  rulerMaxTs = window.until.getTime();
+  try {
+    const [entries, currentGoal] = await Promise.all([
+      loadEntriesWithFallback({
+        limit: 200,
+        since: window.sinceIso,
+        until: window.untilIso,
+        type: "feed",
+      }),
+      loadCurrentGoal(),
+    ]);
+    rulerGoalMl = currentGoal && Number.isFinite(currentGoal.goal_ml)
+      ? currentGoal.goal_ml
+      : rulerGoalMl;
+    rulerEntries = entries
+      .map(normalizeFeedEntry)
+      .filter((entry) => Boolean(entry));
+    rulerAnchorTs = window.until.getTime();
+    if (rulerEntries.length) {
+      rulerAnchorTs = nearestRulerFeedTs(rulerAnchorTs);
+    }
+    clampRulerAnchor();
+    drawRuler();
+  } catch (err) {
+    if (rulerEmptyEl) {
+      rulerEmptyEl.style.display = "flex";
+      rulerEmptyEl.textContent = "Unable to load feed history.";
+    }
+  }
+}
+
+function onRulerPointerDown(event) {
+  if (!rulerCanvasEl) {
+    return;
+  }
+  rulerDragging = true;
+  rulerDragStartX = event.clientX || (event.touches ? event.touches[0].clientX : 0);
+  rulerDragStartAnchor = rulerAnchorTs;
+}
+
+function onRulerPointerMove(event) {
+  if (!rulerDragging || !rulerCanvasEl) {
+    return;
+  }
+  const x = event.clientX || (event.touches ? event.touches[0].clientX : 0);
+  const dx = x - rulerDragStartX;
+  const rect = rulerCanvasEl.getBoundingClientRect();
+  const ratio = dx / rect.width;
+  const span = (rulerMaxTs || Date.now()) - (rulerMinTs || Date.now() - RULER_DAYS_BACK * 24 * 60 * 60 * 1000);
+  const delta = ratio * span;
+  rulerAnchorTs = rulerDragStartAnchor - delta;
+  rulerStretch = Math.min(0.1, Math.abs(dx) / rect.width * 0.18);
+  clampRulerAnchor();
+  drawRuler();
+}
+
+function onRulerPointerUp() {
+  if (!rulerDragging) {
+    return;
+  }
+  rulerDragging = false;
+  rulerStretch = 0;
+  if (rulerSnapToFeeds) {
+    rulerAnchorTs = nearestRulerFeedTs(rulerAnchorTs);
+  }
+  clampRulerAnchor();
+  drawRuler();
+}
+
+function jumpRulerToNow() {
+  rulerAnchorTs = Date.now();
+  if (rulerSnapToFeeds) {
+    rulerAnchorTs = nearestRulerFeedTs(rulerAnchorTs);
+  }
+  clampRulerAnchor();
+  drawRuler();
+}
+
+function onRulerClick(event) {
+  if (!rulerCanvasEl) {
+    return;
+  }
+  const rect = rulerCanvasEl.getBoundingClientRect();
+  const ratio = (event.clientX - rect.left) / rect.width;
+  const span = (rulerMaxTs || Date.now()) - (rulerMinTs || Date.now() - RULER_DAYS_BACK * 24 * 60 * 60 * 1000);
+  const targetTs = (rulerMinTs || Date.now() - RULER_DAYS_BACK * 24 * 60 * 60 * 1000) + ratio * span;
+  rulerAnchorTs = rulerSnapToFeeds ? nearestRulerFeedTs(targetTs) : targetTs;
+  clampRulerAnchor();
+  drawRuler();
+}
+
+function initRulerHandlers() {
+  if (rulerInitialized || pageType !== "timeline" || !rulerCanvasEl) {
+    return;
+  }
+  rulerInitialized = true;
+  rulerCanvasEl.addEventListener("mousedown", onRulerPointerDown);
+  rulerCanvasEl.addEventListener("mousemove", onRulerPointerMove);
+  window.addEventListener("mouseup", onRulerPointerUp);
+  rulerCanvasEl.addEventListener("touchstart", onRulerPointerDown, { passive: true });
+  rulerCanvasEl.addEventListener("touchmove", onRulerPointerMove, { passive: true });
+  rulerCanvasEl.addEventListener("touchend", onRulerPointerUp);
+  rulerCanvasEl.addEventListener("click", onRulerClick);
+  if (rulerSnapToggleEl) {
+    rulerSnapToggleEl.addEventListener("click", () => {
+      rulerSnapToFeeds = !rulerSnapToFeeds;
+      rulerSnapToggleEl.classList.toggle("active", rulerSnapToFeeds);
+      rulerSnapToggleEl.textContent = rulerSnapToFeeds ? "Snap to feeds" : "Free scroll";
+    });
+  }
+  if (rulerNowBtnEl) {
+    rulerNowBtnEl.addEventListener("click", () => {
+      jumpRulerToNow();
+    });
+  }
+  window.addEventListener("resize", resizeRulerCanvas);
+  resizeRulerCanvas();
+  void loadRulerFeeds({ reset: true });
 }
 
 function formatDateInputValue(date) {
@@ -4070,6 +4462,7 @@ function initTimelineHandlers() {
   if (refreshBtn) {
     refreshBtn.addEventListener("click", () => {
       void loadTimelineEntries({ reset: true });
+      void loadRulerFeeds({ reset: true });
     });
   }
   if (timelineWrapEl && timelineSentinelEl) {
@@ -4083,6 +4476,7 @@ function initTimelineHandlers() {
     );
     timelineObserver.observe(timelineSentinelEl);
   }
+  initRulerHandlers();
 }
 
 function updateMilkExpressLedgerSubtotal() {
