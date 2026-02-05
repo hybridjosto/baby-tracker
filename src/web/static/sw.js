@@ -1,4 +1,4 @@
-const CACHE_NAME = "baby-tracker-shell-v3";
+const CACHE_NAME = "baby-tracker-shell-v4";
 const PRECACHE_URLS = [
   "./",
   "./log",
