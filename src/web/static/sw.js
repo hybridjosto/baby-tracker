@@ -1,4 +1,5 @@
-const CACHE_NAME = "baby-tracker-shell-v4";
+const CACHE_NAME = "baby-tracker-shell-v5";
+const STATIC_VERSION = "2026-02-08-1";
 const PRECACHE_URLS = [
   "./",
   "./log",
@@ -9,8 +10,8 @@ const PRECACHE_URLS = [
   "./goals",
   "./settings",
   "./sw.js",
-  "./static/app.js",
-  "./static/styles.css",
+  `./static/app.js?v=${STATIC_VERSION}`,
+  `./static/styles.css?v=${STATIC_VERSION}`,
   "./static/manifest.json",
   "./apple-touch-icon.png",
 ];
