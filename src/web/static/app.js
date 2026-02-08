@@ -123,6 +123,29 @@ const timelineTrackEl = document.getElementById("timeline-track");
 const timelineEmptyEl = document.getElementById("timeline-empty");
 const timelineLoadingEl = document.getElementById("timeline-loading");
 const timelineSentinelEl = document.getElementById("timeline-sentinel");
+
+const calendarDaysEl = document.getElementById("calendar-days");
+const calendarWeekRangeEl = document.getElementById("week-range");
+const calendarEmptyEl = document.getElementById("calendar-empty");
+const calendarPrevBtn = document.querySelector("[data-week-nav='prev']");
+const calendarNextBtn = document.querySelector("[data-week-nav='next']");
+const calendarTodayBtn = document.querySelector("[data-week-nav='today']");
+
+const calendarFormEl = document.getElementById("calendar-form");
+const calendarFormTitleEl = document.getElementById("calendar-form-title");
+const calendarFormSubtitleEl = document.getElementById("calendar-form-subtitle");
+const calendarTitleInputEl = document.getElementById("calendar-title");
+const calendarCategorySelectEl = document.getElementById("calendar-category");
+const calendarDateInputEl = document.getElementById("calendar-date");
+const calendarLocationInputEl = document.getElementById("calendar-location");
+const calendarStartTimeInputEl = document.getElementById("calendar-start-time");
+const calendarEndTimeInputEl = document.getElementById("calendar-end-time");
+const calendarNotesInputEl = document.getElementById("calendar-notes");
+const calendarRecurrenceSelectEl = document.getElementById("calendar-recurrence");
+const calendarRepeatUntilInputEl = document.getElementById("calendar-repeat-until");
+const calendarRepeatUntilFieldEl = document.getElementById("calendar-repeat-until-field");
+const calendarSubmitBtn = document.getElementById("calendar-submit");
+const calendarDeleteBtn = document.getElementById("calendar-delete");
 const rulerWrapEl = document.getElementById("ruler-wrap");
 const rulerBodyEl = document.getElementById("ruler-body");
 const rulerCanvasEl = document.getElementById("ruler-canvas");
@@ -687,13 +710,15 @@ function updateUserDisplay() {
         : "Choose a user to log.";
     } else if (pageType === "goals") {
       userMessageEl.textContent = "Goals stay active until a later-dated entry is logged.";
-  } else if (pageType === "timeline") {
-    userMessageEl.textContent = "All events";
-  } else if (pageType === "bottles") {
-    userMessageEl.textContent = "Shared bottle library";
-  } else if (pageType === "milk-express") {
-    userMessageEl.textContent = "Last 48 hours • All milk express";
-  } else {
+    } else if (pageType === "timeline") {
+      userMessageEl.textContent = "All events";
+    } else if (pageType === "calendar" || pageType === "calendar-form") {
+      userMessageEl.textContent = "Shared calendar";
+    } else if (pageType === "bottles") {
+      userMessageEl.textContent = "Shared bottle library";
+    } else if (pageType === "milk-express") {
+      userMessageEl.textContent = "Last 48 hours • All milk express";
+    } else {
       userMessageEl.textContent = userValid
         ? "All events"
         : "All events. Choose a user to log.";
@@ -738,6 +763,9 @@ let bottlesInitialized = false;
 let bottlesCache = [];
 let bottleExpressedMl = null;
 let hasLoadedFeedingGoals = false;
+let calendarWeekOffset = 0;
+let calendarWeekStart = null;
+let calendarLoading = false;
 let activeFeedingGoal = null;
 let latestFeedTotalMl = 0;
 let hasLoadedTimelineEntries = false;
@@ -1366,6 +1394,7 @@ function applyUserState() {
     return;
   }
   const allowTimeline = pageType === "timeline";
+  const allowSharedPage = allowTimeline || pageType === "calendar" || pageType === "calendar-form";
   toggleDisabled(feedBtn, !userValid);
   toggleDisabled(nappyBtn, !userValid);
   toggleDisabled(miscBtn, !userValid || customEventTypes.length === 0);
@@ -1387,9 +1416,9 @@ function applyUserState() {
   void hydrateBreastfeedFromLocalEntries();
   updateBreastfeedButton();
   if (userFormEl) {
-    userFormEl.hidden = userValid || allowTimeline;
+    userFormEl.hidden = userValid || allowSharedPage;
   }
-  if (!userValid && !allowTimeline) {
+  if (!userValid && !allowSharedPage) {
     closeFeedMenu();
     setStatus("Choose a user below to start logging.");
   } else {
@@ -1410,6 +1439,13 @@ function applyUserState() {
   if (pageType === "timeline") {
     initTimelineHandlers();
     loadTimelineEntries({ reset: true });
+  }
+  if (pageType === "calendar") {
+    initCalendarHandlers();
+    loadCalendarWeek();
+  }
+  if (pageType === "calendar-form") {
+    initCalendarFormHandlers();
   }
   if (pageType === "milk-express") {
     initMilkExpressLedgerHandlers();
@@ -4478,6 +4514,394 @@ function initTimelineHandlers() {
     timelineObserver.observe(timelineSentinelEl);
   }
   initRulerHandlers();
+}
+
+const CALENDAR_CATEGORY_LABELS = {
+  group: "Group",
+  meetup: "Meetup",
+  hub: "Family hub",
+  other: "Other",
+};
+
+function pad2(value) {
+  return String(value).padStart(2, "0");
+}
+
+function toLocalIsoDate(date) {
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+}
+
+function startOfWeekMonday(value) {
+  const date = new Date(value);
+  const day = date.getDay();
+  const diff = (day + 6) % 7;
+  date.setDate(date.getDate() - diff);
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
+function formatWeekRange(startDate) {
+  const endDate = new Date(startDate);
+  endDate.setDate(startDate.getDate() + 6);
+  const fmt = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short" });
+  return `Week of ${fmt.format(startDate)} – ${fmt.format(endDate)}`;
+}
+
+function formatDayLabel(date) {
+  const fmt = new Intl.DateTimeFormat(undefined, { weekday: "short" });
+  return fmt.format(date);
+}
+
+function formatDayDate(date) {
+  const fmt = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short" });
+  return fmt.format(date);
+}
+
+function buildCalendarEventCard(event) {
+  const card = document.createElement("article");
+  card.className = "calendar-event";
+
+  const time = document.createElement("div");
+  time.className = "event-time";
+  const endTime = event.end_time_local;
+  time.textContent = endTime
+    ? `${event.start_time_local}–${endTime}`
+    : event.start_time_local;
+
+  const title = document.createElement("div");
+  title.className = "event-title";
+  title.textContent = event.title;
+
+  const location = event.location ? document.createElement("div") : null;
+  if (location) {
+    location.className = "event-meta";
+    location.textContent = event.location;
+  }
+
+  const notes = event.notes ? document.createElement("div") : null;
+  if (notes) {
+    notes.className = "event-meta";
+    notes.textContent = event.notes;
+  }
+
+  const tag = document.createElement("div");
+  tag.className = "event-tag";
+  tag.dataset.category = event.category;
+  tag.textContent = CALENDAR_CATEGORY_LABELS[event.category] || "Other";
+
+  const actions = document.createElement("div");
+  actions.className = "event-actions";
+  const editLink = document.createElement("a");
+  editLink.href = buildUrl(`/calendar/edit/${event.id}`);
+  editLink.textContent = "Edit";
+  const deleteBtn = document.createElement("button");
+  deleteBtn.type = "button";
+  deleteBtn.dataset.calendarAction = "delete";
+  deleteBtn.dataset.eventId = String(event.id);
+  deleteBtn.textContent = "Delete";
+  actions.appendChild(editLink);
+  actions.appendChild(deleteBtn);
+
+  card.appendChild(time);
+  card.appendChild(title);
+  if (location) {
+    card.appendChild(location);
+  }
+  if (notes) {
+    card.appendChild(notes);
+  }
+  card.appendChild(tag);
+  card.appendChild(actions);
+  return card;
+}
+
+function renderCalendarWeek(startDate, occurrences) {
+  if (!calendarDaysEl || !calendarWeekRangeEl) {
+    return;
+  }
+  calendarWeekRangeEl.textContent = formatWeekRange(startDate);
+  calendarDaysEl.innerHTML = "";
+  const todayIso = toLocalIsoDate(new Date());
+  const occurrencesByDate = new Map();
+  occurrences.forEach((event) => {
+    const key = event.occurrence_date || event.date_local;
+    if (!occurrencesByDate.has(key)) {
+      occurrencesByDate.set(key, []);
+    }
+    occurrencesByDate.get(key).push(event);
+  });
+
+  for (let i = 0; i < 7; i += 1) {
+    const dayDate = new Date(startDate);
+    dayDate.setDate(startDate.getDate() + i);
+    const dayIso = toLocalIsoDate(dayDate);
+    const dayEvents = occurrencesByDate.get(dayIso) || [];
+
+    const section = document.createElement("section");
+    section.className = "calendar-day";
+    if (dayIso === todayIso) {
+      section.classList.add("is-today");
+    }
+    if (!dayEvents.length) {
+      section.classList.add("empty");
+    }
+
+    const header = document.createElement("div");
+    header.className = "calendar-day-header";
+    const label = document.createElement("div");
+    label.className = "calendar-day-label";
+    label.textContent = formatDayLabel(dayDate);
+    const dateLabel = document.createElement("div");
+    dateLabel.className = "calendar-day-date";
+    dateLabel.textContent = formatDayDate(dayDate);
+    header.appendChild(label);
+    header.appendChild(dateLabel);
+
+    const eventsWrap = document.createElement("div");
+    eventsWrap.className = "calendar-events";
+    if (!dayEvents.length) {
+      const empty = document.createElement("div");
+      empty.textContent = "No sessions added yet.";
+      eventsWrap.appendChild(empty);
+    } else {
+      dayEvents.forEach((event) => {
+        eventsWrap.appendChild(buildCalendarEventCard(event));
+      });
+    }
+
+    section.appendChild(header);
+    section.appendChild(eventsWrap);
+    calendarDaysEl.appendChild(section);
+  }
+
+  if (calendarEmptyEl) {
+    calendarEmptyEl.hidden = occurrences.length > 0;
+  }
+}
+
+async function loadCalendarWeek() {
+  if (calendarLoading || pageType !== "calendar") {
+    return;
+  }
+  calendarLoading = true;
+  try {
+    const today = new Date();
+    const baseStart = startOfWeekMonday(today);
+    calendarWeekStart = new Date(baseStart);
+    calendarWeekStart.setDate(baseStart.getDate() + calendarWeekOffset * 7);
+    const startIso = toLocalIsoDate(calendarWeekStart);
+    const endDate = new Date(calendarWeekStart);
+    endDate.setDate(calendarWeekStart.getDate() + 6);
+    const endIso = toLocalIsoDate(endDate);
+
+    const params = new URLSearchParams({ start: startIso, end: endIso });
+    const response = await fetch(buildUrl(`/api/calendar/events?${params}`));
+    if (!response.ok) {
+      setStatus("Failed to load calendar events.");
+      renderCalendarWeek(calendarWeekStart, []);
+      return;
+    }
+    const data = await response.json();
+    renderCalendarWeek(calendarWeekStart, Array.isArray(data) ? data : []);
+  } catch (err) {
+    setStatus("Failed to load calendar events.");
+  } finally {
+    calendarLoading = false;
+  }
+}
+
+async function deleteCalendarEvent(eventId) {
+  try {
+    const response = await fetch(buildUrl(`/api/calendar/events/${eventId}`), {
+      method: "DELETE",
+    });
+    if (!response.ok) {
+      setStatus("Failed to delete calendar event.");
+      return;
+    }
+    void loadCalendarWeek();
+  } catch (err) {
+    setStatus("Failed to delete calendar event.");
+  }
+}
+
+function initCalendarHandlers() {
+  if (pageType !== "calendar") {
+    return;
+  }
+  if (calendarPrevBtn) {
+    calendarPrevBtn.addEventListener("click", () => {
+      calendarWeekOffset -= 1;
+      void loadCalendarWeek();
+    });
+  }
+  if (calendarNextBtn) {
+    calendarNextBtn.addEventListener("click", () => {
+      calendarWeekOffset += 1;
+      void loadCalendarWeek();
+    });
+  }
+  if (calendarTodayBtn) {
+    calendarTodayBtn.addEventListener("click", () => {
+      calendarWeekOffset = 0;
+      void loadCalendarWeek();
+    });
+  }
+  if (calendarDaysEl) {
+    calendarDaysEl.addEventListener("click", (event) => {
+      const target = event.target.closest("[data-calendar-action=\"delete\"]");
+      if (!target) {
+        return;
+      }
+      const eventId = Number.parseInt(target.dataset.eventId || "", 10);
+      if (!Number.isFinite(eventId)) {
+        return;
+      }
+      if (!window.confirm("Delete this event?")) {
+        return;
+      }
+      void deleteCalendarEvent(eventId);
+    });
+  }
+}
+
+function updateCalendarRecurrenceUI() {
+  if (!calendarRecurrenceSelectEl || !calendarRepeatUntilFieldEl || !calendarRepeatUntilInputEl) {
+    return;
+  }
+  const isWeekly = calendarRecurrenceSelectEl.value === "weekly";
+  calendarRepeatUntilFieldEl.hidden = !isWeekly;
+  calendarRepeatUntilInputEl.disabled = !isWeekly;
+  if (!isWeekly) {
+    calendarRepeatUntilInputEl.value = "";
+  }
+}
+
+async function loadCalendarForm(eventId) {
+  try {
+    const response = await fetch(buildUrl(`/api/calendar/events/${eventId}`));
+    if (!response.ok) {
+      setStatus("Event not found.");
+      return;
+    }
+    const event = await response.json();
+    if (calendarTitleInputEl) {
+      calendarTitleInputEl.value = event.title || "";
+    }
+    if (calendarCategorySelectEl) {
+      calendarCategorySelectEl.value = event.category || "group";
+    }
+    if (calendarDateInputEl) {
+      calendarDateInputEl.value = event.date_local || "";
+    }
+    if (calendarLocationInputEl) {
+      calendarLocationInputEl.value = event.location || "";
+    }
+    if (calendarStartTimeInputEl) {
+      calendarStartTimeInputEl.value = event.start_time_local || "";
+    }
+    if (calendarEndTimeInputEl) {
+      calendarEndTimeInputEl.value = event.end_time_local || "";
+    }
+    if (calendarNotesInputEl) {
+      calendarNotesInputEl.value = event.notes || "";
+    }
+    if (calendarRecurrenceSelectEl) {
+      calendarRecurrenceSelectEl.value = event.recurrence || "none";
+    }
+    if (calendarRepeatUntilInputEl) {
+      calendarRepeatUntilInputEl.value = event.recurrence_until_local || "";
+    }
+    updateCalendarRecurrenceUI();
+  } catch (err) {
+    setStatus("Failed to load event.");
+  }
+}
+
+async function submitCalendarForm(eventId) {
+  if (!calendarTitleInputEl || !calendarDateInputEl || !calendarStartTimeInputEl) {
+    return;
+  }
+  const payload = {
+    title: calendarTitleInputEl.value.trim(),
+    date_local: calendarDateInputEl.value,
+    start_time_local: calendarStartTimeInputEl.value,
+    end_time_local: calendarEndTimeInputEl ? calendarEndTimeInputEl.value || null : null,
+    location: calendarLocationInputEl ? calendarLocationInputEl.value.trim() || null : null,
+    notes: calendarNotesInputEl ? calendarNotesInputEl.value.trim() || null : null,
+    category: calendarCategorySelectEl ? calendarCategorySelectEl.value : "group",
+    recurrence: calendarRecurrenceSelectEl ? calendarRecurrenceSelectEl.value : "none",
+    recurrence_until_local: calendarRepeatUntilInputEl ? calendarRepeatUntilInputEl.value || null : null,
+  };
+  if (payload.recurrence !== "weekly") {
+    payload.recurrence_until_local = null;
+  }
+  if (calendarSubmitBtn) {
+    calendarSubmitBtn.disabled = true;
+  }
+  try {
+    const response = await fetch(
+      buildUrl(eventId ? `/api/calendar/events/${eventId}` : "/api/calendar/events"),
+      {
+        method: eventId ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      },
+    );
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      setStatus(data.error || "Failed to save event.");
+      return;
+    }
+    window.location.href = buildUrl("/calendar");
+  } catch (err) {
+    setStatus("Failed to save event.");
+  } finally {
+    if (calendarSubmitBtn) {
+      calendarSubmitBtn.disabled = false;
+    }
+  }
+}
+
+function initCalendarFormHandlers() {
+  if (pageType !== "calendar-form" || !calendarFormEl) {
+    return;
+  }
+  const eventId = Number.parseInt(bodyEl.dataset.eventId || "", 10);
+  const isEdit = Number.isFinite(eventId) && eventId > 0;
+  if (isEdit) {
+    if (calendarFormTitleEl) {
+      calendarFormTitleEl.textContent = "Edit event";
+    }
+    if (calendarFormSubtitleEl) {
+      calendarFormSubtitleEl.textContent = "Update the details for this meetup or group.";
+    }
+    if (calendarDeleteBtn) {
+      calendarDeleteBtn.hidden = false;
+    }
+    void loadCalendarForm(eventId);
+  } else {
+    if (calendarDateInputEl) {
+      calendarDateInputEl.value = toLocalIsoDate(new Date());
+    }
+    updateCalendarRecurrenceUI();
+  }
+  if (calendarRecurrenceSelectEl) {
+    calendarRecurrenceSelectEl.addEventListener("change", updateCalendarRecurrenceUI);
+  }
+  calendarFormEl.addEventListener("submit", (event) => {
+    event.preventDefault();
+    void submitCalendarForm(isEdit ? eventId : null);
+  });
+  if (calendarDeleteBtn && isEdit) {
+    calendarDeleteBtn.addEventListener("click", async () => {
+      if (!window.confirm("Delete this event?")) {
+        return;
+      }
+      await deleteCalendarEvent(eventId);
+      window.location.href = buildUrl("/calendar");
+    });
+  }
 }
 
 function updateMilkExpressLedgerSubtotal() {

@@ -137,6 +137,11 @@
         flex-direction: column;
         gap: 10px;
         min-height: 180px;
+        border: 1px solid transparent;
+      }
+      .calendar-day.is-today {
+        border-color: rgba(19, 236, 91, 0.5);
+        box-shadow: 0 0 0 1px rgba(19, 236, 91, 0.2);
       }
       html.dark .calendar-day {
         background: rgba(255, 255, 255, 0.06);
@@ -191,24 +196,51 @@
         display: inline-flex;
         align-items: center;
         gap: 6px;
-        background: rgba(19, 236, 91, 0.14);
-        color: #0f1a12;
         border-radius: 999px;
         font-size: 11px;
         padding: 2px 8px;
         font-weight: 600;
       }
-      html.dark .event-tag {
+      .event-tag[data-category="group"] {
+        background: rgba(19, 236, 91, 0.18);
         color: #0f1a12;
+      }
+      .event-tag[data-category="meetup"] {
+        background: rgba(125, 211, 252, 0.24);
+        color: #0f1a12;
+      }
+      .event-tag[data-category="hub"] {
+        background: rgba(250, 204, 21, 0.2);
+        color: #4b3b00;
+      }
+      .event-tag[data-category="other"] {
+        background: rgba(148, 163, 184, 0.25);
+        color: #1f2937;
+      }
+      .event-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .event-actions a,
+      .event-actions button {
+        border: none;
+        background: transparent;
+        color: var(--text-secondary);
+        font-size: 12px;
+        cursor: pointer;
+        padding: 0;
       }
       .calendar-day.empty .calendar-events {
         opacity: 0.55;
         font-size: 12px;
         color: var(--text-secondary);
       }
-      .prototype-note {
-        font-size: 12px;
+      .calendar-empty {
+        text-align: center;
         color: var(--text-secondary);
+        font-size: 13px;
+        padding: 12px 0 0;
       }
       @media (max-width: 1100px) {
         .calendar-grid {
@@ -251,10 +283,7 @@
 
       <section class="calendar-shell">
         <div class="week-bar">
-          <div>
-            <div class="week-range" id="week-range">Week of --</div>
-            <div class="prototype-note">Prototype view with sample events.</div>
-          </div>
+          <div class="week-range" id="week-range">Week of --</div>
           <div class="week-actions">
             <button type="button" data-week-nav="prev">
               <span class="material-symbols-outlined" aria-hidden="true">chevron_left</span>
@@ -272,120 +301,11 @@
           </div>
         </div>
         <div class="calendar-grid" id="calendar-days"></div>
+        <div class="calendar-empty" id="calendar-empty" hidden>No sessions added this week.</div>
       </section>
+      <div class="status" id="status"></div>
     </main>
 
-    <script>
-      (() => {
-        const weekRangeEl = document.getElementById("week-range");
-        const daysWrap = document.getElementById("calendar-days");
-        const navButtons = document.querySelectorAll("[data-week-nav]");
-        const dayLabelFmt = new Intl.DateTimeFormat(undefined, { weekday: "short" });
-        const dayDateFmt = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short" });
-        const rangeFmt = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short" });
-
-        const startOfWeek = (value) => {
-          const date = new Date(value);
-          const day = date.getDay();
-          const diff = (day + 6) % 7;
-          date.setDate(date.getDate() - diff);
-          date.setHours(0, 0, 0, 0);
-          return date;
-        };
-
-        const toIsoDate = (date) => date.toISOString().slice(0, 10);
-
-        const buildMockEvents = (weekStart) => {
-          const events = [];
-          const addEvent = (offset, title, time, location, category) => {
-            const date = new Date(weekStart);
-            date.setDate(weekStart.getDate() + offset);
-            events.push({
-              date: toIsoDate(date),
-              title,
-              time,
-              location,
-              category,
-            });
-          };
-          addEvent(0, "Tiny Tots Playgroup", "09:30–11:00", "St. Mary’s Hall", "Group");
-          addEvent(1, "Family Hub Drop-In", "13:00–15:00", "Meadow Family Hub", "Hub");
-          addEvent(2, "Sensory Storytime", "10:00–11:00", "Library Annex", "Meetup");
-          addEvent(4, "Baby Yoga", "09:15–10:00", "Willow Studio", "Group");
-          addEvent(5, "Saturday Park Picnic", "11:00–13:00", "Riverside Park", "Meetup");
-          return events;
-        };
-
-        let weekOffset = 0;
-
-        const renderWeek = () => {
-          const today = new Date();
-          const weekStart = startOfWeek(new Date(today.getFullYear(), today.getMonth(), today.getDate() + weekOffset * 7));
-          const weekEnd = new Date(weekStart);
-          weekEnd.setDate(weekStart.getDate() + 6);
-          weekRangeEl.textContent = `Week of ${rangeFmt.format(weekStart)} – ${rangeFmt.format(weekEnd)}`;
-
-          const events = buildMockEvents(weekStart);
-          daysWrap.innerHTML = "";
-
-          for (let i = 0; i < 7; i += 1) {
-            const dayDate = new Date(weekStart);
-            dayDate.setDate(weekStart.getDate() + i);
-            const dayIso = toIsoDate(dayDate);
-            const dayEvents = events.filter((event) => event.date === dayIso);
-
-            const section = document.createElement("section");
-            section.className = "calendar-day";
-            if (!dayEvents.length) {
-              section.classList.add("empty");
-            }
-
-            section.innerHTML = `
-              <div class="calendar-day-header">
-                <div class="calendar-day-label">${dayLabelFmt.format(dayDate)}</div>
-                <div class="calendar-day-date">${dayDateFmt.format(dayDate)}</div>
-              </div>
-              <div class="calendar-events">
-                ${dayEvents.length ? "" : "<div>No sessions added yet.</div>"}
-              </div>
-            `;
-
-            if (dayEvents.length) {
-              const eventsWrap = section.querySelector(".calendar-events");
-              dayEvents.forEach((event) => {
-                const card = document.createElement("article");
-                card.className = "calendar-event";
-                card.innerHTML = `
-                  <div class="event-time">${event.time}</div>
-                  <div class="event-title">${event.title}</div>
-                  <div class="event-meta">${event.location}</div>
-                  <div class="event-tag">${event.category}</div>
-                `;
-                eventsWrap.appendChild(card);
-              });
-            }
-
-            daysWrap.appendChild(section);
-          }
-        };
-
-        navButtons.forEach((button) => {
-          button.addEventListener("click", () => {
-            const action = button.dataset.weekNav;
-            if (action === "prev") {
-              weekOffset -= 1;
-            } else if (action === "next") {
-              weekOffset += 1;
-            } else {
-              weekOffset = 0;
-            }
-            renderWeek();
-          });
-        });
-
-        renderWeek();
-      })();
-    </script>
     <script src="{{ base_path }}/static/app.js"></script>
   </body>
 </html>

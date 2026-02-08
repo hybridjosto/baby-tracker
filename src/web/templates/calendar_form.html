@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Add Calendar Event</title>
+    <title>Calendar Event</title>
     <link rel="manifest" href="{{ base_path }}/static/manifest.json">
     <link rel="apple-touch-icon" href="{{ base_path }}/apple-touch-icon.png">
     <link
@@ -137,9 +137,13 @@
         background: rgba(255, 255, 255, 0.08);
         color: #d3e4d7;
       }
-      .prototype-note {
-        font-size: 12px;
-        color: var(--text-secondary);
+      .actions .danger {
+        border-color: #fca5a5;
+        color: #b91c1c;
+      }
+      html.dark .actions .danger {
+        border-color: rgba(248, 113, 113, 0.5);
+        color: #fecaca;
       }
       @media (max-width: 720px) {
         .form-grid {
@@ -148,13 +152,18 @@
       }
     </style>
   </head>
-  <body data-user="{{ user_slug }}" data-user-valid="{{ 'true' if user_valid else 'false' }}" data-page="calendar-form" data-base-path="{{ base_path }}">
+  <body
+    data-user="{{ user_slug }}"
+    data-user-valid="{{ 'true' if user_valid else 'false' }}"
+    data-page="calendar-form"
+    data-base-path="{{ base_path }}"
+    data-event-id="{{ event_id or '' }}"
+  >
     <main class="page">
       <header class="header">
         <div>
-          <h1>Add a new event</h1>
-          <p>Capture children’s groups, meetups, and family hub sessions.</p>
-          <div class="prototype-note">Prototype form (save button disabled).</div>
+          <h1 id="calendar-form-title">Add a new event</h1>
+          <p id="calendar-form-subtitle">Capture children’s groups, meetups, and family hub sessions.</p>
         </div>
         <div class="nav-actions">
           <a class="nav-icon" href="{{ base_path }}/calendar" aria-label="Back to calendar" title="Back to calendar">
@@ -166,62 +175,64 @@
         </div>
       </header>
 
-      <section class="form-card">
+      <form class="form-card" id="calendar-form">
         <div class="section-title">Event details</div>
         <div class="form-grid">
           <label class="field">
             Title
-            <input type="text" placeholder="Baby sensory class">
+            <input id="calendar-title" type="text" placeholder="Baby sensory class" required>
           </label>
           <label class="field">
             Category
-            <select>
-              <option>Group</option>
-              <option>Meetup</option>
-              <option>Family hub</option>
-              <option>Other</option>
+            <select id="calendar-category">
+              <option value="group">Group</option>
+              <option value="meetup">Meetup</option>
+              <option value="hub">Family hub</option>
+              <option value="other">Other</option>
             </select>
           </label>
           <label class="field">
             Date
-            <input type="date">
+            <input id="calendar-date" type="date" required>
           </label>
           <label class="field">
             Location
-            <input type="text" placeholder="Council family hub">
+            <input id="calendar-location" type="text" placeholder="Council family hub">
           </label>
           <label class="field">
             Start time
-            <input type="time">
+            <input id="calendar-start-time" type="time" required>
           </label>
           <label class="field">
             End time
-            <input type="time">
+            <input id="calendar-end-time" type="time">
           </label>
         </div>
         <label class="field">
           Notes
-          <textarea placeholder="What to bring, booking info, age range"></textarea>
+          <textarea id="calendar-notes" placeholder="What to bring, booking info, age range"></textarea>
         </label>
         <div class="section-title">Recurrence</div>
         <div class="form-grid">
           <label class="field">
             Repeat
-            <select>
-              <option>Does not repeat</option>
-              <option>Weekly</option>
+            <select id="calendar-recurrence">
+              <option value="none">Does not repeat</option>
+              <option value="weekly">Weekly</option>
             </select>
           </label>
-          <label class="field">
+          <label class="field" id="calendar-repeat-until-field">
             Repeat until
-            <input type="date">
+            <input id="calendar-repeat-until" type="date">
           </label>
         </div>
         <div class="actions">
-          <button type="button" disabled>Save event</button>
+          <button type="submit" id="calendar-submit">Save event</button>
+          <button type="button" class="danger" id="calendar-delete" hidden>Delete event</button>
           <a href="{{ base_path }}/calendar">Cancel</a>
         </div>
-      </section>
+      </form>
+      <div class="status" id="status"></div>
     </main>
     <script src="{{ base_path }}/static/app.js"></script>
   </body>
