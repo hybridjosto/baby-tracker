@@ -24,6 +24,7 @@ const META_SYNC_CURSOR = "sync_cursor";
 const USER_RE = /^[a-z0-9-]{1,24}$/;
 const RESERVED_USER_SLUGS = new Set([
   "timeline",
+  "calendar",
   "summary",
   "log",
   "settings",

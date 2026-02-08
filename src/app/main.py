@@ -168,6 +168,42 @@ def create_app() -> Flask:
             status_code,
         )
 
+    def render_calendar_page(
+        user_slug: str,
+        user_valid: bool,
+        user_message: str,
+        status_code: int = 200,
+    ):
+        return (
+            render_template(
+                "calendar.html",
+                user_slug=user_slug,
+                user_valid=user_valid,
+                user_message=user_message,
+                page="calendar",
+                base_path=config.base_path,
+            ),
+            status_code,
+        )
+
+    def render_calendar_form_page(
+        user_slug: str,
+        user_valid: bool,
+        user_message: str,
+        status_code: int = 200,
+    ):
+        return (
+            render_template(
+                "calendar_form.html",
+                user_slug=user_slug,
+                user_valid=user_valid,
+                user_message=user_message,
+                page="calendar-form",
+                base_path=config.base_path,
+            ),
+            status_code,
+        )
+
     def render_milk_express_page(
         user_slug: str,
         user_valid: bool,
@@ -215,6 +251,22 @@ def create_app() -> Flask:
     @app.get(f"{config.base_path}/timeline")
     def timeline():
         return render_timeline_page(
+            user_slug="",
+            user_valid=False,
+            user_message="Choose a user below (example: josh).",
+        )
+
+    @app.get(f"{config.base_path}/calendar")
+    def calendar():
+        return render_calendar_page(
+            user_slug="",
+            user_valid=False,
+            user_message="Choose a user below (example: josh).",
+        )
+
+    @app.get(f"{config.base_path}/calendar/add")
+    def calendar_add():
+        return render_calendar_form_page(
             user_slug="",
             user_valid=False,
             user_message="Choose a user below (example: josh).",

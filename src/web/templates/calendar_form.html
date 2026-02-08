@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Add Calendar Event</title>
+    <link rel="manifest" href="{{ base_path }}/static/manifest.json">
+    <link rel="apple-touch-icon" href="{{ base_path }}/apple-touch-icon.png">
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    >
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@400,0"
+      rel="stylesheet"
+    >
+    <link rel="stylesheet" href="{{ base_path }}/static/styles.css">
+    <script>
+      (() => {
+        const stored = localStorage.getItem("baby-tracker-theme");
+        const prefersDark = window.matchMedia
+          && window.matchMedia("(prefers-color-scheme: dark)").matches;
+        const theme = stored || (prefersDark ? "dark" : "light");
+        if (theme === "dark") {
+          document.documentElement.classList.add("dark");
+        }
+      })();
+    </script>
+    <style>
+      .page {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 24px 20px 40px;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+      }
+      .header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      .header h1 {
+        margin: 0;
+        font-size: 26px;
+      }
+      .header p {
+        margin: 6px 0 0;
+        color: var(--text-secondary);
+      }
+      .nav-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .nav-icon {
+        width: 40px;
+        height: 40px;
+      }
+      .form-card {
+        background: var(--card-light);
+        border-radius: 24px;
+        border: 1px solid var(--border-light);
+        box-shadow: var(--shadow-soft);
+        padding: 22px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+      html.dark .form-card {
+        background: var(--card-dark);
+        border-color: var(--border-dark);
+      }
+      .form-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+      }
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        font-size: 13px;
+        color: var(--text-secondary);
+      }
+      .field input,
+      .field select,
+      .field textarea {
+        border-radius: 12px;
+        border: 1px solid var(--border-light);
+        background: var(--surface-soft);
+        padding: 10px 12px;
+        font-size: 14px;
+        color: var(--text-primary);
+      }
+      html.dark .field input,
+      html.dark .field select,
+      html.dark .field textarea {
+        border-color: var(--border-dark);
+        background: rgba(255, 255, 255, 0.06);
+        color: #ffffff;
+      }
+      textarea {
+        min-height: 90px;
+        resize: vertical;
+      }
+      .section-title {
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.16em;
+        font-weight: 600;
+        color: var(--text-secondary);
+      }
+      .actions {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      .actions button,
+      .actions a {
+        border-radius: 999px;
+        border: 1px solid var(--border-light);
+        background: var(--surface-soft);
+        padding: 10px 16px;
+        font-size: 13px;
+        font-weight: 600;
+        text-decoration: none;
+        color: var(--text-primary);
+        cursor: pointer;
+      }
+      html.dark .actions button,
+      html.dark .actions a {
+        border-color: var(--border-dark);
+        background: rgba(255, 255, 255, 0.08);
+        color: #d3e4d7;
+      }
+      .prototype-note {
+        font-size: 12px;
+        color: var(--text-secondary);
+      }
+      @media (max-width: 720px) {
+        .form-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body data-user="{{ user_slug }}" data-user-valid="{{ 'true' if user_valid else 'false' }}" data-page="calendar-form" data-base-path="{{ base_path }}">
+    <main class="page">
+      <header class="header">
+        <div>
+          <h1>Add a new event</h1>
+          <p>Capture children’s groups, meetups, and family hub sessions.</p>
+          <div class="prototype-note">Prototype form (save button disabled).</div>
+        </div>
+        <div class="nav-actions">
+          <a class="nav-icon" href="{{ base_path }}/calendar" aria-label="Back to calendar" title="Back to calendar">
+            <span class="material-symbols-outlined" aria-hidden="true">calendar_month</span>
+          </a>
+          <button class="nav-icon" id="theme-toggle" type="button" aria-label="Switch to light mode">
+            <span class="material-symbols-outlined" aria-hidden="true">light_mode</span>
+          </button>
+        </div>
+      </header>
+
+      <section class="form-card">
+        <div class="section-title">Event details</div>
+        <div class="form-grid">
+          <label class="field">
+            Title
+            <input type="text" placeholder="Baby sensory class">
+          </label>
+          <label class="field">
+            Category
+            <select>
+              <option>Group</option>
+              <option>Meetup</option>
+              <option>Family hub</option>
+              <option>Other</option>
+            </select>
+          </label>
+          <label class="field">
+            Date
+            <input type="date">
+          </label>
+          <label class="field">
+            Location
+            <input type="text" placeholder="Council family hub">
+          </label>
+          <label class="field">
+            Start time
+            <input type="time">
+          </label>
+          <label class="field">
+            End time
+            <input type="time">
+          </label>
+        </div>
+        <label class="field">
+          Notes
+          <textarea placeholder="What to bring, booking info, age range"></textarea>
+        </label>
+        <div class="section-title">Recurrence</div>
+        <div class="form-grid">
+          <label class="field">
+            Repeat
+            <select>
+              <option>Does not repeat</option>
+              <option>Weekly</option>
+            </select>
+          </label>
+          <label class="field">
+            Repeat until
+            <input type="date">
+          </label>
+        </div>
+        <div class="actions">
+          <button type="button" disabled>Save event</button>
+          <a href="{{ base_path }}/calendar">Cancel</a>
+        </div>
+      </section>
+    </main>
+    <script src="{{ base_path }}/static/app.js"></script>
+  </body>
+</html>
