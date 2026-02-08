@@ -14,7 +14,7 @@
       href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@400,0"
       rel="stylesheet"
     >
-    <link rel="stylesheet" href="{{ base_path }}/static/styles.css">
+    <link rel="stylesheet" href="{{ base_path }}/static/styles.css?v=2026-02-08-1">
     <script>
       (() => {
         const stored = localStorage.getItem("baby-tracker-theme");
@@ -579,6 +579,9 @@
           <a class="nav-icon" id="summary-link" href="{{ base_path }}/summary" aria-label="Summary" title="Summary">
             <span class="material-symbols-outlined">query_stats</span>
           </a>
+          <a class="nav-icon" href="{{ base_path }}/calendar" aria-label="Calendar" title="Calendar">
+            <span class="material-symbols-outlined">calendar_month</span>
+          </a>
           <a class="nav-icon" id="bottles-link" href="{{ base_path }}/bottles" aria-label="Bottle library" title="Bottle library">
             <span class="material-symbols-outlined">local_drink</span>
           </a>
@@ -633,6 +636,6 @@
 
       <!-- Timeline shows all users; no user filtering UI. -->
     </div>
-    <script src="{{ base_path }}/static/app.js"></script>
+    <script src="{{ base_path }}/static/app.js?v=2026-02-08-1"></script>
   </body>
 </html>

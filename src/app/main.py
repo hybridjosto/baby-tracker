@@ -8,6 +8,7 @@ from src.app.routes.entries import entries_api
 from src.app.routes.bottles import bottles_api
 from src.app.routes.goals import goals_api
 from src.app.routes.settings import settings_api
+from src.app.routes.calendar import calendar_api
 from src.app.routes.feed import feed_api
 from src.app.routes.pushcut import pushcut_api
 from src.app.routes.home_kpis import home_kpis_api
@@ -39,6 +40,7 @@ def create_app() -> Flask:
     app.register_blueprint(bottles_api, url_prefix=f"{config.base_path}/api")
     app.register_blueprint(goals_api, url_prefix=f"{config.base_path}/api")
     app.register_blueprint(settings_api, url_prefix=f"{config.base_path}/api")
+    app.register_blueprint(calendar_api, url_prefix=f"{config.base_path}/api")
     app.register_blueprint(pushcut_api, url_prefix=f"{config.base_path}/api")
     app.register_blueprint(feed_api, url_prefix=f"{config.base_path}/api")
     app.register_blueprint(home_kpis_api, url_prefix=f"{config.base_path}/api")
@@ -168,6 +170,44 @@ def create_app() -> Flask:
             status_code,
         )
 
+    def render_calendar_page(
+        user_slug: str,
+        user_valid: bool,
+        user_message: str,
+        status_code: int = 200,
+    ):
+        return (
+            render_template(
+                "calendar.html",
+                user_slug=user_slug,
+                user_valid=user_valid,
+                user_message=user_message,
+                page="calendar",
+                base_path=config.base_path,
+            ),
+            status_code,
+        )
+
+    def render_calendar_form_page(
+        user_slug: str,
+        user_valid: bool,
+        user_message: str,
+        event_id: int | None = None,
+        status_code: int = 200,
+    ):
+        return (
+            render_template(
+                "calendar_form.html",
+                user_slug=user_slug,
+                user_valid=user_valid,
+                user_message=user_message,
+                event_id=event_id,
+                page="calendar-form",
+                base_path=config.base_path,
+            ),
+            status_code,
+        )
+
     def render_milk_express_page(
         user_slug: str,
         user_valid: bool,
@@ -218,6 +258,31 @@ def create_app() -> Flask:
             user_slug="",
             user_valid=False,
             user_message="Choose a user below (example: josh).",
+        )
+
+    @app.get(f"{config.base_path}/calendar")
+    def calendar():
+        return render_calendar_page(
+            user_slug="",
+            user_valid=False,
+            user_message="Choose a user below (example: josh).",
+        )
+
+    @app.get(f"{config.base_path}/calendar/add")
+    def calendar_add():
+        return render_calendar_form_page(
+            user_slug="",
+            user_valid=False,
+            user_message="Choose a user below (example: josh).",
+        )
+
+    @app.get(f"{config.base_path}/calendar/edit/<int:event_id>")
+    def calendar_edit(event_id: int):
+        return render_calendar_form_page(
+            user_slug="",
+            user_valid=False,
+            user_message="Choose a user below (example: josh).",
+            event_id=event_id,
         )
 
     @app.get(f"{config.base_path}/milk-express")

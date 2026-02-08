@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Weekly Planner</title>
+    <link rel="manifest" href="{{ base_path }}/static/manifest.json">
+    <link rel="apple-touch-icon" href="{{ base_path }}/apple-touch-icon.png">
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    >
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@400,0"
+      rel="stylesheet"
+    >
+    <link rel="stylesheet" href="{{ base_path }}/static/styles.css?v=2026-02-08-1">
+    <script>
+      (() => {
+        const stored = localStorage.getItem("baby-tracker-theme");
+        const prefersDark = window.matchMedia
+          && window.matchMedia("(prefers-color-scheme: dark)").matches;
+        const theme = stored || (prefersDark ? "dark" : "light");
+        if (theme === "dark") {
+          document.documentElement.classList.add("dark");
+        }
+      })();
+    </script>
+    <style>
+      .page {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 22px 20px 40px;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+      }
+      .hero {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        flex-wrap: wrap;
+      }
+      .hero-title {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .hero-title .eyebrow {
+        text-transform: uppercase;
+        letter-spacing: 0.24em;
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--text-secondary);
+      }
+      .hero-title h1 {
+        margin: 0;
+        font-size: 28px;
+      }
+      .hero-title p {
+        margin: 0;
+        color: var(--text-secondary);
+      }
+      .nav-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .nav-icon {
+        width: 40px;
+        height: 40px;
+      }
+      .calendar-shell {
+        background: var(--card-light);
+        border-radius: 26px;
+        border: 1px solid var(--border-light);
+        box-shadow: var(--shadow-soft);
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+      html.dark .calendar-shell {
+        background: var(--card-dark);
+        border-color: var(--border-dark);
+      }
+      .week-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      .week-range {
+        font-size: 18px;
+        font-weight: 600;
+      }
+      .week-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .week-actions button,
+      .week-actions a {
+        border: 1px solid var(--border-light);
+        background: var(--surface-soft);
+        color: var(--text-primary);
+        border-radius: 999px;
+        padding: 8px 14px;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      html.dark .week-actions button,
+      html.dark .week-actions a {
+        border-color: var(--border-dark);
+        background: rgba(255, 255, 255, 0.08);
+        color: #d3e4d7;
+      }
+      .calendar-grid {
+        display: grid;
+        grid-template-columns: repeat(7, minmax(0, 1fr));
+        gap: 12px;
+      }
+      .calendar-day {
+        background: var(--surface-soft);
+        border-radius: 18px;
+        padding: 12px 12px 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        min-height: 180px;
+        border: 1px solid transparent;
+      }
+      .calendar-day.is-today {
+        border-color: rgba(19, 236, 91, 0.5);
+        box-shadow: 0 0 0 1px rgba(19, 236, 91, 0.2);
+      }
+      html.dark .calendar-day {
+        background: rgba(255, 255, 255, 0.06);
+      }
+      .calendar-day-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .calendar-day-label {
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .calendar-day-date {
+        font-size: 12px;
+        color: var(--text-secondary);
+      }
+      .calendar-events {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .calendar-event {
+        background: var(--card-light);
+        border-radius: 14px;
+        padding: 10px 12px;
+        border: 1px solid var(--border-light);
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.06);
+      }
+      html.dark .calendar-event {
+        background: rgba(26, 44, 32, 0.9);
+        border-color: var(--border-dark);
+      }
+      .event-time {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: var(--text-secondary);
+      }
+      .event-title {
+        font-weight: 600;
+        font-size: 14px;
+      }
+      .event-meta {
+        font-size: 12px;
+        color: var(--text-secondary);
+      }
+      .event-tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        border-radius: 999px;
+        font-size: 11px;
+        padding: 2px 8px;
+        font-weight: 600;
+      }
+      .event-tag[data-category="group"] {
+        background: rgba(19, 236, 91, 0.18);
+        color: #0f1a12;
+      }
+      .event-tag[data-category="meetup"] {
+        background: rgba(125, 211, 252, 0.24);
+        color: #0f1a12;
+      }
+      .event-tag[data-category="hub"] {
+        background: rgba(250, 204, 21, 0.2);
+        color: #4b3b00;
+      }
+      .event-tag[data-category="other"] {
+        background: rgba(148, 163, 184, 0.25);
+        color: #1f2937;
+      }
+      .event-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .event-actions a,
+      .event-actions button {
+        border: none;
+        background: transparent;
+        color: var(--text-secondary);
+        font-size: 12px;
+        cursor: pointer;
+        padding: 0;
+      }
+      .calendar-day.empty .calendar-events {
+        opacity: 0.55;
+        font-size: 12px;
+        color: var(--text-secondary);
+      }
+      .calendar-empty {
+        text-align: center;
+        color: var(--text-secondary);
+        font-size: 13px;
+        padding: 12px 0 0;
+      }
+      @media (max-width: 1100px) {
+        .calendar-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+      @media (max-width: 680px) {
+        .calendar-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body data-user="{{ user_slug }}" data-user-valid="{{ 'true' if user_valid else 'false' }}" data-page="calendar" data-base-path="{{ base_path }}">
+    <main class="page">
+      <header class="hero">
+        <div class="hero-title">
+          <span class="eyebrow">Weekly Planner</span>
+          <h1>Find something to do</h1>
+          <p>Keep track of children’s groups, meetups, and local family hub sessions.</p>
+        </div>
+        <div class="nav-actions">
+          <a class="nav-icon" id="home-link" href="#" aria-label="Home" title="Home">
+            <span class="material-symbols-outlined" aria-hidden="true">home</span>
+          </a>
+          <a class="nav-icon" id="log-link" href="#" aria-label="Event log" title="Event log">
+            <span class="material-symbols-outlined" aria-hidden="true">format_list_bulleted</span>
+          </a>
+          <a class="nav-icon" id="timeline-link" href="#" aria-label="Timeline" title="Timeline">
+            <span class="material-symbols-outlined" aria-hidden="true">timeline</span>
+          </a>
+          <a class="nav-icon" href="{{ base_path }}/settings" aria-label="Settings" title="Settings">
+            <span class="material-symbols-outlined" aria-hidden="true">settings</span>
+          </a>
+          <button class="nav-icon" id="theme-toggle" type="button" aria-label="Switch to light mode">
+            <span class="material-symbols-outlined" aria-hidden="true">light_mode</span>
+          </button>
+        </div>
+      </header>
+
+      <section class="calendar-shell">
+        <div class="week-bar">
+          <div class="week-range" id="week-range">Week of --</div>
+          <div class="week-actions">
+            <button type="button" data-week-nav="prev">
+              <span class="material-symbols-outlined" aria-hidden="true">chevron_left</span>
+              Prev
+            </button>
+            <button type="button" data-week-nav="today">Today</button>
+            <button type="button" data-week-nav="next">
+              Next
+              <span class="material-symbols-outlined" aria-hidden="true">chevron_right</span>
+            </button>
+            <a href="{{ base_path }}/calendar/add">
+              <span class="material-symbols-outlined" aria-hidden="true">add</span>
+              Add event
+            </a>
+          </div>
+        </div>
+        <div class="calendar-grid" id="calendar-days"></div>
+        <div class="calendar-empty" id="calendar-empty" hidden>No sessions added this week.</div>
+      </section>
+      <div class="status" id="status"></div>
+    </main>
+
+    <script src="{{ base_path }}/static/app.js?v=2026-02-08-1"></script>
+  </body>
+</html>
