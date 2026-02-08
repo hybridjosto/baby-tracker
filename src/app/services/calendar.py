@@ -238,12 +238,10 @@ def update_event(db_path: str, event_id: int, payload: dict) -> dict:
         existing = repo_get_event(conn, event_id)
         if not existing:
             raise CalendarEventNotFoundError()
-        if (
-            fields.get("recurrence") == "weekly"
-            and fields.get("recurrence_until_local")
-            and "date_local" not in fields
-        ):
-            start_date = date.fromisoformat(existing["date_local"])
+        recurrence = fields.get("recurrence", existing["recurrence"])
+        if fields.get("recurrence_until_local") and recurrence == "weekly":
+            start_value = fields.get("date_local", existing["date_local"])
+            start_date = date.fromisoformat(start_value)
             until_date = date.fromisoformat(fields["recurrence_until_local"])
             if until_date < start_date:
                 raise ValueError("recurrence_until_local must be on or after date_local")
