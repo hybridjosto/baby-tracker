@@ -5,12 +5,33 @@ let userValid = bodyEl.dataset.userValid === "true";
 const pageType = bodyEl.dataset.page || "home";
 const logFilterType = bodyEl.dataset.logType || "";
 const logWindowHours = Number.parseInt(bodyEl.dataset.logWindowHours || "", 10);
+const basePath = bodyEl.dataset.basePath || "";
+const buildUrl = (path) => `${basePath}${path}`;
 
 const THEME_KEY = "baby-tracker-theme";
 const USER_KEY = "baby-tracker-user";
 const BREASTFEED_TIMER_KEY = "baby-tracker-breastfeed-start";
+const BREASTFEED_IN_PROGRESS_NOTE = "Breastfeeding (started)";
+const BREASTFEED_COMPLETE_NOTE = "Breastfed";
+const OFFLINE_WINDOW_DAYS = 30;
+const DB_NAME = "baby-tracker";
+const DB_VERSION = 1;
+const STORE_ENTRIES = "entries";
+const STORE_OUTBOX = "outbox";
+const STORE_META = "meta";
+const META_DEVICE_ID = "device_id";
+const META_SYNC_CURSOR = "sync_cursor";
 const USER_RE = /^[a-z0-9-]{1,24}$/;
-const RESERVED_USER_SLUGS = new Set(["timeline", "summary", "log", "settings", "goals"]);
+const RESERVED_USER_SLUGS = new Set([
+  "timeline",
+  "calendar",
+  "summary",
+  "log",
+  "settings",
+  "goals",
+  "milk-express",
+  "bottles",
+]);
 const themeToggleBtn = document.getElementById("theme-toggle");
 const userFormEl = document.getElementById("user-form");
 const userInputEl = document.getElementById("user-input");
@@ -22,6 +43,10 @@ const feedBtn = document.getElementById("log-feed");
 const feedMenu = document.getElementById("feed-menu");
 const feedBackdrop = document.getElementById("feed-backdrop");
 const breastfeedBtn = document.getElementById("log-breastfeed");
+const breastfeedBannerEl = document.getElementById("breastfeed-banner");
+const breastfeedBannerTimerEl = document.getElementById("breastfeed-banner-timer");
+const breastfeedBannerMetaEl = document.getElementById("breastfeed-banner-meta");
+const breastfeedBannerActionEl = document.getElementById("breastfeed-banner-action");
 const manualFeedBtn = document.getElementById("log-feed-manual");
 const expressedInput = document.getElementById("expressed-ml");
 const expressedBtn = document.getElementById("log-expressed");
@@ -38,6 +63,8 @@ const miscBackdrop = document.getElementById("misc-backdrop");
 const logLinkEl = document.getElementById("log-link");
 const homeLinkEl = document.getElementById("home-link");
 const summaryLinkEl = document.getElementById("summary-link");
+const milkExpressLinkEl = document.getElementById("milk-express-link");
+const bottlesLinkEl = document.getElementById("bottles-link");
 const refreshBtn = document.getElementById("refresh-btn");
 const csvFormEl = document.getElementById("csv-upload-form");
 const csvFileEl = document.getElementById("csv-file");
@@ -55,6 +82,8 @@ const summaryExpressedEl = document.getElementById("summary-expressed-amount");
 const summaryExpressedAvgEl = document.getElementById("summary-expressed-avg");
 const summaryFormulaEl = document.getElementById("summary-formula-amount");
 const summaryFormulaAvgEl = document.getElementById("summary-formula-avg");
+const summaryTotalIntakeEl = document.getElementById("summary-total-intake-amount");
+const summaryTotalIntakeAvgEl = document.getElementById("summary-total-intake-avg");
 const milkExpressCountEl = document.getElementById("milk-express-count");
 const milkExpressTotalsEl = document.getElementById("milk-express-totals");
 const milkExpressListEl = document.getElementById("milk-express-list");
@@ -66,6 +95,28 @@ const milkExpressSparklineTotalEl = document.getElementById("milk-express-sparkl
 const milkExpressSparklineToggleEls = document.querySelectorAll(
   "[data-milk-sparkline-mode]",
 );
+const insightLastFeedEl = document.getElementById("insight-last-feed");
+const insightLastFeedSubEl = document.getElementById("insight-last-feed-sub");
+const insightLastExpressEl = document.getElementById("insight-last-express");
+const insightLastExpressSubEl = document.getElementById("insight-last-express-sub");
+const insightFeedInterval24El = document.getElementById("insight-feed-interval-24");
+const insightFeedInterval24SubEl = document.getElementById("insight-feed-interval-24-sub");
+const insightFeedInterval7dEl = document.getElementById("insight-feed-interval-7d");
+const insightFeedInterval7dSubEl = document.getElementById("insight-feed-interval-7d-sub");
+const insightExpressTotal24El = document.getElementById("insight-express-total-24");
+const insightExpressTotal24SubEl = document.getElementById("insight-express-total-24-sub");
+const insightExpressTotal7El = document.getElementById("insight-express-total-7");
+const insightExpressTotal7SubEl = document.getElementById("insight-express-total-7-sub");
+const insightDiaper24El = document.getElementById("insight-diaper-24");
+const insightDiaper24SubEl = document.getElementById("insight-diaper-24-sub");
+const insightDiaper7El = document.getElementById("insight-diaper-7");
+const insightDiaper7SubEl = document.getElementById("insight-diaper-7-sub");
+const insightAnchorLabelEl = document.getElementById("insight-anchor-label");
+const insightTimeframeBodyEl = document.getElementById("insight-timeframe-body");
+const feedHourGridEl = document.getElementById("feed-hour-grid");
+const expressHourGridEl = document.getElementById("express-hour-grid");
+const feedTrendBarsEl = document.getElementById("feed-trend-bars");
+const expressTrendBarsEl = document.getElementById("express-trend-bars");
 
 const timelineWrapEl = document.getElementById("timeline-wrap");
 const timelineTrackEl = document.getElementById("timeline-track");
@@ -73,10 +124,56 @@ const timelineEmptyEl = document.getElementById("timeline-empty");
 const timelineLoadingEl = document.getElementById("timeline-loading");
 const timelineSentinelEl = document.getElementById("timeline-sentinel");
 
+const calendarDaysEl = document.getElementById("calendar-days");
+const calendarWeekRangeEl = document.getElementById("week-range");
+const calendarEmptyEl = document.getElementById("calendar-empty");
+const calendarPrevBtn = document.querySelector("[data-week-nav='prev']");
+const calendarNextBtn = document.querySelector("[data-week-nav='next']");
+const calendarTodayBtn = document.querySelector("[data-week-nav='today']");
+
+const calendarFormEl = document.getElementById("calendar-form");
+const calendarFormTitleEl = document.getElementById("calendar-form-title");
+const calendarFormSubtitleEl = document.getElementById("calendar-form-subtitle");
+const calendarTitleInputEl = document.getElementById("calendar-title");
+const calendarCategorySelectEl = document.getElementById("calendar-category");
+const calendarDateInputEl = document.getElementById("calendar-date");
+const calendarLocationInputEl = document.getElementById("calendar-location");
+const calendarStartTimeInputEl = document.getElementById("calendar-start-time");
+const calendarEndTimeInputEl = document.getElementById("calendar-end-time");
+const calendarNotesInputEl = document.getElementById("calendar-notes");
+const calendarRecurrenceSelectEl = document.getElementById("calendar-recurrence");
+const calendarRepeatUntilInputEl = document.getElementById("calendar-repeat-until");
+const calendarRepeatUntilFieldEl = document.getElementById("calendar-repeat-until-field");
+const calendarSubmitBtn = document.getElementById("calendar-submit");
+const calendarDeleteBtn = document.getElementById("calendar-delete");
+const rulerWrapEl = document.getElementById("ruler-wrap");
+const rulerBodyEl = document.getElementById("ruler-body");
+const rulerCanvasEl = document.getElementById("ruler-canvas");
+const rulerReadoutEl = document.getElementById("ruler-readout");
+const rulerTotalEl = document.getElementById("ruler-total");
+const rulerDetailEl = document.getElementById("ruler-detail");
+const rulerGoalEl = document.getElementById("ruler-goal");
+const rulerStartEl = document.getElementById("ruler-start");
+const rulerEndEl = document.getElementById("ruler-end");
+const rulerEmptyEl = document.getElementById("ruler-empty");
+const rulerSnapToggleEl = document.getElementById("ruler-snap-toggle");
+const rulerNowBtnEl = document.getElementById("ruler-now-btn");
+
 const chartSvg = document.getElementById("history-chart");
 const chartEmptyEl = document.getElementById("chart-empty");
 const logListEl = document.getElementById("log-entries");
 const logEmptyEl = document.getElementById("log-empty");
+const editEntryBackdropEl = document.getElementById("edit-entry-backdrop");
+const editEntryModalEl = document.getElementById("edit-entry-modal");
+const editEntryFormEl = document.getElementById("edit-entry-form");
+const editEntryTypeEl = document.getElementById("edit-entry-type");
+const editEntryTimeEl = document.getElementById("edit-entry-time");
+const editEntryDurationEl = document.getElementById("edit-entry-duration");
+const editEntryExpressedEl = document.getElementById("edit-entry-expressed");
+const editEntryFormulaEl = document.getElementById("edit-entry-formula");
+const editEntryNotesEl = document.getElementById("edit-entry-notes");
+const editEntryCancelEl = document.getElementById("edit-entry-cancel");
+const editEntryCloseEl = document.getElementById("edit-entry-close");
 const statFeedEl = document.getElementById("stat-feed");
 const statWeeEl = document.getElementById("stat-wee");
 const statPooEl = document.getElementById("stat-poo");
@@ -91,25 +188,62 @@ const nextFeedEl = document.getElementById("next-feed");
 const nextFeedShortcutEl = document.getElementById("next-feed-shortcut");
 const lastWeeEl = document.getElementById("last-wee");
 const lastPooEl = document.getElementById("last-poo");
+const latestBodyEl = document.getElementById("latest-body");
+const latestEmptyEl = document.getElementById("latest-empty");
+const latestTypeEl = document.getElementById("latest-type");
+const latestTimeEl = document.getElementById("latest-time");
+const latestRelativeEl = document.getElementById("latest-relative");
+const latestDetailsEl = document.getElementById("latest-details");
+const latestNotesEl = document.getElementById("latest-notes");
+const latestEditBtn = document.getElementById("latest-edit");
+const latestDeleteBtn = document.getElementById("latest-delete");
 const statCardEls = document.querySelectorAll(".stat-card[data-log-type]");
 
 const timelineLinkEl = document.getElementById("timeline-link");
+
+const milkExpressLedgerTableEl = document.getElementById("milk-express-ledger-table");
+const milkExpressLedgerBodyEl = document.getElementById("milk-express-ledger-body");
+const milkExpressLedgerEmptyEl = document.getElementById("milk-express-ledger-empty");
+const milkExpressLedgerCountEl = document.getElementById("milk-express-ledger-count");
+const milkExpressLedgerTotalEl = document.getElementById("milk-express-ledger-total");
+const milkExpressLedgerSelectAllEl = document.getElementById("milk-express-ledger-select-all");
+const milkExpressLedgerClearEl = document.getElementById("milk-express-ledger-clear");
+const milkExpressLedgerRangeEl = document.getElementById("milk-express-ledger-range");
+const milkExpressLedgerTotalAllEl = document.getElementById("milk-express-ledger-total-all");
+const milkExpressLedgerSelectionEl = document.getElementById("milk-express-ledger-selection");
 
 const settingsFormEl = document.getElementById("settings-form");
 const dobInputEl = document.getElementById("dob-input");
 const ageOutputEl = document.getElementById("age-output");
 const intervalInputEl = document.getElementById("interval-input");
 const customTypeInputEl = document.getElementById("custom-type-input");
+const entryWebhookInputEl = document.getElementById("entry-webhook-input");
+const homeKpisWebhookInputEl = document.getElementById("home-kpis-webhook-input");
+const defaultUserInputEl = document.getElementById("default-user-input");
+const pushcutFeedDueInputEl = document.getElementById("pushcut-feed-due-input");
+const testFeedDueNotificationBtn = document.getElementById("test-feed-due-notification");
 const customTypeAddBtn = document.getElementById("custom-type-add");
 const customTypeListEl = document.getElementById("custom-type-list");
 const customTypeHintEl = document.getElementById("custom-type-hint");
 const customTypeEmptyEl = document.getElementById("custom-type-empty");
+const exportCsvBtn = document.getElementById("export-csv");
 const goalsFormEl = document.getElementById("goals-form");
 const goalAmountInputEl = document.getElementById("goal-amount");
 const goalStartDateInputEl = document.getElementById("goal-start-date");
 const goalHistoryEl = document.getElementById("goal-history");
 const goalEmptyEl = document.getElementById("goal-empty");
 const goalsLinkEl = document.getElementById("goals-link");
+
+const bottleFormEl = document.getElementById("bottle-form");
+const bottleNameInputEl = document.getElementById("bottle-name");
+const bottleWeightInputEl = document.getElementById("bottle-weight");
+const bottleFormHintEl = document.getElementById("bottle-form-hint");
+const bottleListEl = document.getElementById("bottle-list");
+const bottleEmptyEl = document.getElementById("bottle-empty");
+const bottleSelectEl = document.getElementById("bottle-select");
+const bottleTotalWeightEl = document.getElementById("bottle-total-weight");
+const bottleResultValueEl = document.getElementById("bottle-result-value");
+const bottleLogMilkBtnEl = document.getElementById("bottle-log-milk");
 
 let babyDob = null;
 let feedIntervalMinutes = null;
@@ -118,6 +252,17 @@ let breastfeedTickerId = null;
 let hasLoadedHomeEntries = false;
 let hasLoadedLogEntries = false;
 let hasLoadedSummaryEntries = false;
+let hasLoadedSummaryInsights = false;
+let syncInFlight = null;
+let syncTimerId = null;
+let milkExpressLedgerInitialized = false;
+let milkExpressLedgerEntries = [];
+const milkExpressLedgerSelections = new Set();
+let editEntryModalInitialized = false;
+let editEntryModalResolver = null;
+let editEntryModalEntry = null;
+let editEntryModalMode = "full";
+let breastfeedHydrated = false;
 
 const CUSTOM_TYPE_RE = /^[A-Za-z0-9][A-Za-z0-9 /-]{0,31}$/;
 const MILK_EXPRESS_TYPE = "milk express";
@@ -184,10 +329,41 @@ function getFeedIntervalMinutes() {
 }
 
 function getBreastfeedStorageKey() {
-  if (!activeUser) {
+  return BREASTFEED_TIMER_KEY;
+}
+
+function parseBreastfeedPayload(raw, key) {
+  if (!raw) {
     return null;
   }
-  return `${BREASTFEED_TIMER_KEY}:${activeUser}`;
+  let parsed = null;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (err) {
+    parsed = null;
+  }
+  if (parsed && typeof parsed === "object" && parsed.start_at) {
+    const start = new Date(parsed.start_at);
+    if (Number.isNaN(start.getTime())) {
+      if (key) {
+        window.localStorage.removeItem(key);
+      }
+      return null;
+    }
+    return {
+      start,
+      startedBy: parsed.started_by || null,
+      clientEventId: parsed.client_event_id || null,
+    };
+  }
+  const legacyStart = new Date(raw);
+  if (Number.isNaN(legacyStart.getTime())) {
+    if (key) {
+      window.localStorage.removeItem(key);
+    }
+    return null;
+  }
+  return { start: legacyStart, startedBy: null, clientEventId: null };
 }
 
 function getBreastfeedStart() {
@@ -196,23 +372,37 @@ function getBreastfeedStart() {
     return null;
   }
   const raw = window.localStorage.getItem(key);
-  if (!raw) {
-    return null;
+  if (raw) {
+    return parseBreastfeedPayload(raw, key);
   }
-  const start = new Date(raw);
-  if (Number.isNaN(start.getTime())) {
-    window.localStorage.removeItem(key);
-    return null;
+  if (activeUser) {
+    const legacyKey = `${BREASTFEED_TIMER_KEY}:${activeUser}`;
+    const legacyRaw = window.localStorage.getItem(legacyKey);
+    const legacyParsed = parseBreastfeedPayload(legacyRaw, legacyKey);
+    if (legacyParsed) {
+      setBreastfeedStart(legacyParsed.start, activeUser, null);
+      window.localStorage.removeItem(legacyKey);
+      return {
+        start: legacyParsed.start,
+        startedBy: activeUser,
+        clientEventId: null,
+      };
+    }
   }
-  return start;
+  return null;
 }
 
-function setBreastfeedStart(start) {
+function setBreastfeedStart(start, startedBy, clientEventId) {
   const key = getBreastfeedStorageKey();
   if (!key) {
     return;
   }
-  window.localStorage.setItem(key, start.toISOString());
+  const payload = {
+    start_at: start.toISOString(),
+    started_by: startedBy || null,
+    client_event_id: clientEventId || null,
+  };
+  window.localStorage.setItem(key, JSON.stringify(payload));
 }
 
 function clearBreastfeedStart() {
@@ -221,6 +411,9 @@ function clearBreastfeedStart() {
     return;
   }
   window.localStorage.removeItem(key);
+  if (activeUser) {
+    window.localStorage.removeItem(`${BREASTFEED_TIMER_KEY}:${activeUser}`);
+  }
 }
 
 function stopBreastfeedTicker() {
@@ -238,23 +431,147 @@ function startBreastfeedTicker() {
   breastfeedTickerId = window.setInterval(updateBreastfeedButton, 30000);
 }
 
-function updateBreastfeedButton() {
-  if (!breastfeedBtn) {
+function updateBreastfeedBanner(startInfo, durationMinutes) {
+  if (!breastfeedBannerEl || !breastfeedBannerTimerEl || !breastfeedBannerMetaEl) {
     return;
   }
-  const start = getBreastfeedStart();
-  if (start) {
+  if (!startInfo) {
+    breastfeedBannerEl.classList.remove("is-active");
+    breastfeedBannerTimerEl.textContent = "-- min";
+    breastfeedBannerMetaEl.textContent = "Started by --";
+    if (breastfeedBannerActionEl) {
+      breastfeedBannerActionEl.disabled = false;
+      breastfeedBannerActionEl.removeAttribute("title");
+    }
+    return;
+  }
+  const startedBy = startInfo.startedBy || "--";
+  const meta = userValid
+    ? `Started by ${startedBy}`
+    : `Started by ${startedBy} · Choose a user to stop`;
+  breastfeedBannerEl.classList.add("is-active");
+  breastfeedBannerTimerEl.textContent = `${durationMinutes} min`;
+  breastfeedBannerMetaEl.textContent = meta;
+  if (breastfeedBannerActionEl) {
+    breastfeedBannerActionEl.disabled = !userValid;
+    breastfeedBannerActionEl.title = userValid
+      ? "End breastfeeding"
+      : "Choose a user to log the feed";
+  }
+}
+
+function updateBreastfeedButton() {
+  if (!breastfeedBtn) {
+    updateBreastfeedBanner(null, 0);
+    return;
+  }
+  const startInfo = getBreastfeedStart();
+  if (startInfo && startInfo.start) {
+    const start = startInfo.start;
     const durationMinutes = Math.max(
       0,
       Math.round((Date.now() - start.getTime()) / 60000),
     );
     breastfeedBtn.textContent = `End breastfed (${durationMinutes} min)`;
-    breastfeedBtn.title = `Started ${formatTimestamp(start.toISOString())} (${durationMinutes} min)`;
+    const starter = startInfo.startedBy ? ` by ${startInfo.startedBy}` : "";
+    breastfeedBtn.title = `Started${starter} ${formatTimestamp(start.toISOString())} (${durationMinutes} min)`;
+    updateBreastfeedBanner(startInfo, durationMinutes);
     startBreastfeedTicker();
   } else {
     breastfeedBtn.textContent = "Start breastfed";
     breastfeedBtn.removeAttribute("title");
+    updateBreastfeedBanner(null, 0);
     stopBreastfeedTicker();
+  }
+}
+
+function isBreastfeedInProgress(entry) {
+  return entry
+    && entry.type === "feed"
+    && entry.notes === BREASTFEED_IN_PROGRESS_NOTE;
+}
+
+function selectActiveBreastfeedEntry(entries) {
+  if (!Array.isArray(entries) || !entries.length) {
+    return null;
+  }
+  let selected = null;
+  let selectedTime = 0;
+  entries.forEach((entry) => {
+    if (!isBreastfeedInProgress(entry)) {
+      return;
+    }
+    const ts = new Date(entry.timestamp_utc);
+    if (Number.isNaN(ts.getTime())) {
+      return;
+    }
+    const time = ts.getTime();
+    if (!selected || time > selectedTime) {
+      selected = entry;
+      selectedTime = time;
+    }
+  });
+  return selected;
+}
+
+function updateBreastfeedStateFromSync(entries) {
+  if (!Array.isArray(entries) || !entries.length) {
+    return;
+  }
+  const activeEntry = selectActiveBreastfeedEntry(entries);
+  const current = getBreastfeedStart();
+  if (activeEntry) {
+    const start = new Date(activeEntry.timestamp_utc);
+    if (!Number.isNaN(start.getTime())) {
+      const startedBy = activeEntry.user_slug || null;
+      const clientEventId = activeEntry.client_event_id || null;
+      if (
+        !current
+        || current.clientEventId !== clientEventId
+        || current.start.getTime() !== start.getTime()
+        || current.startedBy !== startedBy
+      ) {
+        setBreastfeedStart(start, startedBy, clientEventId);
+      }
+      updateBreastfeedButton();
+      return;
+    }
+  }
+  if (current && current.clientEventId) {
+    const completedMatch = entries.find((entry) => {
+      return entry.client_event_id === current.clientEventId
+        && !isBreastfeedInProgress(entry);
+    });
+    if (completedMatch) {
+      clearBreastfeedStart();
+      updateBreastfeedButton();
+    }
+  }
+}
+
+async function hydrateBreastfeedFromLocalEntries() {
+  if (breastfeedHydrated) {
+    return;
+  }
+  breastfeedHydrated = true;
+  if (getBreastfeedStart()) {
+    return;
+  }
+  const entries = await listEntriesLocalSafe({ limit: 200 });
+  if (!entries) {
+    return;
+  }
+  const activeEntry = selectActiveBreastfeedEntry(entries);
+  if (activeEntry) {
+    const start = new Date(activeEntry.timestamp_utc);
+    if (!Number.isNaN(start.getTime())) {
+      setBreastfeedStart(
+        start,
+        activeEntry.user_slug || null,
+        activeEntry.client_event_id || null,
+      );
+      updateBreastfeedButton();
+    }
   }
 }
 
@@ -392,9 +709,15 @@ function updateUserDisplay() {
         ? `Logging as ${activeUser}`
         : "Choose a user to log.";
     } else if (pageType === "goals") {
-      userMessageEl.textContent = "Goals apply to all feeds logged in the last 24 hours.";
+      userMessageEl.textContent = "Goals stay active until a later-dated entry is logged.";
     } else if (pageType === "timeline") {
       userMessageEl.textContent = "All events";
+    } else if (pageType === "calendar" || pageType === "calendar-form") {
+      userMessageEl.textContent = "Shared calendar";
+    } else if (pageType === "bottles") {
+      userMessageEl.textContent = "Shared bottle library";
+    } else if (pageType === "milk-express") {
+      userMessageEl.textContent = "Last 48 hours • All milk express";
     } else {
       userMessageEl.textContent = userValid
         ? "All events"
@@ -423,16 +746,26 @@ let logInitialized = false;
 let settingsInitialized = false;
 let summaryInitialized = false;
 let timelineInitialized = false;
+let rulerInitialized = false;
 let nextFeedTimer = null;
 let refreshTimer = null;
 let summaryDate = null;
 let summaryEntries = [];
+let summaryInsightsEntries = [];
+let summaryInsightsAnchor = null;
+let summaryInsightsLoading = null;
 let summaryType = "feed";
 let milkExpressSparklineMode = "all";
 let milkExpressAllEntries = [];
 let milkExpressAllLoading = null;
 let goalsInitialized = false;
+let bottlesInitialized = false;
+let bottlesCache = [];
+let bottleExpressedMl = null;
 let hasLoadedFeedingGoals = false;
+let calendarWeekOffset = 0;
+let calendarWeekStart = null;
+let calendarLoading = false;
 let activeFeedingGoal = null;
 let latestFeedTotalMl = 0;
 let hasLoadedTimelineEntries = false;
@@ -443,6 +776,19 @@ let timelineLoading = false;
 let timelineObserver = null;
 const timelineDayMap = new Map();
 const timelineHourMap = new Map();
+const RULER_DAYS_BACK = 7;
+const RULER_WINDOW_MS = 24 * 60 * 60 * 1000;
+const RULER_BUCKET_MS = 30 * 60 * 1000;
+let rulerGoalMl = 700;
+let rulerEntries = [];
+let rulerAnchorTs = Date.now();
+let rulerDragStartX = 0;
+let rulerDragStartAnchor = 0;
+let rulerDragging = false;
+let rulerStretch = 0;
+let rulerMinTs = null;
+let rulerMaxTs = null;
+let rulerSnapToFeeds = true;
 
 function initHomeHandlers() {
   if (homeInitialized || pageType !== "home") {
@@ -465,6 +811,9 @@ function initHomeHandlers() {
   }
   if (breastfeedBtn) {
     breastfeedBtn.addEventListener("click", handleBreastfeedToggle);
+  }
+  if (breastfeedBannerActionEl) {
+    breastfeedBannerActionEl.addEventListener("click", handleBreastfeedToggle);
   }
   if (manualFeedBtn) {
     manualFeedBtn.addEventListener("click", () => {
@@ -584,6 +933,7 @@ function initLogHandlers() {
   if (csvFormEl) {
     csvFormEl.addEventListener("submit", handleCsvUpload);
   }
+  initEditEntryModalHandlers();
   startAutoRefresh(loadLogEntries);
   updateLogEmptyMessage();
 }
@@ -716,9 +1066,44 @@ function initSettingsHandlers() {
       }
     });
   }
+  if (entryWebhookInputEl) {
+    entryWebhookInputEl.addEventListener("change", () => {
+      const value = entryWebhookInputEl.value;
+      void saveBabySettings({ entry_webhook_url: value || null });
+    });
+  }
+  if (homeKpisWebhookInputEl) {
+    homeKpisWebhookInputEl.addEventListener("change", () => {
+      const value = homeKpisWebhookInputEl.value;
+      void saveBabySettings({ home_kpis_webhook_url: value || null });
+    });
+  }
+  if (defaultUserInputEl) {
+    defaultUserInputEl.addEventListener("change", () => {
+      const value = defaultUserInputEl.value;
+      void saveBabySettings({ default_user_slug: value || null });
+    });
+  }
+  if (pushcutFeedDueInputEl) {
+    pushcutFeedDueInputEl.addEventListener("change", () => {
+      const value = pushcutFeedDueInputEl.value;
+      void saveBabySettings({ pushcut_feed_due_url: value || null });
+    });
+  }
   if (settingsFormEl) {
     settingsFormEl.addEventListener("submit", (event) => {
       event.preventDefault();
+    });
+  }
+  if (exportCsvBtn) {
+    exportCsvBtn.addEventListener("click", () => {
+      void handleCsvExport();
+    });
+    toggleDisabled(exportCsvBtn, !userValid);
+  }
+  if (testFeedDueNotificationBtn) {
+    testFeedDueNotificationBtn.addEventListener("click", () => {
+      void handleTestFeedDueNotification();
     });
   }
 }
@@ -754,10 +1139,244 @@ function initGoalsHandlers() {
   }
 }
 
+function formatWeightG(value) {
+  if (!Number.isFinite(value) || value <= 0) {
+    return "0 g";
+  }
+  const rounded = Math.round(value * 10) / 10;
+  return Number.isInteger(rounded) ? `${rounded} g` : `${rounded.toFixed(1)} g`;
+}
+
+function renderBottleOptions() {
+  if (!bottleSelectEl) {
+    return;
+  }
+  bottleSelectEl.innerHTML = "";
+  const defaultOption = document.createElement("option");
+  defaultOption.value = "";
+  defaultOption.textContent = "Select a bottle";
+  bottleSelectEl.appendChild(defaultOption);
+  bottlesCache.forEach((bottle) => {
+    const option = document.createElement("option");
+    option.value = String(bottle.id);
+    option.textContent = `${bottle.name} · ${formatWeightG(bottle.empty_weight_g)}`;
+    bottleSelectEl.appendChild(option);
+  });
+  bottleSelectEl.disabled = !bottlesCache.length;
+}
+
+function updateBottleResult() {
+  if (!bottleResultValueEl) {
+    return;
+  }
+  if (!bottleSelectEl || !bottleTotalWeightEl) {
+    bottleResultValueEl.textContent = "-- ml";
+    bottleExpressedMl = null;
+    updateBottleLogButton();
+    return;
+  }
+  const selectedId = Number.parseInt(bottleSelectEl.value, 10);
+  const bottle = bottlesCache.find((item) => item.id === selectedId);
+  const totalWeight = Number.parseFloat(bottleTotalWeightEl.value);
+  if (!bottle || !Number.isFinite(totalWeight) || totalWeight <= 0) {
+    bottleResultValueEl.textContent = "-- ml";
+    bottleExpressedMl = null;
+    updateBottleLogButton();
+    return;
+  }
+  const expressed = Math.max(0, totalWeight - bottle.empty_weight_g);
+  bottleResultValueEl.textContent = formatMl(expressed);
+  bottleExpressedMl = expressed;
+  updateBottleLogButton();
+}
+
+function updateBottleLogButton() {
+  if (!bottleLogMilkBtnEl) {
+    return;
+  }
+  const canLog = userValid && Number.isFinite(bottleExpressedMl) && bottleExpressedMl > 0;
+  toggleDisabled(bottleLogMilkBtnEl, !canLog);
+  if (canLog) {
+    bottleLogMilkBtnEl.removeAttribute("disabled");
+  } else {
+    bottleLogMilkBtnEl.setAttribute("disabled", "true");
+  }
+}
+
+function renderBottleList(bottles) {
+  if (!bottleListEl || !bottleEmptyEl) {
+    return;
+  }
+  bottleListEl.innerHTML = "";
+  if (!bottles.length) {
+    bottleEmptyEl.hidden = false;
+    return;
+  }
+  bottleEmptyEl.hidden = true;
+  bottles.forEach((bottle) => {
+    const row = document.createElement("div");
+    row.className = "bottle-row";
+
+    const meta = document.createElement("div");
+    meta.className = "bottle-meta";
+    const name = document.createElement("div");
+    name.className = "bottle-name";
+    name.textContent = bottle.name;
+    const weight = document.createElement("div");
+    weight.className = "bottle-weight";
+    weight.textContent = `Empty weight: ${formatWeightG(bottle.empty_weight_g)}`;
+    meta.appendChild(name);
+    meta.appendChild(weight);
+
+    const actions = document.createElement("div");
+    actions.className = "bottle-actions";
+
+    const useBtn = document.createElement("button");
+    useBtn.type = "button";
+    useBtn.className = "ghost-btn";
+    useBtn.textContent = "Use";
+    useBtn.addEventListener("click", () => {
+      if (bottleSelectEl) {
+        bottleSelectEl.value = String(bottle.id);
+      }
+      updateBottleResult();
+      if (bottleTotalWeightEl) {
+        bottleTotalWeightEl.focus();
+      }
+    });
+
+    const editBtn = document.createElement("button");
+    editBtn.type = "button";
+    editBtn.className = "ghost-btn";
+    editBtn.textContent = "Edit";
+    editBtn.addEventListener("click", () => {
+      const nextName = window.prompt("Bottle name", bottle.name || "");
+      if (nextName === null) {
+        return;
+      }
+      const nextWeight = window.prompt(
+        "Empty weight (g)",
+        String(bottle.empty_weight_g ?? ""),
+      );
+      if (nextWeight === null) {
+        return;
+      }
+      const trimmed = nextName.trim();
+      const weightValue = Number.parseFloat(nextWeight);
+      if (!trimmed) {
+        setStatus("Bottle name is required.");
+        return;
+      }
+      if (!Number.isFinite(weightValue) || weightValue <= 0) {
+        setStatus("Empty weight must be a positive number.");
+        return;
+      }
+      void updateBottle(bottle.id, {
+        name: trimmed,
+        empty_weight_g: weightValue,
+      }).then(() => {
+        void loadBottles();
+      });
+    });
+
+    const deleteBtn = document.createElement("button");
+    deleteBtn.type = "button";
+    deleteBtn.className = "ghost-btn";
+    deleteBtn.textContent = "Delete";
+    deleteBtn.addEventListener("click", () => {
+      if (!window.confirm(`Delete "${bottle.name}"?`)) {
+        return;
+      }
+      void deleteBottle(bottle.id).then(() => {
+        void loadBottles();
+      });
+    });
+
+    actions.appendChild(useBtn);
+    actions.appendChild(editBtn);
+    actions.appendChild(deleteBtn);
+
+    row.appendChild(meta);
+    row.appendChild(actions);
+    bottleListEl.appendChild(row);
+  });
+}
+
+function initBottlesHandlers() {
+  if (bottlesInitialized || pageType !== "bottles") {
+    return;
+  }
+  bottlesInitialized = true;
+  if (bottleFormEl) {
+    bottleFormEl.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const name = bottleNameInputEl ? bottleNameInputEl.value.trim() : "";
+      const weightValue = bottleWeightInputEl
+        ? Number.parseFloat(bottleWeightInputEl.value)
+        : Number.NaN;
+      if (!name) {
+        setStatus("Bottle name is required.");
+        return;
+      }
+      if (!Number.isFinite(weightValue) || weightValue <= 0) {
+        setStatus("Empty weight must be a positive number.");
+        return;
+      }
+      void createBottle({
+        name,
+        empty_weight_g: weightValue,
+      }).then(() => {
+        if (bottleNameInputEl) {
+          bottleNameInputEl.value = "";
+        }
+        if (bottleWeightInputEl) {
+          bottleWeightInputEl.value = "";
+        }
+        if (bottleFormHintEl) {
+          bottleFormHintEl.textContent = "Bottle saved.";
+        }
+        void loadBottles();
+      });
+    });
+  }
+  if (bottleSelectEl) {
+    bottleSelectEl.addEventListener("change", () => {
+      updateBottleResult();
+    });
+  }
+  if (bottleTotalWeightEl) {
+    bottleTotalWeightEl.addEventListener("input", () => {
+      updateBottleResult();
+    });
+  }
+  if (bottleLogMilkBtnEl) {
+    bottleLogMilkBtnEl.addEventListener("click", async () => {
+      if (!userValid) {
+        setStatus("Choose a user below to start logging.");
+        return;
+      }
+      if (!Number.isFinite(bottleExpressedMl) || bottleExpressedMl <= 0) {
+        setStatus("Enter a bottle and total weight first.");
+        return;
+      }
+      const payload = buildEntryPayload(MILK_EXPRESS_TYPE);
+      payload.expressed_ml = Math.round(bottleExpressedMl * 10) / 10;
+      await saveEntry(payload);
+      if (bottleTotalWeightEl) {
+        bottleTotalWeightEl.value = "";
+      }
+      updateBottleResult();
+    });
+  }
+}
+
 function applyUserState() {
   if (pageType === "settings") {
     initSettingsHandlers();
     updateUserDisplay();
+    if (exportCsvBtn) {
+      toggleDisabled(exportCsvBtn, !userValid);
+    }
     return;
   }
   if (pageType === "goals") {
@@ -766,7 +1385,16 @@ function applyUserState() {
     loadGoalHistory();
     return;
   }
+  if (pageType === "bottles") {
+    initBottlesHandlers();
+    updateUserDisplay();
+    setStatus("");
+    updateBottleLogButton();
+    loadBottles();
+    return;
+  }
   const allowTimeline = pageType === "timeline";
+  const allowSharedPage = allowTimeline || pageType === "calendar" || pageType === "calendar-form";
   toggleDisabled(feedBtn, !userValid);
   toggleDisabled(nappyBtn, !userValid);
   toggleDisabled(miscBtn, !userValid || customEventTypes.length === 0);
@@ -785,11 +1413,12 @@ function applyUserState() {
   });
   initLinks();
   updateUserDisplay();
+  void hydrateBreastfeedFromLocalEntries();
   updateBreastfeedButton();
   if (userFormEl) {
-    userFormEl.hidden = userValid || allowTimeline;
+    userFormEl.hidden = userValid || allowSharedPage;
   }
-  if (!userValid && !allowTimeline) {
+  if (!userValid && !allowSharedPage) {
     closeFeedMenu();
     setStatus("Choose a user below to start logging.");
   } else {
@@ -810,6 +1439,21 @@ function applyUserState() {
   if (pageType === "timeline") {
     initTimelineHandlers();
     loadTimelineEntries({ reset: true });
+  }
+  if (pageType === "calendar") {
+    initCalendarHandlers();
+    loadCalendarWeek();
+  }
+  if (pageType === "calendar-form") {
+    initCalendarFormHandlers();
+  }
+  if (pageType === "milk-express") {
+    initMilkExpressLedgerHandlers();
+    loadMilkExpressLedger();
+  }
+  if (pageType === "bottles") {
+    initBottlesHandlers();
+    loadBottles();
   }
 }
 
@@ -1014,7 +1658,7 @@ async function handleCsvUpload(event) {
   formData.append("file", file);
   setStatus("Uploading CSV...");
   try {
-    const response = await fetch(`/api/users/${activeUser}/entries/import`, {
+    const response = await fetch(buildUrl(`/api/users/${activeUser}/entries/import`), {
       method: "POST",
       body: formData,
     });
@@ -1035,6 +1679,64 @@ async function handleCsvUpload(event) {
   }
 }
 
+async function handleCsvExport() {
+  if (!userValid || !activeUser) {
+    setStatus("Choose a user below to export entries.");
+    return;
+  }
+  setStatus("Preparing CSV...");
+  try {
+    const response = await fetch(buildUrl("/api/entries/export"));
+    if (!response.ok) {
+      let detail = "";
+      try {
+        const err = await response.json();
+        detail = err.error || JSON.stringify(err);
+      } catch (parseError) {
+        detail = await response.text();
+      }
+      setStatus(`Error: ${detail || response.status}`);
+      return;
+    }
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    const dateStamp = new Date().toISOString().slice(0, 10);
+    link.href = url;
+    link.download = `baby-tracker-events-${activeUser}-${dateStamp}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+    setStatus("CSV downloaded");
+  } catch (error) {
+    setStatus("Error: network issue exporting CSV");
+  }
+}
+
+async function handleTestFeedDueNotification() {
+  setStatus("Sending test notification...");
+  try {
+    const response = await fetch(buildUrl("/api/push/feed-due"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: "Feed due (test)",
+        body: "This is a test notification from Baby Tracker settings.",
+      }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const detail = payload.error || response.status;
+      setStatus(`Error: ${detail}`);
+      return;
+    }
+    setStatus("Test feed-due notification sent");
+  } catch (error) {
+    setStatus("Error: network issue sending test notification");
+  }
+}
+
 function startAutoRefresh(refreshFn) {
   if (refreshTimer) {
     return;
@@ -1051,6 +1753,275 @@ function generateId() {
     return window.crypto.randomUUID();
   }
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function requestToPromise(request) {
+  return new Promise((resolve, reject) => {
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+function openDb() {
+  if (!("indexedDB" in window)) {
+    return Promise.reject(new Error("IndexedDB not supported"));
+  }
+  if (openDb.cached) {
+    return openDb.cached;
+  }
+  openDb.cached = new Promise((resolve, reject) => {
+    const request = window.indexedDB.open(DB_NAME, DB_VERSION);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(STORE_ENTRIES)) {
+        const store = db.createObjectStore(STORE_ENTRIES, { keyPath: "client_event_id" });
+        store.createIndex("by_timestamp_utc", "timestamp_utc", { unique: false });
+        store.createIndex("by_user_slug", "user_slug", { unique: false });
+      }
+      if (!db.objectStoreNames.contains(STORE_OUTBOX)) {
+        db.createObjectStore(STORE_OUTBOX, { autoIncrement: true });
+      }
+      if (!db.objectStoreNames.contains(STORE_META)) {
+        db.createObjectStore(STORE_META, { keyPath: "key" });
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+  return openDb.cached;
+}
+
+async function getMetaValue(key) {
+  const db = await openDb();
+  const tx = db.transaction(STORE_META, "readonly");
+  const store = tx.objectStore(STORE_META);
+  const record = await requestToPromise(store.get(key));
+  return record ? record.value : null;
+}
+
+async function setMetaValue(key, value) {
+  const db = await openDb();
+  const tx = db.transaction(STORE_META, "readwrite");
+  const store = tx.objectStore(STORE_META);
+  await requestToPromise(store.put({ key, value }));
+}
+
+async function getDeviceId() {
+  let deviceId = await getMetaValue(META_DEVICE_ID);
+  if (!deviceId) {
+    deviceId = generateId();
+    await setMetaValue(META_DEVICE_ID, deviceId);
+  }
+  return deviceId;
+}
+
+async function getSyncCursor() {
+  return getMetaValue(META_SYNC_CURSOR);
+}
+
+async function setSyncCursor(cursor) {
+  await setMetaValue(META_SYNC_CURSOR, cursor);
+}
+
+async function upsertEntryLocal(entry) {
+  const db = await openDb();
+  const tx = db.transaction(STORE_ENTRIES, "readwrite");
+  const store = tx.objectStore(STORE_ENTRIES);
+  await requestToPromise(store.put(entry));
+}
+
+async function getEntryLocal(clientEventId) {
+  const db = await openDb();
+  const tx = db.transaction(STORE_ENTRIES, "readonly");
+  const store = tx.objectStore(STORE_ENTRIES);
+  return requestToPromise(store.get(clientEventId));
+}
+
+async function pruneEntriesLocal(entries, cutoffMs) {
+  const staleKeys = entries
+    .filter((entry) => {
+      const timestamp = new Date(entry.timestamp_utc);
+      return !Number.isNaN(timestamp.getTime()) && timestamp.getTime() < cutoffMs;
+    })
+    .map((entry) => entry.client_event_id);
+  if (!staleKeys.length) {
+    return;
+  }
+  const db = await openDb();
+  await new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_ENTRIES, "readwrite");
+    const store = tx.objectStore(STORE_ENTRIES);
+    staleKeys.forEach((key) => store.delete(key));
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error);
+  });
+}
+
+async function listEntriesLocal(params = {}) {
+  const db = await openDb();
+  const tx = db.transaction(STORE_ENTRIES, "readonly");
+  const store = tx.objectStore(STORE_ENTRIES);
+  const allEntries = await requestToPromise(store.getAll());
+  const cutoffMs = Date.now() - OFFLINE_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+  void pruneEntriesLocal(allEntries, cutoffMs);
+
+  const since = params.since ? new Date(params.since) : null;
+  const until = params.until ? new Date(params.until) : null;
+  const filtered = allEntries.filter((entry) => {
+    if (entry.deleted_at_utc) {
+      return false;
+    }
+    if (params.user_slug && entry.user_slug !== params.user_slug) {
+      return false;
+    }
+    if (params.type && entry.type !== params.type) {
+      return false;
+    }
+    const timestamp = new Date(entry.timestamp_utc);
+    if (Number.isNaN(timestamp.getTime())) {
+      return false;
+    }
+    if (timestamp.getTime() < cutoffMs) {
+      return false;
+    }
+    if (since && timestamp < since) {
+      return false;
+    }
+    if (until && timestamp > until) {
+      return false;
+    }
+    return true;
+  });
+  filtered.sort((a, b) => {
+    const left = new Date(a.timestamp_utc).getTime();
+    const right = new Date(b.timestamp_utc).getTime();
+    return right - left;
+  });
+  if (Number.isFinite(params.limit)) {
+    return filtered.slice(0, params.limit);
+  }
+  return filtered;
+}
+
+async function enqueueOutbox(change) {
+  const db = await openDb();
+  const tx = db.transaction(STORE_OUTBOX, "readwrite");
+  const store = tx.objectStore(STORE_OUTBOX);
+  await requestToPromise(
+    store.add({ ...change, queued_at: new Date().toISOString() }),
+  );
+}
+
+async function drainOutbox(limit = 100) {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_OUTBOX, "readonly");
+    const store = tx.objectStore(STORE_OUTBOX);
+    const items = [];
+    let count = 0;
+    const request = store.openCursor();
+    request.onsuccess = (event) => {
+      const cursor = event.target.result;
+      if (!cursor || count >= limit) {
+        resolve(items);
+        return;
+      }
+      items.push({ key: cursor.key, value: cursor.value });
+      count += 1;
+      cursor.continue();
+    };
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function clearOutbox(keys) {
+  if (!keys.length) {
+    return;
+  }
+  const db = await openDb();
+  await new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_OUTBOX, "readwrite");
+    const store = tx.objectStore(STORE_OUTBOX);
+    keys.forEach((key) => store.delete(key));
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error);
+  });
+}
+
+async function applyServerEntries(entries) {
+  if (!entries || !entries.length) {
+    return;
+  }
+  const db = await openDb();
+  await new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_ENTRIES, "readwrite");
+    const store = tx.objectStore(STORE_ENTRIES);
+    entries.forEach((entry) => store.put(entry));
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error);
+  });
+}
+
+async function syncNow() {
+  if (!navigator.onLine) {
+    return null;
+  }
+  if (syncInFlight) {
+    return syncInFlight;
+  }
+  syncInFlight = (async () => {
+    const deviceId = await getDeviceId();
+    const cursor = await getSyncCursor();
+    const outbox = await drainOutbox();
+    const changes = outbox.map((item) => item.value);
+
+    if (changes.length) {
+      setStatus("Syncing...");
+    }
+
+    const response = await fetch(buildUrl("/api/sync/entries"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ device_id: deviceId, cursor, changes }),
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const data = await response.json();
+    await applyServerEntries(data.entries || []);
+    updateBreastfeedStateFromSync(data.entries || []);
+    await setSyncCursor(data.cursor);
+    await clearOutbox(outbox.map((item) => item.key));
+    if (changes.length) {
+      setStatus("Synced");
+    }
+    return data;
+  })()
+    .catch((err) => {
+      console.warn("Sync failed", err);
+      if (!navigator.onLine) {
+        setStatus("Offline - changes will sync when online");
+      } else if (statusEl) {
+        setStatus("Sync failed");
+      }
+      return null;
+    })
+    .finally(() => {
+      syncInFlight = null;
+    });
+  return syncInFlight;
+}
+
+function scheduleSync() {
+  if (syncTimerId) {
+    return;
+  }
+  syncTimerId = window.setInterval(() => {
+    void syncNow();
+  }, 60000);
 }
 
 function formatTimestamp(value) {
@@ -1245,21 +2216,29 @@ function updateNextFeed() {
   const intervalMinutes = getFeedIntervalMinutes();
   const lastTimestamp = lastFeedEl ? lastFeedEl.dataset.timestamp : null;
   if (!intervalMinutes || !lastTimestamp) {
-    nextFeedEl.textContent = "--";
-    nextFeedEl.removeAttribute("data-timestamp");
+    if (nextFeedEl) {
+      nextFeedEl.textContent = "--";
+      nextFeedEl.removeAttribute("data-timestamp");
+    }
+    // nextFeedCard removed
     setNextFeedShortcut(false, "");
     return;
   }
   const lastDate = new Date(lastTimestamp);
   if (Number.isNaN(lastDate.getTime())) {
-    nextFeedEl.textContent = "--";
-    nextFeedEl.removeAttribute("data-timestamp");
+    if (nextFeedEl) {
+      nextFeedEl.textContent = "--";
+      nextFeedEl.removeAttribute("data-timestamp");
+    }
+    // nextFeedCard removed
     setNextFeedShortcut(false, "");
     return;
   }
   const nextDate = new Date(lastDate.getTime() + intervalMinutes * 60000);
-  nextFeedEl.textContent = formatTimeUntil(nextDate);
-  nextFeedEl.dataset.timestamp = nextDate.toISOString();
+  if (nextFeedEl) {
+    nextFeedEl.textContent = formatTimeUntil(nextDate);
+    nextFeedEl.dataset.timestamp = nextDate.toISOString();
+  }
   const shortcutUrl = buildFeedShortcutUrl(nextDate);
   setNextFeedShortcut(Boolean(shortcutUrl), shortcutUrl);
 }
@@ -1287,6 +2266,372 @@ function computeWindow(hours) {
   };
 }
 
+function getCssVar(name, fallback) {
+  const value = window.getComputedStyle(document.documentElement).getPropertyValue(name);
+  if (!value) {
+    return fallback;
+  }
+  const trimmed = value.trim();
+  return trimmed ? trimmed : fallback;
+}
+
+function normalizeFeedEntry(entry) {
+  if (!entry || entry.type !== "feed") {
+    return null;
+  }
+  if (activeUser && entry.user_slug && entry.user_slug !== activeUser) {
+    return null;
+  }
+  const timestamp = new Date(entry.timestamp_utc);
+  if (Number.isNaN(timestamp.getTime())) {
+    return null;
+  }
+  const expressed = Number.isFinite(entry.expressed_ml) ? entry.expressed_ml : 0;
+  const formula = Number.isFinite(entry.formula_ml) ? entry.formula_ml : 0;
+  if (!expressed && !formula) {
+    return null;
+  }
+  return {
+    ts: timestamp.getTime(),
+    expressed,
+    formula,
+  };
+}
+
+function buildRulerBuckets() {
+  const buckets = new Map();
+  rulerEntries.forEach((entry) => {
+    const bucketTs = Math.round(entry.ts / RULER_BUCKET_MS) * RULER_BUCKET_MS;
+    const key = bucketTs.toString();
+    if (!buckets.has(key)) {
+      buckets.set(key, { ts: bucketTs, expressed: 0, formula: 0 });
+    }
+    const bucket = buckets.get(key);
+    bucket.expressed += entry.expressed;
+    bucket.formula += entry.formula;
+  });
+  return Array.from(buckets.values());
+}
+
+function computeRulerWindow(anchor, stretch = 0) {
+  const windowMs = RULER_WINDOW_MS * (1 + stretch);
+  const start = anchor - windowMs;
+  let expressed = 0;
+  let formula = 0;
+  rulerEntries.forEach((entry) => {
+    if (entry.ts >= start && entry.ts <= anchor) {
+      expressed += entry.expressed;
+      formula += entry.formula;
+    }
+  });
+  return {
+    start,
+    end: anchor,
+    expressed,
+    formula,
+    total: expressed + formula,
+    windowMs,
+  };
+}
+
+function nearestRulerFeedTs(ts) {
+  if (!rulerEntries.length) {
+    return ts;
+  }
+  let nearest = rulerEntries[0].ts;
+  let minDiff = Math.abs(ts - nearest);
+  rulerEntries.forEach((entry) => {
+    const diff = Math.abs(ts - entry.ts);
+    if (diff < minDiff) {
+      minDiff = diff;
+      nearest = entry.ts;
+    }
+  });
+  return nearest;
+}
+
+function clampRulerAnchor() {
+  if (!Number.isFinite(rulerMinTs) || !Number.isFinite(rulerMaxTs)) {
+    return;
+  }
+  const minAnchor = rulerMinTs + RULER_WINDOW_MS;
+  const maxAnchor = rulerMaxTs;
+  if (rulerAnchorTs < minAnchor) {
+    rulerAnchorTs = minAnchor;
+  }
+  if (rulerAnchorTs > maxAnchor) {
+    rulerAnchorTs = maxAnchor;
+  }
+}
+
+function resizeRulerCanvas() {
+  if (!rulerCanvasEl) {
+    return;
+  }
+  const rect = rulerCanvasEl.getBoundingClientRect();
+  rulerCanvasEl.width = rect.width * window.devicePixelRatio;
+  rulerCanvasEl.height = rect.height * window.devicePixelRatio;
+  drawRuler();
+}
+
+function updateRulerReadout(data, anchorX) {
+  if (!rulerReadoutEl) {
+    return;
+  }
+  if (rulerTotalEl) {
+    rulerTotalEl.textContent = formatMl(data.total);
+  }
+  if (rulerDetailEl) {
+    rulerDetailEl.textContent = `Expressed ${formatMl(data.expressed)} · Formula ${formatMl(data.formula)}`;
+  }
+  const goalValue = Number.isFinite(rulerGoalMl) && rulerGoalMl > 0 ? rulerGoalMl : 0;
+  const goalPct = goalValue ? Math.min(200, Math.round((data.total / goalValue) * 100)) : 0;
+  if (rulerGoalEl) {
+    rulerGoalEl.textContent = `${goalPct}% of ${goalValue || "--"} ml goal`;
+  }
+  if (rulerStartEl) {
+    rulerStartEl.textContent = formatTimestamp(new Date(data.start).toISOString());
+  }
+  if (rulerEndEl) {
+    rulerEndEl.textContent = formatTimestamp(new Date(data.end).toISOString());
+  }
+  if (!rulerBodyEl) {
+    return;
+  }
+  const rect = rulerBodyEl.getBoundingClientRect();
+  const minX = 90;
+  const maxX = rect.width - 90;
+  const clamped = Math.max(minX, Math.min(maxX, anchorX));
+  rulerReadoutEl.style.left = `${clamped}px`;
+}
+
+function drawRuler() {
+  if (!rulerCanvasEl || !rulerEntries || !rulerEntries.length) {
+    if (rulerCanvasEl) {
+      const ctx = rulerCanvasEl.getContext("2d");
+      if (ctx) {
+        ctx.clearRect(0, 0, rulerCanvasEl.width, rulerCanvasEl.height);
+      }
+    }
+    if (rulerEmptyEl) {
+      rulerEmptyEl.style.display = "flex";
+    }
+    if (rulerReadoutEl) {
+      rulerReadoutEl.style.display = "none";
+    }
+    return;
+  }
+  if (rulerEmptyEl) {
+    rulerEmptyEl.style.display = "none";
+  }
+  if (rulerReadoutEl) {
+    rulerReadoutEl.style.display = "block";
+  }
+  const ctx = rulerCanvasEl.getContext("2d");
+  if (!ctx) {
+    return;
+  }
+  const data = computeRulerWindow(rulerAnchorTs, rulerStretch);
+  const { width, height } = rulerCanvasEl;
+  const scale = window.devicePixelRatio;
+  ctx.clearRect(0, 0, width, height);
+
+  const padding = 18 * scale;
+  const trackY = height * 0.62;
+  const trackWidth = width - padding * 2;
+  const trackHeight = 6 * scale;
+  const minTs = rulerMinTs || Date.now() - RULER_DAYS_BACK * 24 * 60 * 60 * 1000;
+  const maxTs = rulerMaxTs || Date.now();
+  const span = Math.max(1, maxTs - minTs);
+
+  const expressedColor = getCssVar("--ruler-expressed", "#13ec5b");
+  const formulaColor = getCssVar("--ruler-formula", "#f8b13c");
+  const trackColor = getCssVar("--ruler-track", "#e0e7e1");
+  const windowColor = getCssVar("--ruler-window", "rgba(19, 236, 91, 0.12)");
+  const anchorColor = getCssVar("--ruler-anchor", "#0f1a12");
+
+  ctx.fillStyle = trackColor;
+  ctx.fillRect(padding, trackY, trackWidth, trackHeight);
+
+  const windowStartRatio = (data.start - minTs) / span;
+  const windowEndRatio = (data.end - minTs) / span;
+  const windowX = padding + windowStartRatio * trackWidth;
+  const windowW = (windowEndRatio - windowStartRatio) * trackWidth;
+  ctx.fillStyle = windowColor;
+  ctx.fillRect(windowX, trackY - 26 * scale, windowW, trackHeight + 52 * scale);
+
+  const buckets = buildRulerBuckets().filter((bucket) => (
+    bucket.ts >= minTs && bucket.ts <= maxTs
+  ));
+
+  buckets.forEach((bucket) => {
+    const ratio = (bucket.ts - minTs) / span;
+    const x = padding + ratio * trackWidth;
+    const baseHeight = 10 * scale;
+    const expressedH = baseHeight + Math.min(38 * scale, bucket.expressed * 0.34 * scale);
+    const formulaH = baseHeight + Math.min(30 * scale, bucket.formula * 0.3 * scale);
+
+    if (bucket.formula > 0) {
+      ctx.strokeStyle = formulaColor;
+      ctx.lineWidth = 3 * scale;
+      ctx.beginPath();
+      ctx.moveTo(x, trackY + baseHeight * 0.2);
+      ctx.lineTo(x, trackY + formulaH);
+      ctx.stroke();
+    }
+
+    if (bucket.expressed > 0) {
+      ctx.strokeStyle = expressedColor;
+      ctx.lineWidth = 3 * scale;
+      ctx.beginPath();
+      ctx.moveTo(x, trackY - baseHeight * 0.2);
+      ctx.lineTo(x, trackY - expressedH);
+      ctx.stroke();
+    }
+  });
+
+  const anchorRatio = (data.end - minTs) / span;
+  const anchorX = padding + anchorRatio * trackWidth;
+  ctx.strokeStyle = anchorColor;
+  ctx.lineWidth = 2 * scale;
+  ctx.beginPath();
+  ctx.moveTo(anchorX, trackY - 40 * scale);
+  ctx.lineTo(anchorX, trackY + 48 * scale);
+  ctx.stroke();
+
+  updateRulerReadout(data, anchorX / scale);
+}
+
+async function loadRulerFeeds({ reset } = {}) {
+  if (!rulerCanvasEl) {
+    return;
+  }
+  if (reset) {
+    rulerEntries = [];
+  }
+  const windowHours = RULER_DAYS_BACK * 24;
+  const window = computeWindow(windowHours);
+  rulerMinTs = window.since.getTime();
+  rulerMaxTs = window.until.getTime();
+  try {
+    const [entries, currentGoal] = await Promise.all([
+      loadEntriesWithFallback({
+        limit: 200,
+        since: window.sinceIso,
+        until: window.untilIso,
+        type: "feed",
+      }),
+      loadCurrentGoal(),
+    ]);
+    rulerGoalMl = currentGoal && Number.isFinite(currentGoal.goal_ml)
+      ? currentGoal.goal_ml
+      : rulerGoalMl;
+    rulerEntries = entries
+      .map(normalizeFeedEntry)
+      .filter((entry) => Boolean(entry));
+    rulerAnchorTs = window.until.getTime();
+    if (rulerEntries.length) {
+      rulerAnchorTs = nearestRulerFeedTs(rulerAnchorTs);
+    }
+    clampRulerAnchor();
+    drawRuler();
+  } catch (err) {
+    if (rulerEmptyEl) {
+      rulerEmptyEl.style.display = "flex";
+      rulerEmptyEl.textContent = "Unable to load feed history.";
+    }
+  }
+}
+
+function onRulerPointerDown(event) {
+  if (!rulerCanvasEl) {
+    return;
+  }
+  rulerDragging = true;
+  rulerDragStartX = event.clientX || (event.touches ? event.touches[0].clientX : 0);
+  rulerDragStartAnchor = rulerAnchorTs;
+}
+
+function onRulerPointerMove(event) {
+  if (!rulerDragging || !rulerCanvasEl) {
+    return;
+  }
+  const x = event.clientX || (event.touches ? event.touches[0].clientX : 0);
+  const dx = x - rulerDragStartX;
+  const rect = rulerCanvasEl.getBoundingClientRect();
+  const ratio = dx / rect.width;
+  const span = (rulerMaxTs || Date.now()) - (rulerMinTs || Date.now() - RULER_DAYS_BACK * 24 * 60 * 60 * 1000);
+  const delta = ratio * span;
+  rulerAnchorTs = rulerDragStartAnchor - delta;
+  rulerStretch = Math.min(0.1, Math.abs(dx) / rect.width * 0.18);
+  clampRulerAnchor();
+  drawRuler();
+}
+
+function onRulerPointerUp() {
+  if (!rulerDragging) {
+    return;
+  }
+  rulerDragging = false;
+  rulerStretch = 0;
+  if (rulerSnapToFeeds) {
+    rulerAnchorTs = nearestRulerFeedTs(rulerAnchorTs);
+  }
+  clampRulerAnchor();
+  drawRuler();
+}
+
+function jumpRulerToNow() {
+  rulerAnchorTs = Date.now();
+  if (rulerSnapToFeeds) {
+    rulerAnchorTs = nearestRulerFeedTs(rulerAnchorTs);
+  }
+  clampRulerAnchor();
+  drawRuler();
+}
+
+function onRulerClick(event) {
+  if (!rulerCanvasEl) {
+    return;
+  }
+  const rect = rulerCanvasEl.getBoundingClientRect();
+  const ratio = (event.clientX - rect.left) / rect.width;
+  const span = (rulerMaxTs || Date.now()) - (rulerMinTs || Date.now() - RULER_DAYS_BACK * 24 * 60 * 60 * 1000);
+  const targetTs = (rulerMinTs || Date.now() - RULER_DAYS_BACK * 24 * 60 * 60 * 1000) + ratio * span;
+  rulerAnchorTs = rulerSnapToFeeds ? nearestRulerFeedTs(targetTs) : targetTs;
+  clampRulerAnchor();
+  drawRuler();
+}
+
+function initRulerHandlers() {
+  if (rulerInitialized || pageType !== "timeline" || !rulerCanvasEl) {
+    return;
+  }
+  rulerInitialized = true;
+  rulerCanvasEl.addEventListener("mousedown", onRulerPointerDown);
+  rulerCanvasEl.addEventListener("mousemove", onRulerPointerMove);
+  window.addEventListener("mouseup", onRulerPointerUp);
+  rulerCanvasEl.addEventListener("touchstart", onRulerPointerDown, { passive: true });
+  rulerCanvasEl.addEventListener("touchmove", onRulerPointerMove, { passive: true });
+  rulerCanvasEl.addEventListener("touchend", onRulerPointerUp);
+  rulerCanvasEl.addEventListener("click", onRulerClick);
+  if (rulerSnapToggleEl) {
+    rulerSnapToggleEl.addEventListener("click", () => {
+      rulerSnapToFeeds = !rulerSnapToFeeds;
+      rulerSnapToggleEl.classList.toggle("active", rulerSnapToFeeds);
+      rulerSnapToggleEl.textContent = rulerSnapToFeeds ? "Snap to feeds" : "Free scroll";
+    });
+  }
+  if (rulerNowBtnEl) {
+    rulerNowBtnEl.addEventListener("click", () => {
+      jumpRulerToNow();
+    });
+  }
+  window.addEventListener("resize", resizeRulerCanvas);
+  resizeRulerCanvas();
+  void loadRulerFeeds({ reset: true });
+}
+
 function formatDateInputValue(date) {
   const pad = (value) => String(value).padStart(2, "0");
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
@@ -1307,6 +2652,44 @@ function isSameDay(a, b) {
   return a.getFullYear() === b.getFullYear()
     && a.getMonth() === b.getMonth()
     && a.getDate() === b.getDate();
+}
+
+function getDateKeyFromTimestamp(value) {
+  if (!value) {
+    return null;
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+  return formatDateInputValue(parsed);
+}
+
+function getGoalDayWindow(dateKey) {
+  const parsed = parseDateInputValue(dateKey);
+  if (!parsed) {
+    return null;
+  }
+  return getSummaryDayWindow(parsed);
+}
+
+function computeFeedTotalMl(entries) {
+  let totalMl = 0;
+  entries.forEach((entry) => {
+    if (entry.type !== "feed") {
+      return;
+    }
+    if (typeof entry.amount_ml === "number" && Number.isFinite(entry.amount_ml)) {
+      totalMl += entry.amount_ml;
+    }
+    if (typeof entry.expressed_ml === "number" && Number.isFinite(entry.expressed_ml)) {
+      totalMl += entry.expressed_ml;
+    }
+    if (typeof entry.formula_ml === "number" && Number.isFinite(entry.formula_ml)) {
+      totalMl += entry.formula_ml;
+    }
+  });
+  return totalMl;
 }
 
 function formatSummaryDateLabel(date) {
@@ -1458,11 +2841,111 @@ function formatMilkExpressDetails(entry) {
   return parts.join(" • ");
 }
 
+function formatEntryTypeLabel(type) {
+  const normalized = normalizeEntryType(type);
+  if (!normalized) {
+    return "Event";
+  }
+  return normalized
+    .split(" ")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
+function renderLatestEntry(entry) {
+  if (
+    !latestBodyEl
+    || !latestEmptyEl
+    || !latestTypeEl
+    || !latestTimeEl
+    || !latestRelativeEl
+    || !latestDetailsEl
+  ) {
+    return;
+  }
+  if (!entry) {
+    latestBodyEl.hidden = true;
+    latestEmptyEl.hidden = false;
+    latestRelativeEl.textContent = "--";
+    if (latestEditBtn) {
+      latestEditBtn.disabled = true;
+    }
+    if (latestDeleteBtn) {
+      latestDeleteBtn.disabled = true;
+    }
+    return;
+  }
+  latestBodyEl.hidden = false;
+  latestEmptyEl.hidden = true;
+  latestTypeEl.textContent = formatEntryTypeLabel(entry.type);
+  latestTimeEl.textContent = formatTimestamp(entry.timestamp_utc);
+  latestRelativeEl.textContent = formatRelativeTime(entry.timestamp_utc);
+  latestTypeEl.classList.remove("skeleton-text", "skeleton-mid");
+  latestTimeEl.classList.remove("skeleton-text", "skeleton-wide");
+
+  latestDetailsEl.innerHTML = "";
+  const details = [];
+  if (entry.type === "feed") {
+    if (entry.amount_ml !== null && entry.amount_ml !== undefined) {
+      details.push({ label: "Amount", value: formatMl(entry.amount_ml) });
+    }
+    if (entry.expressed_ml !== null && entry.expressed_ml !== undefined) {
+      details.push({ label: "Expressed", value: formatMl(entry.expressed_ml) });
+    }
+    if (entry.formula_ml !== null && entry.formula_ml !== undefined) {
+      details.push({ label: "Formula", value: formatMl(entry.formula_ml) });
+    }
+    if (entry.feed_duration_min !== null && entry.feed_duration_min !== undefined) {
+      details.push({
+        label: "Duration",
+        value: formatDurationMinutes(entry.feed_duration_min),
+      });
+    }
+  } else if (isMilkExpressType(entry.type)) {
+    const { ml, minutes } = getMilkExpressAmounts(entry);
+    if (Number.isFinite(ml) && ml > 0) {
+      details.push({ label: "Expressed", value: formatMl(ml) });
+    }
+    if (Number.isFinite(minutes) && minutes > 0) {
+      details.push({ label: "Duration", value: formatDurationMinutes(minutes) });
+    }
+  } else if (entry.feed_duration_min !== null && entry.feed_duration_min !== undefined) {
+    details.push({
+      label: "Duration",
+      value: formatDurationMinutes(entry.feed_duration_min),
+    });
+  }
+  details.forEach(({ label, value }) => {
+    const chip = document.createElement("span");
+    chip.className = "latest-chip";
+    chip.textContent = `${label} ${value}`;
+    latestDetailsEl.appendChild(chip);
+  });
+
+  if (latestNotesEl) {
+    if (entry.notes) {
+      latestNotesEl.textContent = entry.notes;
+      latestNotesEl.hidden = false;
+    } else {
+      latestNotesEl.hidden = true;
+    }
+  }
+  if (latestEditBtn) {
+    latestEditBtn.disabled = false;
+    latestEditBtn.onclick = () => editEntry(entry);
+  }
+  if (latestDeleteBtn) {
+    latestDeleteBtn.disabled = false;
+    latestDeleteBtn.onclick = () => deleteEntry(entry);
+  }
+}
+
 function renderSummaryStats(entries) {
   if (
     !summaryFeedDurationEl
     || !summaryExpressedEl
     || !summaryFormulaEl
+    || !summaryTotalIntakeEl
   ) {
     return;
   }
@@ -1472,6 +2955,9 @@ function renderSummaryStats(entries) {
   let formulaTotal = 0;
   entries.forEach((entry) => {
     if (isFeedType(entry.type)) {
+      if (isBreastfeedInProgress(entry)) {
+        return;
+      }
       feedCount += 1;
       const duration = Number.parseFloat(entry.feed_duration_min);
       if (Number.isFinite(duration)) {
@@ -1487,9 +2973,11 @@ function renderSummaryStats(entries) {
       }
     }
   });
+  const totalIntake = expressedTotal + formulaTotal;
   summaryFeedDurationEl.textContent = formatDurationMinutes(durationTotal);
   summaryExpressedEl.textContent = formatMl(expressedTotal);
   summaryFormulaEl.textContent = formatMl(formulaTotal);
+  summaryTotalIntakeEl.textContent = formatMl(totalIntake);
   if (summaryFeedDurationAvgEl) {
     summaryFeedDurationAvgEl.textContent = `Avg / feed: ${formatAverageDuration(
       durationTotal,
@@ -1505,6 +2993,12 @@ function renderSummaryStats(entries) {
   if (summaryFormulaAvgEl) {
     summaryFormulaAvgEl.textContent = `Avg / feed: ${formatAverageMl(
       formulaTotal,
+      feedCount,
+    )}`;
+  }
+  if (summaryTotalIntakeAvgEl) {
+    summaryTotalIntakeAvgEl.textContent = `Avg / feed: ${formatAverageMl(
+      totalIntake,
       feedCount,
     )}`;
   }
@@ -1658,6 +3152,14 @@ function formatMilkExpressSparklineRange(entries, isAllTime) {
     return formatSummaryDateLabel(base);
   }
   if (!entries.length) {
+    if (insightAnchorLabelEl && anchorEnd) {
+      const anchorLabel = formatSummaryDateLabel(anchorEnd);
+      const anchorShort = anchorEnd.toLocaleDateString(undefined, {
+        month: "short",
+        day: "numeric",
+      });
+      insightAnchorLabelEl.textContent = `${anchorLabel} • ${anchorShort}`;
+    }
     return "All time";
   }
   const sorted = [...entries].sort((a, b) => {
@@ -1749,6 +3251,436 @@ function buildAllTimeSparklinePoints(entries, config) {
     const y = height - padding - (day.total / maxMl) * plotHeight;
     return { x, y };
   });
+}
+
+function formatRelativeTimeFrom(baseDate, value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime()) || !baseDate || Number.isNaN(baseDate.getTime())) {
+    return "--";
+  }
+  const diffMs = baseDate.getTime() - date.getTime();
+  const diffMinutes = Math.max(0, Math.floor(diffMs / 60000));
+  if (diffMinutes < 1) {
+    return "just now";
+  }
+  if (diffMinutes < 60) {
+    return `${diffMinutes} min${diffMinutes === 1 ? "" : "s"}`;
+  }
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) {
+    return `${diffHours} hour${diffHours === 1 ? "" : "s"}`;
+  }
+  const diffDays = Math.floor(diffHours / 24);
+  return `${diffDays} day${diffDays === 1 ? "" : "s"}`;
+}
+
+function getInsightAnchor(date) {
+  const base = date ? new Date(date) : new Date();
+  const window = getSummaryDayWindow(base);
+  const now = new Date();
+  const anchorEnd = isSameDay(base, now) ? now : window.until;
+  return {
+    base,
+    anchorEnd,
+    anchorIso: anchorEnd.toISOString(),
+  };
+}
+
+function filterEntriesByWindow(entries, sinceMs, untilMs) {
+  return entries.filter((entry) => {
+    const ts = new Date(entry.timestamp_utc);
+    if (Number.isNaN(ts.getTime())) {
+      return false;
+    }
+    const time = ts.getTime();
+    if (sinceMs && time < sinceMs) {
+      return false;
+    }
+    if (untilMs && time > untilMs) {
+      return false;
+    }
+    return true;
+  });
+}
+
+function computeFeedStats(entries) {
+  const feedEntries = entries.filter((entry) => entry.type === "feed");
+  const sorted = [...feedEntries].sort((a, b) => {
+    return new Date(a.timestamp_utc) - new Date(b.timestamp_utc);
+  });
+  let durationTotal = 0;
+  let expressedTotal = 0;
+  let formulaTotal = 0;
+  sorted.forEach((entry) => {
+    const duration = Number.parseFloat(entry.feed_duration_min);
+    if (Number.isFinite(duration)) {
+      durationTotal += duration;
+    }
+    const expressed = Number.parseFloat(entry.expressed_ml);
+    if (Number.isFinite(expressed)) {
+      expressedTotal += expressed;
+    }
+    const formula = Number.parseFloat(entry.formula_ml);
+    if (Number.isFinite(formula)) {
+      formulaTotal += formula;
+    }
+  });
+  const gaps = [];
+  for (let i = 1; i < sorted.length; i += 1) {
+    const prev = new Date(sorted[i - 1].timestamp_utc);
+    const next = new Date(sorted[i].timestamp_utc);
+    if (Number.isNaN(prev.getTime()) || Number.isNaN(next.getTime())) {
+      continue;
+    }
+    const diffMinutes = (next.getTime() - prev.getTime()) / 60000;
+    if (diffMinutes > 0) {
+      gaps.push(diffMinutes);
+    }
+  }
+  const avgGap = gaps.length
+    ? gaps.reduce((sum, value) => sum + value, 0) / gaps.length
+    : null;
+  const medianGap = gaps.length
+    ? [...gaps].sort((a, b) => a - b)[Math.floor(gaps.length / 2)]
+    : null;
+  return {
+    count: feedEntries.length,
+    durationTotal,
+    expressedTotal,
+    formulaTotal,
+    avgGap,
+    medianGap,
+    entries: sorted,
+  };
+}
+
+function computeExpressStats(entries) {
+  const expressEntries = entries.filter((entry) => isMilkExpressType(entry.type));
+  const sorted = [...expressEntries].sort((a, b) => {
+    return new Date(a.timestamp_utc) - new Date(b.timestamp_utc);
+  });
+  let totalMl = 0;
+  let totalMinutes = 0;
+  sorted.forEach((entry) => {
+    const { ml, minutes } = getMilkExpressAmounts(entry);
+    totalMl += Number.isFinite(ml) ? ml : 0;
+    totalMinutes += Number.isFinite(minutes) ? minutes : 0;
+  });
+  return {
+    count: expressEntries.length,
+    totalMl,
+    totalMinutes,
+    entries: sorted,
+  };
+}
+
+function computeDiaperStats(entries) {
+  let weeCount = 0;
+  let pooCount = 0;
+  entries.forEach((entry) => {
+    if (entry.type === "wee") {
+      weeCount += 1;
+    } else if (entry.type === "poo") {
+      pooCount += 1;
+    }
+  });
+  return {
+    wee: weeCount,
+    poo: pooCount,
+    total: weeCount + pooCount,
+  };
+}
+
+function buildHourCounts(entries, isExpress = false) {
+  const counts = new Array(24).fill(0);
+  entries.forEach((entry) => {
+    if (isExpress && !isMilkExpressType(entry.type)) {
+      return;
+    }
+    if (!isExpress && entry.type !== "feed") {
+      return;
+    }
+    const ts = new Date(entry.timestamp_utc);
+    if (Number.isNaN(ts.getTime())) {
+      return;
+    }
+    counts[ts.getHours()] += 1;
+  });
+  return counts;
+}
+
+function renderHourGrid(container, counts, variantClass) {
+  if (!container) {
+    return;
+  }
+  container.innerHTML = "";
+  const max = Math.max(...counts, 1);
+  counts.forEach((count, hour) => {
+    const bar = document.createElement("div");
+    bar.className = variantClass ? `hour-bar ${variantClass}` : "hour-bar";
+    const height = Math.max(6, (count / max) * 52);
+    bar.style.height = `${height}px`;
+    bar.title = `${hour}:00 • ${count}`;
+    container.appendChild(bar);
+  });
+}
+
+function renderTrendBars(container, values, variantClass) {
+  if (!container) {
+    return;
+  }
+  container.innerHTML = "";
+  const max = Math.max(...values, 1);
+  values.forEach((value, idx) => {
+    const bar = document.createElement("div");
+    bar.className = variantClass ? `trend-bar ${variantClass}` : "trend-bar";
+    const height = Math.max(6, (value / max) * 44);
+    bar.style.height = `${height}px`;
+    bar.title = `Day ${idx + 1}: ${value}`;
+    container.appendChild(bar);
+  });
+}
+
+function renderSummaryInsights(entries, anchorEnd) {
+  if (!entries.length) {
+    if (insightLastFeedEl) {
+      insightLastFeedEl.textContent = "--";
+    }
+    if (insightLastFeedSubEl) {
+      insightLastFeedSubEl.textContent = "No feed logged";
+    }
+    if (insightLastExpressEl) {
+      insightLastExpressEl.textContent = "--";
+    }
+    if (insightLastExpressSubEl) {
+      insightLastExpressSubEl.textContent = "No express logged";
+    }
+    if (insightFeedInterval24El) {
+      insightFeedInterval24El.textContent = "--";
+    }
+    if (insightFeedInterval24SubEl) {
+      insightFeedInterval24SubEl.textContent = "--";
+    }
+    if (insightFeedInterval7dEl) {
+      insightFeedInterval7dEl.textContent = "--";
+    }
+    if (insightFeedInterval7dSubEl) {
+      insightFeedInterval7dSubEl.textContent = "--";
+    }
+    if (insightExpressTotal24El) {
+      insightExpressTotal24El.textContent = "--";
+    }
+    if (insightExpressTotal24SubEl) {
+      insightExpressTotal24SubEl.textContent = "--";
+    }
+    if (insightExpressTotal7El) {
+      insightExpressTotal7El.textContent = "--";
+    }
+    if (insightExpressTotal7SubEl) {
+      insightExpressTotal7SubEl.textContent = "--";
+    }
+    if (insightDiaper24El) {
+      insightDiaper24El.textContent = "--";
+    }
+    if (insightDiaper24SubEl) {
+      insightDiaper24SubEl.textContent = "--";
+    }
+    if (insightDiaper7El) {
+      insightDiaper7El.textContent = "--";
+    }
+    if (insightDiaper7SubEl) {
+      insightDiaper7SubEl.textContent = "--";
+    }
+    if (insightTimeframeBodyEl) {
+      insightTimeframeBodyEl.innerHTML = "";
+    }
+    if (feedHourGridEl) {
+      feedHourGridEl.innerHTML = "";
+    }
+    if (expressHourGridEl) {
+      expressHourGridEl.innerHTML = "";
+    }
+    if (feedTrendBarsEl) {
+      feedTrendBarsEl.innerHTML = "";
+    }
+    if (expressTrendBarsEl) {
+      expressTrendBarsEl.innerHTML = "";
+    }
+    return;
+  }
+  const anchorLabel = formatSummaryDateLabel(anchorEnd);
+  const anchorShort = anchorEnd.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  });
+  if (insightAnchorLabelEl) {
+    insightAnchorLabelEl.textContent = `${anchorLabel} • ${anchorShort}`;
+  }
+
+  const allFeedStats = computeFeedStats(entries);
+  const allExpressStats = computeExpressStats(entries);
+  const lastFeed = allFeedStats.entries[allFeedStats.entries.length - 1];
+  const lastExpress = allExpressStats.entries[allExpressStats.entries.length - 1];
+
+  if (insightLastFeedEl) {
+    if (lastFeed) {
+      insightLastFeedEl.textContent = formatSummaryTime(lastFeed.timestamp_utc);
+    } else {
+      insightLastFeedEl.textContent = "--";
+    }
+  }
+  if (insightLastFeedSubEl) {
+    if (lastFeed) {
+      const date = new Date(lastFeed.timestamp_utc);
+      insightLastFeedSubEl.textContent = `${formatSummaryDateLabel(date)} • ${formatRelativeTimeFrom(anchorEnd, date)}`;
+    } else {
+      insightLastFeedSubEl.textContent = "No feed logged";
+    }
+  }
+  if (insightLastExpressEl) {
+    if (lastExpress) {
+      insightLastExpressEl.textContent = formatSummaryTime(lastExpress.timestamp_utc);
+    } else {
+      insightLastExpressEl.textContent = "--";
+    }
+  }
+  if (insightLastExpressSubEl) {
+    if (lastExpress) {
+      const date = new Date(lastExpress.timestamp_utc);
+      insightLastExpressSubEl.textContent = `${formatSummaryDateLabel(date)} • ${formatRelativeTimeFrom(anchorEnd, date)}`;
+    } else {
+      insightLastExpressSubEl.textContent = "No express logged";
+    }
+  }
+
+  const timeframeSpecs = [
+    { key: "24h", label: "Last 24h", hours: 24 },
+    { key: "3d", label: "Last 3d", hours: 72 },
+    { key: "7d", label: "Last 7d", hours: 168 },
+    { key: "30d", label: "Last 30d", hours: 720 },
+    { key: "all", label: "All time", hours: null },
+  ];
+  if (insightTimeframeBodyEl) {
+    insightTimeframeBodyEl.innerHTML = "";
+  }
+  timeframeSpecs.forEach((spec) => {
+    const untilMs = anchorEnd.getTime();
+    const sinceMs = spec.hours ? untilMs - spec.hours * 3600000 : null;
+    const windowEntries = filterEntriesByWindow(entries, sinceMs, untilMs);
+    const feedStats = computeFeedStats(windowEntries);
+    const expressStats = computeExpressStats(windowEntries);
+    const diaperStats = computeDiaperStats(windowEntries);
+    const avgGapText = feedStats.avgGap ? formatDurationMinutes(feedStats.avgGap) : "--";
+    const expressAvgText = expressStats.count
+      ? formatMl(expressStats.totalMl / expressStats.count)
+      : "--";
+
+    if (spec.key === "24h") {
+      if (insightFeedInterval24El) {
+        insightFeedInterval24El.textContent = avgGapText;
+      }
+      if (insightFeedInterval24SubEl) {
+        insightFeedInterval24SubEl.textContent = feedStats.medianGap
+          ? `Median ${formatDurationMinutes(feedStats.medianGap)} • ${feedStats.count} feeds`
+          : `${feedStats.count} feeds`;
+      }
+      if (insightExpressTotal24El) {
+        insightExpressTotal24El.textContent = formatMl(expressStats.totalMl);
+      }
+      if (insightExpressTotal24SubEl) {
+        insightExpressTotal24SubEl.textContent = expressStats.count
+          ? `${expressStats.count} sessions • avg ${expressAvgText}`
+          : "No express sessions";
+      }
+      if (insightDiaper24El) {
+        insightDiaper24El.textContent = `${diaperStats.total} changes`;
+      }
+      if (insightDiaper24SubEl) {
+        insightDiaper24SubEl.textContent = `Wee ${diaperStats.wee} • Poo ${diaperStats.poo}`;
+      }
+    }
+    if (spec.key === "7d") {
+      if (insightFeedInterval7dEl) {
+        insightFeedInterval7dEl.textContent = avgGapText;
+      }
+      if (insightFeedInterval7dSubEl) {
+        insightFeedInterval7dSubEl.textContent = feedStats.medianGap
+          ? `Median ${formatDurationMinutes(feedStats.medianGap)} • ${feedStats.count} feeds`
+          : `${feedStats.count} feeds`;
+      }
+      if (insightExpressTotal7El) {
+        insightExpressTotal7El.textContent = formatMl(expressStats.totalMl);
+      }
+      if (insightExpressTotal7SubEl) {
+        insightExpressTotal7SubEl.textContent = expressStats.count
+          ? `${expressStats.count} sessions • avg ${expressAvgText}`
+          : "No express sessions";
+      }
+      if (insightDiaper7El) {
+        insightDiaper7El.textContent = `${diaperStats.total} changes`;
+      }
+      if (insightDiaper7SubEl) {
+        insightDiaper7SubEl.textContent = `Wee ${diaperStats.wee} • Poo ${diaperStats.poo}`;
+      }
+    }
+
+    if (insightTimeframeBodyEl) {
+      const row = document.createElement("div");
+      row.className = "insight-row";
+      const cells = [
+        spec.label,
+        `${feedStats.count}`,
+        avgGapText,
+        formatDurationMinutes(feedStats.durationTotal),
+        `${formatMl(expressStats.totalMl)} • ${expressStats.count}x`,
+        expressAvgText,
+      ];
+      cells.forEach((text, idx) => {
+        const cell = document.createElement("div");
+        cell.className = "insight-cell";
+        cell.textContent = text;
+        if (idx === 0) {
+          const strong = document.createElement("strong");
+          strong.textContent = text;
+          cell.textContent = "";
+          cell.appendChild(strong);
+        }
+        row.appendChild(cell);
+      });
+      insightTimeframeBodyEl.appendChild(row);
+    }
+  });
+
+  renderHourGrid(feedHourGridEl, buildHourCounts(entries, false), "");
+  renderHourGrid(expressHourGridEl, buildHourCounts(entries, true), "express");
+
+  const dayTotals = new Map();
+  const expressTotals = new Map();
+  entries.forEach((entry) => {
+    const ts = new Date(entry.timestamp_utc);
+    if (Number.isNaN(ts.getTime())) {
+      return;
+    }
+    const key = formatDateInputValue(ts);
+    if (entry.type === "feed") {
+      dayTotals.set(key, (dayTotals.get(key) || 0) + 1);
+    }
+    if (isMilkExpressType(entry.type)) {
+      const { ml } = getMilkExpressAmounts(entry);
+      expressTotals.set(key, (expressTotals.get(key) || 0) + (Number.isFinite(ml) ? ml : 0));
+    }
+  });
+
+  const trendDays = [];
+  for (let i = 13; i >= 0; i -= 1) {
+    const day = new Date(anchorEnd);
+    day.setDate(day.getDate() - i);
+    trendDays.push(formatDateInputValue(day));
+  }
+  const feedTrendValues = trendDays.map((key) => dayTotals.get(key) || 0);
+  const expressTrendValues = trendDays.map((key) => Math.round(expressTotals.get(key) || 0));
+  renderTrendBars(feedTrendBarsEl, feedTrendValues, "");
+  renderTrendBars(expressTrendBarsEl, expressTrendValues, "express");
 }
 
 function getSummaryTypeColor(type) {
@@ -1890,6 +3822,51 @@ function normalizeGoalsResponse(data) {
   return [];
 }
 
+async function listEntriesLocalSafe(params) {
+  try {
+    return await listEntriesLocal(params);
+  } catch (err) {
+    return null;
+  }
+}
+
+async function loadEntriesWithFallback(params) {
+  const localEntries = await listEntriesLocalSafe(params);
+  try {
+    const serverEntries = await fetchEntries(params);
+    try {
+      await applyServerEntries(serverEntries);
+    } catch (err) {
+      // Ignore cache failures and return server data.
+    }
+    return serverEntries;
+  } catch (err) {
+    if (localEntries) {
+      return localEntries;
+    }
+    if (localEntries === null) {
+      throw err;
+    }
+    return [];
+  }
+}
+
+async function loadLatestEntryWithFallback() {
+  const localEntries = await listEntriesLocalSafe({ limit: 1 });
+  const localLatest = localEntries && localEntries.length ? localEntries[0] : null;
+  try {
+    const serverEntries = await fetchEntries({ limit: 1 });
+    try {
+      await applyServerEntries(serverEntries);
+    } catch (err) {
+      // Ignore cache failures and return server data.
+    }
+    return serverEntries && serverEntries.length ? serverEntries[0] : localLatest;
+  } catch (err) {
+    return localLatest;
+  }
+}
+
 function buildQuery(params) {
   const search = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
@@ -1903,7 +3880,7 @@ function buildQuery(params) {
 
 async function fetchEntries(params) {
   const response = await fetch(
-    `/api/entries${buildQuery(params)}`,
+    buildUrl(`/api/entries${buildQuery(params)}`),
   );
   if (!response.ok) {
     let detail = "";
@@ -1919,8 +3896,30 @@ async function fetchEntries(params) {
   return normalizeEntriesResponse(data);
 }
 
+async function fetchAllEntriesUntil(untilIso) {
+  const limit = 500;
+  let batchUntil = untilIso;
+  let entries = [];
+  for (let page = 0; page < 20; page += 1) {
+    const batch = await fetchEntries({
+      limit,
+      until: batchUntil,
+    });
+    entries = entries.concat(batch);
+    if (batch.length < limit) {
+      break;
+    }
+    const oldest = batch[batch.length - 1];
+    if (!oldest || !oldest.timestamp_utc) {
+      break;
+    }
+    batchUntil = decrementIsoTimestamp(oldest.timestamp_utc);
+  }
+  return entries;
+}
+
 async function fetchFeedingGoals(params) {
-  const response = await fetch(`/api/feeding-goals${buildQuery(params || {})}`);
+  const response = await fetch(buildUrl(`/api/feeding-goals${buildQuery(params || {})}`));
   if (!response.ok) {
     let detail = "";
     try {
@@ -1935,11 +3934,101 @@ async function fetchFeedingGoals(params) {
   return normalizeGoalsResponse(data);
 }
 
+async function fetchBottles() {
+  const response = await fetch(buildUrl("/api/bottles"));
+  if (!response.ok) {
+    let detail = "";
+    try {
+      const err = await response.json();
+      detail = err.error || JSON.stringify(err);
+    } catch (parseError) {
+      detail = await response.text();
+    }
+    throw new Error(detail || `HTTP ${response.status}`);
+  }
+  const data = await response.json();
+  return Array.isArray(data) ? data : [];
+}
+
+async function createBottle(payload) {
+  const response = await fetch(buildUrl("/api/bottles"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    let detail = "";
+    try {
+      const err = await response.json();
+      detail = err.error || JSON.stringify(err);
+    } catch (parseError) {
+      detail = await response.text();
+    }
+    throw new Error(detail || `HTTP ${response.status}`);
+  }
+  return response.json();
+}
+
+async function updateBottle(bottleId, payload) {
+  const response = await fetch(buildUrl(`/api/bottles/${bottleId}`), {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    let detail = "";
+    try {
+      const err = await response.json();
+      detail = err.error || JSON.stringify(err);
+    } catch (parseError) {
+      detail = await response.text();
+    }
+    throw new Error(detail || `HTTP ${response.status}`);
+  }
+  return response.json();
+}
+
+async function deleteBottle(bottleId) {
+  const response = await fetch(buildUrl(`/api/bottles/${bottleId}`), { method: "DELETE" });
+  if (!response.ok) {
+    let detail = "";
+    try {
+      const err = await response.json();
+      detail = err.error || JSON.stringify(err);
+    } catch (parseError) {
+      detail = await response.text();
+    }
+    throw new Error(detail || `HTTP ${response.status}`);
+  }
+}
+
+async function fetchCurrentGoal() {
+  const response = await fetch(buildUrl("/api/feeding-goals/current"));
+  if (!response.ok) {
+    let detail = "";
+    try {
+      const err = await response.json();
+      detail = err.error || JSON.stringify(err);
+    } catch (parseError) {
+      detail = await response.text();
+    }
+    throw new Error(detail || `HTTP ${response.status}`);
+  }
+  return response.json();
+}
+
 async function loadFeedingGoals(limit) {
   const goals = await fetchFeedingGoals({ limit });
-  activeFeedingGoal = goals[0] || null;
   hasLoadedFeedingGoals = true;
   return goals;
+}
+
+async function loadCurrentGoal() {
+  try {
+    return await fetchCurrentGoal();
+  } catch (err) {
+    return null;
+  }
 }
 
 function renderChart(entries, windowBounds) {
@@ -2130,7 +4219,6 @@ function renderLogEntries(entries) {
     };
 
     const editBtn = buildIconButton("Edit", "edit", () => editEntry(entry));
-    const timeBtn = buildIconButton("Edit time", "schedule", () => editEntryTime(entry));
     const delBtn = buildIconButton("Delete", "delete", () => deleteEntry(entry));
 
     amounts.forEach(({ label, value }) => {
@@ -2143,7 +4231,6 @@ function renderLogEntries(entries) {
       right.appendChild(amountsWrap);
     }
     buttonsWrap.appendChild(editBtn);
-    buttonsWrap.appendChild(timeBtn);
     buttonsWrap.appendChild(delBtn);
     right.appendChild(buttonsWrap);
     item.appendChild(left);
@@ -2369,7 +4456,23 @@ async function loadTimelineEntries(options = {}) {
     if (!options.reset && timelineOldestTimestamp) {
       params.until = timelineOldestTimestamp;
     }
-    const entries = await fetchEntries(params);
+    if (!navigator.onLine) {
+      const cachedEntries = await listEntriesLocalSafe(params);
+      if (cachedEntries && cachedEntries.length) {
+        appendTimelineEntries(cachedEntries);
+        if (cachedEntries.length) {
+          timelineOldestTimestamp = decrementIsoTimestamp(
+            cachedEntries[cachedEntries.length - 1].timestamp_utc,
+          );
+        }
+        if (cachedEntries.length < params.limit) {
+          timelineHasMore = false;
+        }
+      }
+      return;
+    }
+    await syncNow();
+    const entries = await loadEntriesWithFallback(params);
     appendTimelineEntries(entries);
     if (entries.length) {
       timelineOldestTimestamp = decrementIsoTimestamp(
@@ -2400,6 +4503,7 @@ function initTimelineHandlers() {
   if (refreshBtn) {
     refreshBtn.addEventListener("click", () => {
       void loadTimelineEntries({ reset: true });
+      void loadRulerFeeds({ reset: true });
     });
   }
   if (timelineWrapEl && timelineSentinelEl) {
@@ -2412,6 +4516,574 @@ function initTimelineHandlers() {
       { root: timelineWrapEl, rootMargin: "200px" },
     );
     timelineObserver.observe(timelineSentinelEl);
+  }
+  initRulerHandlers();
+}
+
+const CALENDAR_CATEGORY_LABELS = {
+  group: "Group",
+  meetup: "Meetup",
+  hub: "Family hub",
+  other: "Other",
+};
+
+function pad2(value) {
+  return String(value).padStart(2, "0");
+}
+
+function toLocalIsoDate(date) {
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+}
+
+function startOfWeekMonday(value) {
+  const date = new Date(value);
+  const day = date.getDay();
+  const diff = (day + 6) % 7;
+  date.setDate(date.getDate() - diff);
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
+function formatWeekRange(startDate) {
+  const endDate = new Date(startDate);
+  endDate.setDate(startDate.getDate() + 6);
+  const fmt = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short" });
+  return `Week of ${fmt.format(startDate)} – ${fmt.format(endDate)}`;
+}
+
+function formatDayLabel(date) {
+  const fmt = new Intl.DateTimeFormat(undefined, { weekday: "short" });
+  return fmt.format(date);
+}
+
+function formatDayDate(date) {
+  const fmt = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short" });
+  return fmt.format(date);
+}
+
+function buildCalendarEventCard(event) {
+  const card = document.createElement("article");
+  card.className = "calendar-event";
+
+  const time = document.createElement("div");
+  time.className = "event-time";
+  const endTime = event.end_time_local;
+  time.textContent = endTime
+    ? `${event.start_time_local}–${endTime}`
+    : event.start_time_local;
+
+  const title = document.createElement("div");
+  title.className = "event-title";
+  title.textContent = event.title;
+
+  const location = event.location ? document.createElement("div") : null;
+  if (location) {
+    location.className = "event-meta";
+    location.textContent = event.location;
+  }
+
+  const notes = event.notes ? document.createElement("div") : null;
+  if (notes) {
+    notes.className = "event-meta";
+    notes.textContent = event.notes;
+  }
+
+  const tag = document.createElement("div");
+  tag.className = "event-tag";
+  tag.dataset.category = event.category;
+  tag.textContent = CALENDAR_CATEGORY_LABELS[event.category] || "Other";
+
+  const actions = document.createElement("div");
+  actions.className = "event-actions";
+  const editLink = document.createElement("a");
+  editLink.href = buildUrl(`/calendar/edit/${event.id}`);
+  editLink.textContent = "Edit";
+  const deleteBtn = document.createElement("button");
+  deleteBtn.type = "button";
+  deleteBtn.dataset.calendarAction = "delete";
+  deleteBtn.dataset.eventId = String(event.id);
+  deleteBtn.textContent = "Delete";
+  actions.appendChild(editLink);
+  actions.appendChild(deleteBtn);
+
+  card.appendChild(time);
+  card.appendChild(title);
+  if (location) {
+    card.appendChild(location);
+  }
+  if (notes) {
+    card.appendChild(notes);
+  }
+  card.appendChild(tag);
+  card.appendChild(actions);
+  return card;
+}
+
+function renderCalendarWeek(startDate, occurrences) {
+  if (!calendarDaysEl || !calendarWeekRangeEl) {
+    return;
+  }
+  calendarWeekRangeEl.textContent = formatWeekRange(startDate);
+  calendarDaysEl.innerHTML = "";
+  const todayIso = toLocalIsoDate(new Date());
+  const occurrencesByDate = new Map();
+  occurrences.forEach((event) => {
+    const key = event.occurrence_date || event.date_local;
+    if (!occurrencesByDate.has(key)) {
+      occurrencesByDate.set(key, []);
+    }
+    occurrencesByDate.get(key).push(event);
+  });
+
+  for (let i = 0; i < 7; i += 1) {
+    const dayDate = new Date(startDate);
+    dayDate.setDate(startDate.getDate() + i);
+    const dayIso = toLocalIsoDate(dayDate);
+    const dayEvents = occurrencesByDate.get(dayIso) || [];
+
+    const section = document.createElement("section");
+    section.className = "calendar-day";
+    if (dayIso === todayIso) {
+      section.classList.add("is-today");
+    }
+    if (!dayEvents.length) {
+      section.classList.add("empty");
+    }
+
+    const header = document.createElement("div");
+    header.className = "calendar-day-header";
+    const label = document.createElement("div");
+    label.className = "calendar-day-label";
+    label.textContent = formatDayLabel(dayDate);
+    const dateLabel = document.createElement("div");
+    dateLabel.className = "calendar-day-date";
+    dateLabel.textContent = formatDayDate(dayDate);
+    header.appendChild(label);
+    header.appendChild(dateLabel);
+
+    const eventsWrap = document.createElement("div");
+    eventsWrap.className = "calendar-events";
+    if (!dayEvents.length) {
+      const empty = document.createElement("div");
+      empty.textContent = "No sessions added yet.";
+      eventsWrap.appendChild(empty);
+    } else {
+      dayEvents.forEach((event) => {
+        eventsWrap.appendChild(buildCalendarEventCard(event));
+      });
+    }
+
+    section.appendChild(header);
+    section.appendChild(eventsWrap);
+    calendarDaysEl.appendChild(section);
+  }
+
+  if (calendarEmptyEl) {
+    calendarEmptyEl.hidden = occurrences.length > 0;
+  }
+}
+
+async function loadCalendarWeek() {
+  if (calendarLoading || pageType !== "calendar") {
+    return;
+  }
+  calendarLoading = true;
+  try {
+    const today = new Date();
+    const baseStart = startOfWeekMonday(today);
+    calendarWeekStart = new Date(baseStart);
+    calendarWeekStart.setDate(baseStart.getDate() + calendarWeekOffset * 7);
+    const startIso = toLocalIsoDate(calendarWeekStart);
+    const endDate = new Date(calendarWeekStart);
+    endDate.setDate(calendarWeekStart.getDate() + 6);
+    const endIso = toLocalIsoDate(endDate);
+
+    const params = new URLSearchParams({ start: startIso, end: endIso });
+    const response = await fetch(buildUrl(`/api/calendar/events?${params}`));
+    if (!response.ok) {
+      setStatus("Failed to load calendar events.");
+      renderCalendarWeek(calendarWeekStart, []);
+      return;
+    }
+    const data = await response.json();
+    renderCalendarWeek(calendarWeekStart, Array.isArray(data) ? data : []);
+  } catch (err) {
+    setStatus("Failed to load calendar events.");
+  } finally {
+    calendarLoading = false;
+  }
+}
+
+async function deleteCalendarEvent(eventId) {
+  try {
+    const response = await fetch(buildUrl(`/api/calendar/events/${eventId}`), {
+      method: "DELETE",
+    });
+    if (!response.ok) {
+      setStatus("Failed to delete calendar event.");
+      return;
+    }
+    void loadCalendarWeek();
+  } catch (err) {
+    setStatus("Failed to delete calendar event.");
+  }
+}
+
+function initCalendarHandlers() {
+  if (pageType !== "calendar") {
+    return;
+  }
+  if (calendarPrevBtn) {
+    calendarPrevBtn.addEventListener("click", () => {
+      calendarWeekOffset -= 1;
+      void loadCalendarWeek();
+    });
+  }
+  if (calendarNextBtn) {
+    calendarNextBtn.addEventListener("click", () => {
+      calendarWeekOffset += 1;
+      void loadCalendarWeek();
+    });
+  }
+  if (calendarTodayBtn) {
+    calendarTodayBtn.addEventListener("click", () => {
+      calendarWeekOffset = 0;
+      void loadCalendarWeek();
+    });
+  }
+  if (calendarDaysEl) {
+    calendarDaysEl.addEventListener("click", (event) => {
+      const target = event.target.closest("[data-calendar-action=\"delete\"]");
+      if (!target) {
+        return;
+      }
+      const eventId = Number.parseInt(target.dataset.eventId || "", 10);
+      if (!Number.isFinite(eventId)) {
+        return;
+      }
+      if (!window.confirm("Delete this event?")) {
+        return;
+      }
+      void deleteCalendarEvent(eventId);
+    });
+  }
+}
+
+function updateCalendarRecurrenceUI() {
+  if (!calendarRecurrenceSelectEl || !calendarRepeatUntilFieldEl || !calendarRepeatUntilInputEl) {
+    return;
+  }
+  const isWeekly = calendarRecurrenceSelectEl.value === "weekly";
+  calendarRepeatUntilFieldEl.hidden = !isWeekly;
+  calendarRepeatUntilInputEl.disabled = !isWeekly;
+  if (!isWeekly) {
+    calendarRepeatUntilInputEl.value = "";
+  }
+}
+
+async function loadCalendarForm(eventId) {
+  try {
+    const response = await fetch(buildUrl(`/api/calendar/events/${eventId}`));
+    if (!response.ok) {
+      setStatus("Event not found.");
+      return;
+    }
+    const event = await response.json();
+    if (calendarTitleInputEl) {
+      calendarTitleInputEl.value = event.title || "";
+    }
+    if (calendarCategorySelectEl) {
+      calendarCategorySelectEl.value = event.category || "group";
+    }
+    if (calendarDateInputEl) {
+      calendarDateInputEl.value = event.date_local || "";
+    }
+    if (calendarLocationInputEl) {
+      calendarLocationInputEl.value = event.location || "";
+    }
+    if (calendarStartTimeInputEl) {
+      calendarStartTimeInputEl.value = event.start_time_local || "";
+    }
+    if (calendarEndTimeInputEl) {
+      calendarEndTimeInputEl.value = event.end_time_local || "";
+    }
+    if (calendarNotesInputEl) {
+      calendarNotesInputEl.value = event.notes || "";
+    }
+    if (calendarRecurrenceSelectEl) {
+      calendarRecurrenceSelectEl.value = event.recurrence || "none";
+    }
+    if (calendarRepeatUntilInputEl) {
+      calendarRepeatUntilInputEl.value = event.recurrence_until_local || "";
+    }
+    updateCalendarRecurrenceUI();
+  } catch (err) {
+    setStatus("Failed to load event.");
+  }
+}
+
+async function submitCalendarForm(eventId) {
+  if (!calendarTitleInputEl || !calendarDateInputEl || !calendarStartTimeInputEl) {
+    return;
+  }
+  const payload = {
+    title: calendarTitleInputEl.value.trim(),
+    date_local: calendarDateInputEl.value,
+    start_time_local: calendarStartTimeInputEl.value,
+    end_time_local: calendarEndTimeInputEl ? calendarEndTimeInputEl.value || null : null,
+    location: calendarLocationInputEl ? calendarLocationInputEl.value.trim() || null : null,
+    notes: calendarNotesInputEl ? calendarNotesInputEl.value.trim() || null : null,
+    category: calendarCategorySelectEl ? calendarCategorySelectEl.value : "group",
+    recurrence: calendarRecurrenceSelectEl ? calendarRecurrenceSelectEl.value : "none",
+    recurrence_until_local: calendarRepeatUntilInputEl ? calendarRepeatUntilInputEl.value || null : null,
+  };
+  if (payload.recurrence !== "weekly") {
+    payload.recurrence_until_local = null;
+  }
+  if (calendarSubmitBtn) {
+    calendarSubmitBtn.disabled = true;
+  }
+  try {
+    const response = await fetch(
+      buildUrl(eventId ? `/api/calendar/events/${eventId}` : "/api/calendar/events"),
+      {
+        method: eventId ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      },
+    );
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      setStatus(data.error || "Failed to save event.");
+      return;
+    }
+    window.location.href = buildUrl("/calendar");
+  } catch (err) {
+    setStatus("Failed to save event.");
+  } finally {
+    if (calendarSubmitBtn) {
+      calendarSubmitBtn.disabled = false;
+    }
+  }
+}
+
+function initCalendarFormHandlers() {
+  if (pageType !== "calendar-form" || !calendarFormEl) {
+    return;
+  }
+  const eventId = Number.parseInt(bodyEl.dataset.eventId || "", 10);
+  const isEdit = Number.isFinite(eventId) && eventId > 0;
+  if (isEdit) {
+    if (calendarFormTitleEl) {
+      calendarFormTitleEl.textContent = "Edit event";
+    }
+    if (calendarFormSubtitleEl) {
+      calendarFormSubtitleEl.textContent = "Update the details for this meetup or group.";
+    }
+    if (calendarDeleteBtn) {
+      calendarDeleteBtn.hidden = false;
+    }
+    void loadCalendarForm(eventId);
+  } else {
+    if (calendarDateInputEl) {
+      calendarDateInputEl.value = toLocalIsoDate(new Date());
+    }
+    updateCalendarRecurrenceUI();
+  }
+  if (calendarRecurrenceSelectEl) {
+    calendarRecurrenceSelectEl.addEventListener("change", updateCalendarRecurrenceUI);
+  }
+  calendarFormEl.addEventListener("submit", (event) => {
+    event.preventDefault();
+    void submitCalendarForm(isEdit ? eventId : null);
+  });
+  if (calendarDeleteBtn && isEdit) {
+    calendarDeleteBtn.addEventListener("click", async () => {
+      if (!window.confirm("Delete this event?")) {
+        return;
+      }
+      await deleteCalendarEvent(eventId);
+      window.location.href = buildUrl("/calendar");
+    });
+  }
+}
+
+function updateMilkExpressLedgerSubtotal() {
+  if (!milkExpressLedgerCountEl || !milkExpressLedgerTotalEl) {
+    return;
+  }
+  let totalMl = 0;
+  milkExpressLedgerEntries.forEach((entry) => {
+    const key = entry.client_event_id || entry.id || entry.timestamp_utc;
+    if (!milkExpressLedgerSelections.has(key)) {
+      return;
+    }
+    const { ml } = getMilkExpressAmounts(entry);
+    if (Number.isFinite(ml)) {
+      totalMl += ml;
+    }
+  });
+  const count = milkExpressLedgerSelections.size;
+  milkExpressLedgerCountEl.textContent = `${count} ${count === 1 ? "item" : "items"}`;
+  milkExpressLedgerTotalEl.textContent = formatMl(totalMl);
+}
+
+function updateMilkExpressLedgerTotalAll(entries) {
+  if (!milkExpressLedgerTotalAllEl) {
+    return;
+  }
+  const totalMl = entries.reduce((acc, entry) => {
+    const { ml } = getMilkExpressAmounts(entry);
+    return acc + (Number.isFinite(ml) ? ml : 0);
+  }, 0);
+  milkExpressLedgerTotalAllEl.textContent = `Total: ${formatMl(totalMl)}`;
+}
+
+function setMilkExpressLedgerEmptyState(message) {
+  if (!milkExpressLedgerEmptyEl || !milkExpressLedgerTableEl) {
+    return;
+  }
+  milkExpressLedgerEmptyEl.textContent = message;
+  milkExpressLedgerEmptyEl.hidden = false;
+  milkExpressLedgerTableEl.hidden = true;
+  if (milkExpressLedgerSelectionEl) {
+    milkExpressLedgerSelectionEl.hidden = true;
+  }
+}
+
+function renderMilkExpressLedger(entries) {
+  if (!milkExpressLedgerBodyEl || !milkExpressLedgerEmptyEl || !milkExpressLedgerTableEl) {
+    return;
+  }
+  milkExpressLedgerEntries = entries;
+  milkExpressLedgerSelections.clear();
+  milkExpressLedgerBodyEl.innerHTML = "";
+  updateMilkExpressLedgerTotalAll(entries);
+  if (!entries.length) {
+    setMilkExpressLedgerEmptyState("No milk express events in the last 48 hours.");
+    updateMilkExpressLedgerSubtotal();
+    return;
+  }
+  milkExpressLedgerEmptyEl.hidden = true;
+  milkExpressLedgerTableEl.hidden = false;
+  if (milkExpressLedgerSelectionEl) {
+    milkExpressLedgerSelectionEl.hidden = false;
+  }
+  entries.forEach((entry, index) => {
+    const key = entry.client_event_id || entry.id || `${entry.timestamp_utc}-${index}`;
+    const { ml } = getMilkExpressAmounts(entry);
+    const row = document.createElement("tr");
+    row.dataset.entryId = key;
+
+    const checkCell = document.createElement("td");
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.className = "ledger-check";
+    checkbox.dataset.entryId = key;
+    checkbox.addEventListener("change", () => {
+      if (checkbox.checked) {
+        milkExpressLedgerSelections.add(key);
+      } else {
+        milkExpressLedgerSelections.delete(key);
+      }
+      if (milkExpressLedgerSelectAllEl) {
+        const allChecked = milkExpressLedgerEntries.every((item, idx) => {
+          const itemKey = item.client_event_id || item.id || `${item.timestamp_utc}-${idx}`;
+          return milkExpressLedgerSelections.has(itemKey);
+        });
+        milkExpressLedgerSelectAllEl.checked = allChecked;
+      }
+      updateMilkExpressLedgerSubtotal();
+    });
+    checkCell.appendChild(checkbox);
+
+    const timeCell = document.createElement("td");
+    timeCell.textContent = formatTimestamp(entry.timestamp_utc);
+
+    const valueCell = document.createElement("td");
+    valueCell.textContent = formatMl(ml);
+
+    row.append(checkCell, timeCell, valueCell);
+    milkExpressLedgerBodyEl.appendChild(row);
+  });
+  if (milkExpressLedgerSelectAllEl) {
+    milkExpressLedgerSelectAllEl.checked = false;
+  }
+  updateMilkExpressLedgerSubtotal();
+}
+
+async function loadMilkExpressLedger() {
+  if (!milkExpressLedgerBodyEl) {
+    return;
+  }
+  if (milkExpressLedgerRangeEl) {
+    milkExpressLedgerRangeEl.textContent = "Last 48 hours";
+  }
+  const window = computeWindow(48);
+  const params = {
+    limit: 200,
+    since: window.sinceIso,
+    until: window.untilIso,
+  };
+  try {
+    const cachedEntries = await listEntriesLocalSafe(params);
+    if (cachedEntries) {
+      const filteredCached = cachedEntries.filter((entry) => (
+        isMilkExpressType(entry.type)
+      ));
+      renderMilkExpressLedger(filteredCached);
+    }
+    await syncNow();
+    const entries = await loadEntriesWithFallback(params);
+    const filtered = entries.filter((entry) => isMilkExpressType(entry.type));
+    renderMilkExpressLedger(filtered);
+  } catch (err) {
+    setStatus(`Failed to load milk express entries: ${err.message || "unknown error"}`);
+  }
+}
+
+function initMilkExpressLedgerHandlers() {
+  if (milkExpressLedgerInitialized || pageType !== "milk-express") {
+    return;
+  }
+  milkExpressLedgerInitialized = true;
+  if (milkExpressLedgerSelectAllEl) {
+    milkExpressLedgerSelectAllEl.addEventListener("change", () => {
+      const shouldSelectAll = milkExpressLedgerSelectAllEl.checked;
+      if (!milkExpressLedgerBodyEl) {
+        return;
+      }
+      const checkboxes = milkExpressLedgerBodyEl.querySelectorAll("input[type=\"checkbox\"]");
+      checkboxes.forEach((checkbox) => {
+        checkbox.checked = shouldSelectAll;
+        const key = checkbox.dataset.entryId;
+        if (key) {
+          if (shouldSelectAll) {
+            milkExpressLedgerSelections.add(key);
+          } else {
+            milkExpressLedgerSelections.delete(key);
+          }
+        }
+      });
+      updateMilkExpressLedgerSubtotal();
+    });
+  }
+  if (milkExpressLedgerClearEl) {
+    milkExpressLedgerClearEl.addEventListener("click", (event) => {
+      event.preventDefault();
+      if (!milkExpressLedgerBodyEl) {
+        return;
+      }
+      milkExpressLedgerSelections.clear();
+      const checkboxes = milkExpressLedgerBodyEl.querySelectorAll("input[type=\"checkbox\"]");
+      checkboxes.forEach((checkbox) => {
+        checkbox.checked = false;
+      });
+      if (milkExpressLedgerSelectAllEl) {
+        milkExpressLedgerSelectAllEl.checked = false;
+      }
+      updateMilkExpressLedgerSubtotal();
+    });
   }
 }
 
@@ -2432,6 +5104,9 @@ function renderStats(entries) {
   };
   entries.forEach((entry) => {
     if (isFeedType(entry.type)) {
+      if (isBreastfeedInProgress(entry)) {
+        return;
+      }
       feedCount += 1;
       addMl(entry.amount_ml);
       if (typeof entry.expressed_ml === "number" && Number.isFinite(entry.expressed_ml)) {
@@ -2508,7 +5183,9 @@ function renderGoalHistory(goals) {
     item.className = "goal-item";
     const label = document.createElement("div");
     label.className = "goal-meta";
-    const badge = index === 0 ? "Active" : "Past";
+    const badge = activeFeedingGoal && goal.id === activeFeedingGoal.id
+      ? "Active"
+      : (index === 0 ? "Latest" : "Past");
     label.textContent = `${badge} · ${formatGoalDateLabel(goal.start_date)}`;
     const amount = document.createElement("div");
     amount.className = "goal-amount";
@@ -2601,9 +5278,9 @@ function renderLastByType(entries) {
 
 function buildLogTypeUrl(type) {
   if (!type) {
-    return "/log";
+    return buildUrl("/log");
   }
-  return `/log/${type}`;
+  return buildUrl(`/log/${type}`);
 }
 
 function handleStatCardNavigate(event) {
@@ -2638,48 +5315,64 @@ function buildEntryPayload(type) {
     type,
     timestamp_utc: new Date().toISOString(),
     client_event_id: generateId(),
+    user_slug: activeUser || null,
   };
 }
 
 async function saveEntry(payload) {
   setStatus("Saving...");
+  const now = new Date().toISOString();
+  const entry = {
+    ...payload,
+    user_slug: activeUser,
+    created_at_utc: now,
+    updated_at_utc: now,
+    deleted_at_utc: null,
+  };
   try {
-    const response = await fetch(`/api/users/${activeUser}/entries`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
-    if (response.status === 409) {
-      setStatus("Already saved (duplicate tap)");
-      if (pageType === "log") {
-        await loadLogEntries();
-      } else {
-        await loadHomeEntries();
-      }
-      return;
+    await upsertEntryLocal(entry);
+    await enqueueOutbox({ action: "upsert", entry });
+    if (!navigator.onLine) {
+      setStatus("Saved offline");
+    } else {
+      setStatus("Saved (syncing...)");
+      await syncNow();
     }
-
-    if (!response.ok) {
-      let detail = "";
-      try {
-        const err = await response.json();
-        detail = err.error || JSON.stringify(err);
-      } catch (parseError) {
-        detail = await response.text();
-      }
-      setStatus(`Error: ${detail || response.status}`);
-      return;
-    }
-
-    setStatus("Saved");
     if (pageType === "log") {
       await loadLogEntries();
     } else {
       await loadHomeEntries();
     }
   } catch (err) {
-    setStatus("Error: network issue saving entry");
+    try {
+      const response = await fetch(buildUrl(`/api/users/${activeUser}/entries`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (response.status === 409) {
+        setStatus("Already saved (duplicate tap)");
+      } else if (!response.ok) {
+        let detail = "";
+        try {
+          const errBody = await response.json();
+          detail = errBody.error || JSON.stringify(errBody);
+        } catch (parseError) {
+          detail = await response.text();
+        }
+        setStatus(`Error: ${detail || response.status}`);
+        return;
+      } else {
+        setStatus("Saved");
+      }
+      if (pageType === "log") {
+        await loadLogEntries();
+      } else {
+        await loadHomeEntries();
+      }
+    } catch (networkErr) {
+      setStatus("Error: network issue saving entry");
+    }
   }
 }
 
@@ -2777,28 +5470,85 @@ function parseOptionalMlInput(inputEl, label) {
   }
   return { value: ml, hasValue: true, valid: true };
 }
+
+function parseOptionalNumberInput(inputEl, label) {
+  if (!inputEl) {
+    return { value: null, hasValue: false, valid: true };
+  }
+  const trimmed = inputEl.value.trim();
+  if (!trimmed) {
+    return { value: null, hasValue: false, valid: true };
+  }
+  const amount = Number.parseFloat(trimmed);
+  if (!Number.isFinite(amount) || amount < 0) {
+    setStatus(`${label} must be a non-negative number`);
+    inputEl.focus();
+    return { value: null, hasValue: true, valid: false };
+  }
+  return { value: amount, hasValue: true, valid: true };
+}
+
+async function getBreastfeedEntryForUpdate(startInfo) {
+  if (startInfo && startInfo.clientEventId) {
+    const localEntry = await getEntryLocal(startInfo.clientEventId);
+    if (localEntry) {
+      return localEntry;
+    }
+  }
+  const start = startInfo && startInfo.start ? startInfo.start : new Date();
+  const startIso = start.toISOString();
+  return {
+    client_event_id: startInfo && startInfo.clientEventId
+      ? startInfo.clientEventId
+      : generateId(),
+    user_slug: (startInfo && startInfo.startedBy) || activeUser || null,
+    type: "feed",
+    timestamp_utc: startIso,
+    notes: BREASTFEED_IN_PROGRESS_NOTE,
+    amount_ml: null,
+    expressed_ml: null,
+    formula_ml: null,
+    feed_duration_min: null,
+    caregiver_id: null,
+    created_at_utc: startIso,
+    updated_at_utc: startIso,
+    deleted_at_utc: null,
+  };
+}
+
 async function handleBreastfeedToggle() {
   if (!userValid) {
     setStatus("Choose a user below to start logging.");
     return;
   }
-  const start = getBreastfeedStart();
-  if (!start) {
-    setBreastfeedStart(new Date());
+  const startInfo = getBreastfeedStart();
+  if (!startInfo) {
+    const start = new Date();
+    const payload = buildEntryPayload("feed");
+    payload.timestamp_utc = start.toISOString();
+    payload.notes = BREASTFEED_IN_PROGRESS_NOTE;
+    payload.feed_duration_min = null;
+    setBreastfeedStart(start, activeUser || null, payload.client_event_id);
     updateBreastfeedButton();
     closeFeedMenu();
     setStatus("Breastfeed started");
+    await saveEntry(payload);
     return;
   }
   const now = new Date();
-  const durationMinutes = Math.max(0, Math.round((now - start) / 60000));
+  const durationMinutes = Math.max(0, Math.round((now - startInfo.start) / 60000));
+  const entry = await getBreastfeedEntryForUpdate(startInfo);
   clearBreastfeedStart();
   updateBreastfeedButton();
   closeFeedMenu();
-  const payload = buildEntryPayload("feed");
-  payload.feed_duration_min = durationMinutes;
-  payload.notes = "Breastfed";
-  await saveEntry(payload);
+  await commitEntryUpdate(entry, {
+    feed_duration_min: durationMinutes,
+    notes: BREASTFEED_COMPLETE_NOTE,
+  }, {
+    online: "Breastfeed ended (syncing...)",
+    offline: "Breastfeed ended offline",
+    error: "Error: unable to end breastfeeding",
+  });
 }
 
 async function handleMlEntry(inputEl, label) {
@@ -2825,7 +5575,276 @@ async function handleMlEntry(inputEl, label) {
   await saveEntry(payload);
 }
 
+function isEditEntryModalAvailable() {
+  return Boolean(editEntryModalEl && editEntryFormEl && editEntryTimeEl);
+}
+
+function renderEditEntryTypeOptions(currentType) {
+  if (!editEntryTypeEl) {
+    return;
+  }
+  const normalizedCurrent = String(currentType || "").trim().toLowerCase();
+  const baseOptions = ["feed", "wee", "poo", "milk express"];
+  const options = [...new Set([...baseOptions, ...customEventTypes])].filter(Boolean);
+  if (normalizedCurrent && !options.includes(normalizedCurrent)) {
+    options.push(normalizedCurrent);
+  }
+  editEntryTypeEl.innerHTML = "";
+  options.forEach((value) => {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = value;
+    editEntryTypeEl.appendChild(option);
+  });
+  if (normalizedCurrent) {
+    editEntryTypeEl.value = normalizedCurrent;
+  }
+}
+
+function updateEditEntryFieldVisibility(type) {
+  if (!editEntryModalEl) {
+    return;
+  }
+  const normalized = String(type || "").trim().toLowerCase();
+  const isFeed = normalized === "feed";
+  const isExpress = isMilkExpressType(normalized);
+  const numbersWrap = editEntryModalEl.querySelector(".edit-field--numbers");
+  if (numbersWrap) {
+    numbersWrap.style.display = isFeed || isExpress ? "grid" : "none";
+  }
+  const durationField = editEntryDurationEl ? editEntryDurationEl.closest(".edit-field") : null;
+  const expressedField = editEntryExpressedEl ? editEntryExpressedEl.closest(".edit-field") : null;
+  const formulaField = editEntryFormulaEl ? editEntryFormulaEl.closest(".edit-field") : null;
+  if (durationField) {
+    durationField.style.display = isFeed || isExpress ? "grid" : "none";
+  }
+  if (expressedField) {
+    expressedField.style.display = isFeed || isExpress ? "grid" : "none";
+  }
+  if (formulaField) {
+    formulaField.style.display = isFeed ? "grid" : "none";
+  }
+}
+
+function closeEditEntryModal(result = null) {
+  if (editEntryModalEl) {
+    editEntryModalEl.hidden = true;
+    editEntryModalEl.setAttribute("aria-hidden", "true");
+    editEntryModalEl.classList.remove("is-time-only");
+  }
+  if (editEntryBackdropEl) {
+    editEntryBackdropEl.hidden = true;
+    editEntryBackdropEl.classList.remove("open");
+  }
+  const resolver = editEntryModalResolver;
+  editEntryModalResolver = null;
+  editEntryModalEntry = null;
+  editEntryModalMode = "full";
+  if (resolver) {
+    resolver(result);
+  }
+}
+
+function initEditEntryModalHandlers() {
+  if (editEntryModalInitialized || !isEditEntryModalAvailable()) {
+    return;
+  }
+  editEntryModalInitialized = true;
+  if (editEntryTypeEl) {
+    editEntryTypeEl.addEventListener("change", () => {
+      updateEditEntryFieldVisibility(editEntryTypeEl.value);
+    });
+  }
+  if (editEntryFormEl) {
+    editEntryFormEl.addEventListener("submit", (event) => {
+      event.preventDefault();
+      if (!editEntryModalEntry) {
+        closeEditEntryModal(null);
+        return;
+      }
+      const nextTime = editEntryTimeEl ? editEntryTimeEl.value : "";
+      if (!nextTime) {
+        setStatus("Timestamp is required");
+        editEntryTimeEl?.focus();
+        return;
+      }
+      const nextDate = new Date(nextTime);
+      if (Number.isNaN(nextDate.getTime())) {
+        setStatus("Invalid timestamp");
+        editEntryTimeEl?.focus();
+        return;
+      }
+      if (editEntryModalMode === "time") {
+        closeEditEntryModal({ timestamp_utc: nextDate.toISOString() });
+        return;
+      }
+      const rawType = editEntryTypeEl ? editEntryTypeEl.value : editEntryModalEntry.type;
+      const nextType = String(rawType || "").trim().toLowerCase();
+      if (!nextType) {
+        setStatus("Type is required");
+        editEntryTypeEl?.focus();
+        return;
+      }
+      const payload = { type: nextType, timestamp_utc: nextDate.toISOString() };
+      if (nextType === "feed") {
+        const duration = parseOptionalNumberInput(editEntryDurationEl, "Duration");
+        if (!duration.valid) {
+          return;
+        }
+        payload.feed_duration_min = duration.hasValue ? duration.value : null;
+
+        const expressed = parseOptionalNumberInput(editEntryExpressedEl, "Expressed amount");
+        if (!expressed.valid) {
+          return;
+        }
+        payload.expressed_ml = expressed.hasValue ? expressed.value : null;
+
+        const formula = parseOptionalNumberInput(editEntryFormulaEl, "Formula amount");
+        if (!formula.valid) {
+          return;
+        }
+        payload.formula_ml = formula.hasValue ? formula.value : null;
+      } else if (isMilkExpressType(nextType)) {
+        const expressed = parseOptionalNumberInput(editEntryExpressedEl, "Expressed amount");
+        if (!expressed.valid) {
+          return;
+        }
+        payload.expressed_ml = expressed.hasValue ? expressed.value : null;
+
+        const duration = parseOptionalNumberInput(editEntryDurationEl, "Duration");
+        if (!duration.valid) {
+          return;
+        }
+        payload.feed_duration_min = duration.hasValue ? duration.value : null;
+
+        if (editEntryModalEntry.formula_ml !== null && editEntryModalEntry.formula_ml !== undefined) {
+          payload.formula_ml = null;
+        }
+        if (editEntryModalEntry.amount_ml !== null && editEntryModalEntry.amount_ml !== undefined) {
+          payload.amount_ml = null;
+        }
+      } else if (
+        editEntryModalEntry.feed_duration_min !== null
+        && editEntryModalEntry.feed_duration_min !== undefined
+      ) {
+        payload.feed_duration_min = null;
+      }
+      if (nextType !== "feed" && !isMilkExpressType(nextType)) {
+        if (editEntryModalEntry.expressed_ml !== null && editEntryModalEntry.expressed_ml !== undefined) {
+          payload.expressed_ml = null;
+        }
+        if (editEntryModalEntry.formula_ml !== null && editEntryModalEntry.formula_ml !== undefined) {
+          payload.formula_ml = null;
+        }
+      }
+      const noteValue = editEntryNotesEl ? editEntryNotesEl.value.trim() : "";
+      payload.notes = noteValue ? noteValue : null;
+      closeEditEntryModal(payload);
+    });
+  }
+  if (editEntryCancelEl) {
+    editEntryCancelEl.addEventListener("click", () => closeEditEntryModal(null));
+  }
+  if (editEntryCloseEl) {
+    editEntryCloseEl.addEventListener("click", () => closeEditEntryModal(null));
+  }
+  if (editEntryBackdropEl) {
+    editEntryBackdropEl.addEventListener("click", () => closeEditEntryModal(null));
+  }
+  if (editEntryModalEl) {
+    editEntryModalEl.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        event.stopPropagation();
+        closeEditEntryModal(null);
+      }
+    });
+  }
+}
+
+function openEditEntryModal(entry, mode = "full") {
+  if (!isEditEntryModalAvailable()) {
+    return Promise.resolve(null);
+  }
+  initEditEntryModalHandlers();
+  editEntryModalEntry = entry;
+  editEntryModalMode = mode;
+  if (editEntryModalEl) {
+    editEntryModalEl.hidden = false;
+    editEntryModalEl.setAttribute("aria-hidden", "false");
+    editEntryModalEl.classList.toggle("is-time-only", mode === "time");
+  }
+  if (editEntryBackdropEl) {
+    editEntryBackdropEl.hidden = false;
+    editEntryBackdropEl.classList.add("open");
+  }
+  renderEditEntryTypeOptions(entry.type);
+  if (editEntryTimeEl) {
+    editEntryTimeEl.value = toLocalDateTimeValue(entry.timestamp_utc);
+  }
+  if (editEntryDurationEl) {
+    editEntryDurationEl.value = entry.feed_duration_min !== null && entry.feed_duration_min !== undefined
+      ? String(entry.feed_duration_min)
+      : "";
+  }
+  if (editEntryExpressedEl) {
+    const fallback = getMilkExpressAmounts(entry);
+    editEntryExpressedEl.value = entry.expressed_ml !== null && entry.expressed_ml !== undefined
+      ? String(entry.expressed_ml)
+      : (Number.isFinite(fallback.ml) && fallback.ml > 0 ? String(fallback.ml) : "");
+  }
+  if (editEntryFormulaEl) {
+    editEntryFormulaEl.value = entry.formula_ml !== null && entry.formula_ml !== undefined
+      ? String(entry.formula_ml)
+      : "";
+  }
+  if (editEntryNotesEl) {
+    editEntryNotesEl.value = entry.notes ?? "";
+  }
+  updateEditEntryFieldVisibility(entry.type);
+  editEntryTimeEl?.focus();
+  return new Promise((resolve) => {
+    editEntryModalResolver = resolve;
+  });
+}
+
+async function commitEntryUpdate(entry, payload, messages) {
+  try {
+    const updated = {
+      ...entry,
+      ...payload,
+      updated_at_utc: new Date().toISOString(),
+    };
+    await upsertEntryLocal(updated);
+    await enqueueOutbox({ action: "upsert", entry: updated });
+    if (!navigator.onLine) {
+      setStatus(messages.offline);
+    } else {
+      setStatus(messages.online);
+      await syncNow();
+    }
+    if (pageType === "log") {
+      await loadLogEntries();
+    } else {
+      await loadHomeEntries();
+    }
+  } catch (err) {
+    setStatus(messages.error);
+  }
+}
+
 async function editEntry(entry) {
+  if (isEditEntryModalAvailable()) {
+    const payload = await openEditEntryModal(entry, "full");
+    if (!payload) {
+      return;
+    }
+    await commitEntryUpdate(entry, payload, {
+      online: "Updated (syncing...)",
+      offline: "Updated offline",
+      error: "Error: unable to update entry",
+    });
+    return;
+  }
   const rawType = window.prompt("Type", entry.type);
   if (!rawType) {
     return;
@@ -2967,26 +5986,26 @@ async function editEntry(entry) {
   const trimmedNote = noteInput.trim();
   payload.notes = trimmedNote ? trimmedNote : null;
 
-  const response = await fetch(`/api/entries/${entry.id}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
+  await commitEntryUpdate(entry, payload, {
+    online: "Updated (syncing...)",
+    offline: "Updated offline",
+    error: "Error: unable to update entry",
   });
-
-  if (response.ok) {
-    setStatus("Updated");
-    if (pageType === "log") {
-      await loadLogEntries();
-    } else {
-      await loadHomeEntries();
-    }
-  } else {
-    const err = await response.json();
-    setStatus(`Error: ${err.error || "unknown"}`);
-  }
 }
 
 async function editEntryTime(entry) {
+  if (isEditEntryModalAvailable()) {
+    const payload = await openEditEntryModal(entry, "time");
+    if (!payload) {
+      return;
+    }
+    await commitEntryUpdate(entry, payload, {
+      online: "Updated time (syncing...)",
+      offline: "Updated time offline",
+      error: "Error: unable to update time",
+    });
+    return;
+  }
   const current = toLocalDateTimeValue(entry.timestamp_utc);
   const nextValue = window.prompt("Timestamp (YYYY-MM-DDTHH:MM)", current);
   if (!nextValue) {
@@ -2998,49 +6017,46 @@ async function editEntryTime(entry) {
     return;
   }
 
-  const response = await fetch(`/api/entries/${entry.id}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ timestamp_utc: nextDate.toISOString() }),
+  await commitEntryUpdate(entry, { timestamp_utc: nextDate.toISOString() }, {
+    online: "Updated time (syncing...)",
+    offline: "Updated time offline",
+    error: "Error: unable to update time",
   });
-
-  if (response.ok) {
-    setStatus("Updated time");
-    if (pageType === "log") {
-      await loadLogEntries();
-    } else {
-      await loadHomeEntries();
-    }
-  } else {
-    const err = await response.json();
-    setStatus(`Error: ${err.error || "unknown"}`);
-  }
 }
 
 async function deleteEntry(entry) {
   if (!window.confirm("Delete this entry?")) {
     return;
   }
-  const response = await fetch(`/api/entries/${entry.id}`, {
-    method: "DELETE",
-  });
-  if (response.status === 204) {
-    setStatus("Deleted");
+  try {
+    const deletedAt = new Date().toISOString();
+    const updated = {
+      ...entry,
+      deleted_at_utc: deletedAt,
+      updated_at_utc: deletedAt,
+    };
+    await upsertEntryLocal(updated);
+    await enqueueOutbox({ action: "delete", client_event_id: entry.client_event_id });
+    if (!navigator.onLine) {
+      setStatus("Deleted offline");
+    } else {
+      setStatus("Deleted (syncing...)");
+      await syncNow();
+    }
     if (pageType === "log") {
       await loadLogEntries();
     } else {
       await loadHomeEntries();
     }
-  } else {
-    const err = await response.json();
-    setStatus(`Error: ${err.error || "unknown"}`);
+  } catch (err) {
+    setStatus("Error: unable to delete entry");
   }
 }
 
 async function saveFeedingGoal(payload) {
   setStatus("Saving goal...");
   try {
-    const response = await fetch("/api/feeding-goals", {
+    const response = await fetch(buildUrl("/api/feeding-goals"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -3062,6 +6078,19 @@ async function saveFeedingGoal(payload) {
   }
 }
 
+async function loadBottles() {
+  try {
+    const bottles = await fetchBottles();
+    bottlesCache = bottles;
+    renderBottleList(bottles);
+    renderBottleOptions();
+    updateBottleResult();
+    setStatus("");
+  } catch (err) {
+    setStatus(`Failed to load bottles: ${err.message || "unknown error"}`);
+  }
+}
+
 async function loadGoalHistory() {
   const shouldShowLoading = pageType === "goals" && !hasLoadedFeedingGoals;
   if (shouldShowLoading) {
@@ -3069,6 +6098,8 @@ async function loadGoalHistory() {
   }
   try {
     const goals = await loadFeedingGoals(50);
+    const currentGoal = await loadCurrentGoal();
+    activeFeedingGoal = currentGoal;
     renderGoalHistory(goals);
     renderGoalComparison();
     if (goalStartDateInputEl && !goalStartDateInputEl.value) {
@@ -3091,15 +6122,41 @@ async function loadHomeEntries() {
   try {
     const statsWindow = computeWindow(24);
     const chartWindow = computeWindow(6);
-    const [entries, goals] = await Promise.all([
-      fetchEntries({
+    const cachedEntries = await listEntriesLocalSafe({
+      limit: 200,
+      since: statsWindow.sinceIso,
+      until: statsWindow.untilIso,
+    });
+    if (cachedEntries) {
+      const cachedChartEntries = cachedEntries.filter((entry) => {
+        const ts = new Date(entry.timestamp_utc);
+        return ts >= chartWindow.since && ts <= chartWindow.until;
+      });
+      renderChart(cachedChartEntries, chartWindow);
+      renderStats(cachedEntries);
+      renderGoalComparison();
+      renderStatsWindow(statsWindow);
+      renderLastActivity(cachedEntries);
+      renderLastByType(cachedEntries);
+    }
+    const cachedLatest = await listEntriesLocalSafe({ limit: 1 });
+    if (cachedLatest) {
+      renderLatestEntry(cachedLatest[0] || null);
+    }
+
+    await syncNow();
+
+    const [entries, goals, currentGoal, latestEntry] = await Promise.all([
+      loadEntriesWithFallback({
         limit: 200,
         since: statsWindow.sinceIso,
         until: statsWindow.untilIso,
       }),
       loadFeedingGoals(1).catch(() => []),
+      loadCurrentGoal(),
+      loadLatestEntryWithFallback(),
     ]);
-    activeFeedingGoal = goals[0] || null;
+    activeFeedingGoal = currentGoal;
     const chartEntries = entries.filter((entry) => {
       const ts = new Date(entry.timestamp_utc);
       return ts >= chartWindow.since && ts <= chartWindow.until;
@@ -3110,6 +6167,7 @@ async function loadHomeEntries() {
     renderStatsWindow(statsWindow);
     renderLastActivity(entries);
     renderLastByType(entries);
+    renderLatestEntry(latestEntry || null);
   } catch (err) {
     setStatus(`Failed to load entries: ${err.message || "unknown error"}`);
   } finally {
@@ -3130,8 +6188,21 @@ async function loadSummaryEntries() {
       setSummaryDate(new Date());
     }
     const dayWindow = getSummaryDayWindow(summaryDate);
+    const cachedEntries = await listEntriesLocalSafe({
+      limit: 200,
+      since: dayWindow.sinceIso,
+      until: dayWindow.untilIso,
+    });
+    if (cachedEntries) {
+      summaryEntries = cachedEntries;
+      renderSummaryStats(cachedEntries);
+      renderMilkExpressSummary(cachedEntries);
+    }
+
+    await syncNow();
+
     const [entries] = await Promise.all([
-      fetchEntries({
+      loadEntriesWithFallback({
         limit: 200,
         since: dayWindow.sinceIso,
         until: dayWindow.untilIso,
@@ -3141,6 +6212,7 @@ async function loadSummaryEntries() {
     summaryEntries = entries;
     renderSummaryStats(entries);
     renderMilkExpressSummary(entries);
+    await loadSummaryInsights();
   } catch (err) {
     setStatus(`Failed to load entries: ${err.message || "unknown error"}`);
   } finally {
@@ -3151,6 +6223,36 @@ async function loadSummaryEntries() {
   }
 }
 
+async function loadSummaryInsights() {
+  if (pageType !== "summary") {
+    return;
+  }
+  const { anchorEnd, anchorIso } = getInsightAnchor(summaryDate || new Date());
+  if (summaryInsightsAnchor === anchorIso && summaryInsightsEntries.length) {
+    renderSummaryInsights(summaryInsightsEntries, anchorEnd);
+    return;
+  }
+  if (summaryInsightsLoading) {
+    return summaryInsightsLoading;
+  }
+  summaryInsightsLoading = fetchAllEntriesUntil(anchorIso)
+    .then((entries) => {
+      summaryInsightsEntries = entries;
+      summaryInsightsAnchor = anchorIso;
+      renderSummaryInsights(entries, anchorEnd);
+      return entries;
+    })
+    .catch((err) => {
+      setStatus(`Failed to load insights: ${err.message || "unknown error"}`);
+      summaryInsightsEntries = [];
+    })
+    .finally(() => {
+      summaryInsightsLoading = null;
+      hasLoadedSummaryInsights = true;
+    });
+  return summaryInsightsLoading;
+}
+
 async function ensureMilkExpressAllEntries() {
   if (milkExpressAllEntries.length) {
     return milkExpressAllEntries;
@@ -3158,9 +6260,7 @@ async function ensureMilkExpressAllEntries() {
   if (milkExpressAllLoading) {
     return milkExpressAllLoading;
   }
-  milkExpressAllLoading = fetchEntries({
-    limit: 200,
-  })
+  milkExpressAllLoading = loadEntriesWithFallback({ limit: 200 })
     .then((entries) => {
       const filtered = entries.filter((entry) => isMilkExpressType(entry.type));
       milkExpressAllEntries = filtered;
@@ -3192,7 +6292,12 @@ async function loadLogEntries() {
     if (logFilterType) {
       params.type = logFilterType;
     }
-    const entries = await fetchEntries(params);
+    const cachedEntries = await listEntriesLocalSafe(params);
+    if (cachedEntries) {
+      renderLogEntries(cachedEntries);
+    }
+    await syncNow();
+    const entries = await loadEntriesWithFallback(params);
     renderLogEntries(entries);
   } catch (err) {
     setStatus(`Failed to load entries: ${err.message || "unknown error"}`);
@@ -3207,29 +6312,37 @@ async function loadLogEntries() {
 function initLinks() {
   if (logLinkEl) {
     logLinkEl.classList.remove("disabled");
-    logLinkEl.href = "/log";
+    logLinkEl.href = buildUrl("/log");
   }
   if (homeLinkEl) {
     homeLinkEl.classList.remove("disabled");
-    homeLinkEl.href = "/";
+    homeLinkEl.href = buildUrl("/");
   }
   if (summaryLinkEl) {
     summaryLinkEl.classList.remove("disabled");
-    summaryLinkEl.href = "/summary";
+    summaryLinkEl.href = buildUrl("/summary");
+  }
+  if (milkExpressLinkEl) {
+    milkExpressLinkEl.classList.remove("disabled");
+    milkExpressLinkEl.href = buildUrl("/milk-express");
+  }
+  if (bottlesLinkEl) {
+    bottlesLinkEl.classList.remove("disabled");
+    bottlesLinkEl.href = buildUrl("/bottles");
   }
   if (goalsLinkEl) {
     goalsLinkEl.classList.remove("disabled");
-    goalsLinkEl.href = "/goals";
+    goalsLinkEl.href = buildUrl("/goals");
   }
   if (timelineLinkEl) {
     timelineLinkEl.classList.remove("disabled");
-    timelineLinkEl.href = "/timeline";
+    timelineLinkEl.href = buildUrl("/timeline");
   }
 }
 
 async function loadBabySettings() {
   try {
-    const response = await fetch("/api/settings");
+    const response = await fetch(buildUrl("/api/settings"));
     if (!response.ok) {
       return;
     }
@@ -3249,6 +6362,18 @@ async function loadBabySettings() {
         ? String(feedIntervalMinutes / 60)
         : "";
     }
+    if (entryWebhookInputEl) {
+      entryWebhookInputEl.value = data.entry_webhook_url || "";
+    }
+    if (homeKpisWebhookInputEl) {
+      homeKpisWebhookInputEl.value = data.home_kpis_webhook_url || "";
+    }
+    if (defaultUserInputEl) {
+      defaultUserInputEl.value = data.default_user_slug || "";
+    }
+    if (pushcutFeedDueInputEl) {
+      pushcutFeedDueInputEl.value = data.pushcut_feed_due_url || "";
+    }
     applyCustomEventTypes();
     updateAgeDisplay();
     updateNextFeed();
@@ -3259,7 +6384,7 @@ async function loadBabySettings() {
 
 async function saveBabySettings(patch) {
   try {
-    const response = await fetch("/api/settings", {
+    const response = await fetch(buildUrl("/api/settings"), {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(patch),
@@ -3275,6 +6400,18 @@ async function saveBabySettings(patch) {
     customEventTypes = Array.isArray(data.custom_event_types)
       ? data.custom_event_types
       : [];
+    if (entryWebhookInputEl) {
+      entryWebhookInputEl.value = data.entry_webhook_url || "";
+    }
+    if (homeKpisWebhookInputEl) {
+      homeKpisWebhookInputEl.value = data.home_kpis_webhook_url || "";
+    }
+    if (defaultUserInputEl) {
+      defaultUserInputEl.value = data.default_user_slug || "";
+    }
+    if (pushcutFeedDueInputEl) {
+      pushcutFeedDueInputEl.value = data.pushcut_feed_due_url || "";
+    }
     applyCustomEventTypes();
     updateAgeDisplay();
     updateNextFeed();
@@ -3292,3 +6429,17 @@ if (userFormEl) {
 }
 void loadBabySettings();
 initializeUser();
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker
+      .register(buildUrl("/sw.js"), { scope: buildUrl("/") })
+      .catch((err) => {
+      console.warn("Service worker registration failed", err);
+    });
+  });
+}
+window.addEventListener("online", () => {
+  setStatus("Back online");
+  void syncNow();
+});
+scheduleSync();

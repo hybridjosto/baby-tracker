@@ -2,6 +2,7 @@ from datetime import date, datetime, timezone
 
 from src.app.storage.db import get_connection
 from src.app.storage.feeding_goals import create_goal as repo_create_goal
+from src.app.storage.feeding_goals import get_current_goal as repo_get_current_goal
 from src.app.storage.feeding_goals import list_goals as repo_list_goals
 
 
@@ -36,6 +37,11 @@ def list_goals(db_path: str, limit: int = 50) -> list[dict]:
     safe_limit = max(1, min(limit, 200))
     with get_connection(db_path) as conn:
         return repo_list_goals(conn, safe_limit)
+
+
+def get_current_goal(db_path: str) -> dict | None:
+    with get_connection(db_path) as conn:
+        return repo_get_current_goal(conn)
 
 
 def create_goal(db_path: str, payload: dict) -> dict:

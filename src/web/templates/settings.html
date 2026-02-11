@@ -4,8 +4,8 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Baby Tracker Settings</title>
-    <link rel="manifest" href="/static/manifest.json">
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+    <link rel="manifest" href="{{ base_path }}/static/manifest.json">
+    <link rel="apple-touch-icon" href="{{ base_path }}/apple-touch-icon.png">
     <link
       href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700&display=swap"
       rel="stylesheet"
@@ -14,7 +14,7 @@
       href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@400,0"
       rel="stylesheet"
     >
-    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="stylesheet" href="{{ base_path }}/static/styles.css?v=2026-02-08-1">
     <script>
       (() => {
         const stored = localStorage.getItem("baby-tracker-theme");
@@ -54,7 +54,7 @@
         border-radius: 10px;
         border: 1px solid var(--border-light);
         padding: 10px 12px;
-        font-size: 14px;
+        font-size: 16px;
         background: #ffffff;
         color: var(--text-primary);
         box-sizing: border-box;
@@ -128,13 +128,30 @@
       }
     </style>
   </head>
-  <body data-page="settings">
+  <body data-page="settings" data-base-path="{{ base_path }}">
     <div class="page">
       <div class="card">
         <div class="nav-row">
           <h1>Settings</h1>
           <div class="nav-actions">
-            <a href="/">Back to home</a>
+            <a class="nav-icon" id="home-link" href="{{ base_path }}/" aria-label="Home" title="Home">
+              <span class="material-symbols-outlined">home</span>
+            </a>
+            <a class="nav-icon" id="summary-link" href="{{ base_path }}/summary" aria-label="Summary" title="Summary">
+              <span class="material-symbols-outlined">query_stats</span>
+            </a>
+            <a class="nav-icon" id="log-link" href="{{ base_path }}/log" aria-label="Event log" title="Event log">
+              <span class="material-symbols-outlined">list_alt</span>
+            </a>
+            <a class="nav-icon" id="timeline-link" href="{{ base_path }}/timeline" aria-label="Timeline" title="Timeline">
+              <span class="material-symbols-outlined">history</span>
+            </a>
+            <a class="nav-icon" id="goals-link" href="{{ base_path }}/goals" aria-label="Feeding goals" title="Feeding goals">
+              <span class="material-symbols-outlined">track_changes</span>
+            </a>
+            <a class="nav-icon" id="bottles-link" href="{{ base_path }}/bottles" aria-label="Bottle library" title="Bottle library">
+              <span class="material-symbols-outlined">local_drink</span>
+            </a>
             <button class="nav-icon" id="theme-toggle" type="button" aria-label="Switch to light mode">
               <span class="material-symbols-outlined">dark_mode</span>
             </button>
@@ -149,7 +166,15 @@
           </div>
           <div class="field">
             <label for="interval-input">Current feed interval (hours)</label>
-            <input id="interval-input" type="number" name="feed_interval" min="0" step="0.25" inputmode="decimal">
+            <input
+              id="interval-input"
+              type="number"
+              name="feed_interval"
+              min="0"
+              step="0.25"
+              inputmode="decimal"
+              pattern="[0-9]*[.,]?[0-9]*"
+            >
             <div class="hint">Used to estimate time to next feed.</div>
           </div>
           <div class="field">
@@ -168,9 +193,62 @@
             <ul class="pill-list" id="custom-type-list"></ul>
             <div class="hint" id="custom-type-empty">No custom types yet.</div>
           </div>
+          <div class="field">
+            <label for="entry-webhook-input">Entry webhook URL</label>
+            <input
+              id="entry-webhook-input"
+              type="url"
+              name="entry_webhook_url"
+              placeholder="https://example.com/webhook"
+            >
+            <div class="hint">POSTed when a new entry is created.</div>
+          </div>
+          <div class="field">
+            <label for="home-kpis-webhook-input">Home KPIs webhook URL</label>
+            <input
+              id="home-kpis-webhook-input"
+              type="url"
+              name="home_kpis_webhook_url"
+              placeholder="https://example.com/webhook"
+            >
+            <div class="hint">POSTed on new entries and every 15 minutes.</div>
+          </div>
+          <div class="field">
+            <label for="default-user-input">Default user slug</label>
+            <input
+              id="default-user-input"
+              type="text"
+              name="default_user_slug"
+              placeholder="default"
+            >
+            <div class="hint">Used when logging via Pushcut without a user.</div>
+          </div>
+          <div class="field">
+            <label for="pushcut-feed-due-input">Pushcut feed-due URL</label>
+            <input
+              id="pushcut-feed-due-input"
+              type="url"
+              name="pushcut_feed_due_url"
+              placeholder="https://api.pushcut.io/..."
+            >
+            <div class="hint">Endpoint to trigger the feed due notification.</div>
+            <div class="inline-row" style="margin-top: 8px;">
+              <button class="add-btn" id="test-feed-due-notification" type="button">
+                Send test feed-due notification
+              </button>
+            </div>
+          </div>
+          <div class="field">
+            <label>Export events</label>
+            <div class="inline-row">
+              <button class="add-btn" id="export-csv" type="button">Download CSV</button>
+            </div>
+            <div class="hint">Includes event type, date, time, duration, and feed amounts.</div>
+          </div>
         </form>
+        <div class="status" id="status"></div>
       </div>
     </div>
-    <script src="/static/app.js"></script>
+    <script src="{{ base_path }}/static/app.js?v=2026-02-08-1"></script>
   </body>
 </html>

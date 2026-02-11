@@ -1,0 +1,17 @@
+[Unit]
+Description=Baby Tracker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/josh/baby-tracker
+Environment=PYTHONUNBUFFERED=1
+Environment=BABY_TRACKER_HOST=0.0.0.0
+Environment=BABY_TRACKER_PORT=8000
+ExecStart=/home/josh/.local/bin/uv run gunicorn "src.app.main:application" --bind ${BABY_TRACKER_HOST}:${BABY_TRACKER_PORT} --workers 1 --threads 1 --access-logfile - --error-logfile -
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

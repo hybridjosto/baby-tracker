@@ -4,8 +4,8 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Baby Activity</title>
-    <link rel="manifest" href="/static/manifest.json">
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+    <link rel="manifest" href="{{ base_path }}/static/manifest.json">
+    <link rel="apple-touch-icon" href="{{ base_path }}/apple-touch-icon.png">
     <script>
       (() => {
         const stored = localStorage.getItem("baby-tracker-theme");
@@ -25,7 +25,7 @@
       href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@400,0"
       rel="stylesheet"
     >
-    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="stylesheet" href="{{ base_path }}/static/styles.css?v=2026-02-08-1">
     <style>
       :root {
         --action-height: 80px;
@@ -97,7 +97,7 @@
       }
       .stats {
         display: grid;
-        grid-template-columns: repeat(3, 1fr);
+        grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 10px;
       }
       .stat-card {
@@ -107,6 +107,7 @@
         border: 1px solid #e5ebe6;
         text-align: center;
         box-shadow: 0 6px 14px rgba(0, 0, 0, 0.06);
+        min-width: 0;
       }
       .stat-card.is-clickable {
         cursor: pointer;
@@ -123,6 +124,14 @@
       html.dark .stat-card {
         background: var(--card-dark);
         border-color: rgba(255, 255, 255, 0.06);
+      }
+      @media (max-width: 520px) {
+        .content {
+          padding: 8px 12px 170px;
+        }
+        .stats {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
       }
       .stat-label {
         font-size: 10px;
@@ -161,6 +170,117 @@
         font-size: 11px;
         color: var(--text-secondary);
         text-align: center;
+      }
+      .latest-card {
+        margin-top: 14px;
+        background: #ffffff;
+        border-radius: 18px;
+        padding: 14px;
+        border: 1px solid #e5ebe6;
+        box-shadow: 0 8px 18px rgba(0, 0, 0, 0.08);
+        display: grid;
+        gap: 12px;
+      }
+      html.dark .latest-card {
+        background: var(--card-dark);
+        border-color: rgba(255, 255, 255, 0.06);
+      }
+      .latest-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+      .latest-title {
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.18em;
+        color: var(--text-secondary);
+        font-weight: 700;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .latest-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: #13ec5b;
+        box-shadow: 0 0 12px rgba(19, 236, 91, 0.5);
+      }
+      .latest-meta {
+        font-size: 12px;
+        color: var(--text-secondary);
+        text-align: right;
+      }
+      .latest-body {
+        display: grid;
+        gap: 10px;
+      }
+      .latest-type {
+        font-size: 18px;
+        font-weight: 700;
+        text-transform: capitalize;
+      }
+      .latest-time {
+        font-size: 13px;
+        color: var(--text-secondary);
+      }
+      .latest-details {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .latest-chip {
+        font-size: 11px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        border: 1px solid #e3e8e4;
+        background: #f7faf8;
+        font-weight: 600;
+      }
+      html.dark .latest-chip {
+        border-color: rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.06);
+      }
+      .latest-notes {
+        font-size: 12px;
+        color: var(--text-secondary);
+        background: var(--surface-soft);
+        padding: 10px 12px;
+        border-radius: 12px;
+        border: 1px dashed var(--border-light);
+      }
+      html.dark .latest-notes {
+        border-color: var(--border-dark);
+        background: rgba(26, 44, 32, 0.7);
+      }
+      .latest-actions {
+        display: flex;
+        gap: 8px;
+        justify-content: flex-end;
+      }
+      .latest-actions button {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        padding: 6px 10px;
+        border-radius: 10px;
+        border: 1px solid var(--border-light);
+        background: var(--surface-muted);
+        cursor: pointer;
+      }
+      html.dark .latest-actions button {
+        border-color: var(--border-dark);
+        background: rgba(255, 255, 255, 0.08);
+        color: #d3e4d7;
+      }
+      .latest-empty {
+        font-size: 13px;
+        color: var(--text-secondary);
+        text-align: center;
+        padding: 12px 8px;
       }
       .chart-card {
         margin-top: 16px;
@@ -234,6 +354,147 @@
         justify-content: center;
         font-size: 13px;
         color: var(--text-secondary);
+      }
+      .edit-modal-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 26, 18, 0.45);
+        backdrop-filter: blur(6px);
+        z-index: 30;
+        display: none;
+      }
+      .edit-modal-backdrop.open {
+        display: block;
+      }
+      .edit-modal {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        padding: 16px;
+        z-index: 31;
+      }
+      .edit-modal[hidden] {
+        display: none;
+      }
+      .edit-modal-card {
+        width: min(100%, 420px);
+        max-width: calc(100vw - 32px);
+        border-radius: 16px;
+        border: 1px solid var(--border-light);
+        background: var(--card-light);
+        padding: 16px;
+        display: grid;
+        gap: 12px;
+        box-shadow: var(--shadow-soft);
+        overflow: hidden;
+      }
+      html.dark .edit-modal-card {
+        border-color: var(--border-dark);
+        background: var(--card-dark);
+        box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+      }
+      .edit-modal-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .edit-modal-eyebrow {
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.2em;
+        color: var(--text-secondary);
+      }
+      .edit-modal-title {
+        font-size: 20px;
+        margin: 2px 0 0 0;
+      }
+      .edit-modal-close {
+        border: none;
+        background: transparent;
+        cursor: pointer;
+        color: var(--text-secondary);
+        font-size: 20px;
+        line-height: 1;
+      }
+      .edit-field {
+        display: grid;
+        gap: 6px;
+        min-width: 0;
+      }
+      .edit-field label {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: var(--text-secondary);
+      }
+      .edit-field input,
+      .edit-field select,
+      .edit-field textarea {
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        border-radius: 10px;
+        border: 1px solid var(--border-light);
+        padding: 10px 12px;
+        font-size: 16px;
+        background: #ffffff;
+        color: var(--text-primary);
+        box-sizing: border-box;
+        font-family: inherit;
+        display: block;
+      }
+      .edit-field input[type="datetime-local"] {
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        appearance: none;
+      }
+      html.dark .edit-field input,
+      html.dark .edit-field select,
+      html.dark .edit-field textarea {
+        border-color: var(--border-dark);
+        background: rgba(16, 24, 18, 0.9);
+        color: #f3f6f4;
+      }
+      .edit-field textarea {
+        min-height: 72px;
+        resize: vertical;
+      }
+      .edit-number-grid {
+        display: grid;
+        gap: 10px;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      }
+      .edit-modal-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+      .edit-modal-actions button {
+        border-radius: 10px;
+        border: 1px solid var(--border-light);
+        padding: 10px 12px;
+        font-weight: 700;
+        cursor: pointer;
+        background: var(--surface-soft);
+        color: var(--text-primary);
+      }
+      html.dark .edit-modal-actions button {
+        border-color: var(--border-dark);
+        background: rgba(255, 255, 255, 0.08);
+        color: #f3f6f4;
+      }
+      .edit-modal-actions .primary {
+        background: var(--primary);
+        border-color: transparent;
+        color: #0f1a12;
+      }
+      .edit-modal.is-time-only .edit-field--type,
+      .edit-modal.is-time-only .edit-field--numbers,
+      .edit-modal.is-time-only .edit-field--notes {
+        display: none;
       }
       .last-events {
         margin-top: 12px;
@@ -335,7 +596,7 @@
         border-radius: 12px;
         border: 1px solid #d6ded8;
         padding: 10px 12px;
-        font-size: 14px;
+        font-size: 16px;
         background: #ffffff;
         color: #1b2b1f;
       }
@@ -360,8 +621,9 @@
       }
       .bottom-bar {
         position: fixed;
-        left: 50%;
-        transform: translateX(-50%);
+        left: 0;
+        right: 0;
+        margin: 0 auto;
         bottom: 0;
         width: 100%;
         max-width: 420px;
@@ -543,15 +805,17 @@
         display: grid;
       }
       .feed-menu {
-        position: absolute;
-        bottom: calc(var(--action-height) + 12px);
+        position: fixed;
+        top: 50%;
         left: 50%;
-        transform: translateX(-50%);
+        transform: translate(-50%, -50%);
         display: none;
         grid-template-columns: 1fr;
         gap: 10px;
         padding: 12px;
-        min-width: 220px;
+        width: min(92vw, 360px);
+        max-height: 80vh;
+        overflow-y: auto;
         background: #f2f6f3;
         border: 1px solid #d6ded8;
         border-radius: 18px;
@@ -608,6 +872,7 @@
         background: rgba(255, 255, 255, 0.9);
         color: #1b2b1f;
         font-weight: 600;
+        font-size: 16px;
       }
       html.dark .feed-input-field {
         border: 1px solid rgba(255, 255, 255, 0.12);
@@ -692,6 +957,82 @@
       .is-loading #chart-empty {
         opacity: 0;
       }
+      .breastfeed-banner {
+        display: none;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 12px 16px;
+        border-radius: 16px;
+        margin: 10px 0 18px;
+        background: linear-gradient(135deg, rgba(19, 236, 91, 0.2), rgba(16, 185, 129, 0.08));
+        border: 1px solid rgba(19, 236, 91, 0.35);
+        box-shadow: 0 12px 30px rgba(10, 22, 14, 0.12);
+      }
+      .breastfeed-banner.is-active {
+        display: flex;
+      }
+      html.dark .breastfeed-banner {
+        background: linear-gradient(135deg, rgba(19, 236, 91, 0.16), rgba(16, 185, 129, 0.06));
+        border-color: rgba(19, 236, 91, 0.4);
+      }
+      .breastfeed-banner .banner-left {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .breastfeed-banner .banner-title {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 14px;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+        color: var(--text-primary);
+      }
+      .breastfeed-banner .pulse-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        background: #13ec5b;
+        box-shadow: 0 0 0 0 rgba(19, 236, 91, 0.6);
+        animation: banner-pulse 1.6s infinite;
+      }
+      .breastfeed-banner .banner-meta {
+        font-size: 12px;
+        color: var(--text-secondary);
+      }
+      .breastfeed-banner .banner-timer {
+        font-size: 20px;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+        color: #10b981;
+      }
+      .breastfeed-banner .banner-action {
+        border: none;
+        border-radius: 12px;
+        padding: 10px 14px;
+        font-weight: 700;
+        background: var(--primary);
+        color: #0f1a12;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      .breastfeed-banner .banner-action:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      @keyframes banner-pulse {
+        0% {
+          box-shadow: 0 0 0 0 rgba(19, 236, 91, 0.5);
+        }
+        70% {
+          box-shadow: 0 0 0 10px rgba(19, 236, 91, 0);
+        }
+        100% {
+          box-shadow: 0 0 0 0 rgba(19, 236, 91, 0);
+        }
+      }
       @keyframes skeleton-shimmer {
         0% {
           background-position: 200% 0;
@@ -702,7 +1043,7 @@
       }
     </style>
   </head>
-  <body data-user="{{ user_slug }}" data-user-valid="{{ 'true' if user_valid else 'false' }}" data-page="{{ page }}">
+  <body data-user="{{ user_slug }}" data-user-valid="{{ 'true' if user_valid else 'false' }}" data-page="{{ page }}" data-base-path="{{ base_path }}">
     <div class="app">
       <header>
         <div class="avatar" id="user-chip">{{ user_slug[:2]|upper if user_slug else 'BT' }}</div>
@@ -714,13 +1055,13 @@
           <button class="icon-btn" id="refresh-btn" type="button" aria-label="Refresh data" title="Refresh data">
             <span class="material-symbols-outlined">refresh</span>
           </button>
-          <a class="icon-btn" id="goals-link" href="/goals" aria-label="Feeding goals">
+          <a class="icon-btn" id="goals-link" href="{{ base_path }}/goals" aria-label="Feeding goals">
             <span class="material-symbols-outlined">track_changes</span>
           </a>
-          <a class="icon-btn" id="summary-link" href="/summary" aria-label="Summary">
+          <a class="icon-btn" id="summary-link" href="{{ base_path }}/summary" aria-label="Summary">
             <span class="material-symbols-outlined">query_stats</span>
           </a>
-          <a class="icon-btn" href="/settings" aria-label="Settings">
+          <a class="icon-btn" href="{{ base_path }}/settings" aria-label="Settings">
             <span class="material-symbols-outlined">settings</span>
           </a>
           <button class="icon-btn" id="theme-toggle" type="button" aria-label="Switch to light mode">
@@ -729,7 +1070,36 @@
         </div>
       </header>
       <main class="content">
+        <section
+          class="breastfeed-banner"
+          id="breastfeed-banner"
+          role="status"
+          aria-live="polite"
+        >
+          <div class="banner-left">
+            <div class="banner-title">
+              <span class="pulse-dot" aria-hidden="true"></span>
+              Breastfeeding active
+            </div>
+            <div class="banner-meta" id="breastfeed-banner-meta">Started by --</div>
+          </div>
+          <div class="banner-timer" id="breastfeed-banner-timer">-- min</div>
+          <button class="banner-action" id="breastfeed-banner-action" type="button">
+            End breastfeeding
+          </button>
+        </section>
         <section class="stats">
+          <div class="stat-card" aria-label="Next feed time">
+            <div class="stat-label">
+              <span class="material-symbols-outlined" style="font-size: 18px; color: #f6c453;">schedule</span>
+              Next feed
+            </div>
+            <div class="stat-value skeleton-text skeleton-mid" id="next-feed">--</div>
+            <a class="stat-link is-disabled" id="next-feed-shortcut" aria-label="Run feed reminder shortcut">
+              + Reminder
+              <span class="material-symbols-outlined" style="font-size: 14px;">arrow_forward</span>
+            </a>
+          </div>
           <div class="stat-card" aria-label="Total feed amount in last 24 hours">
             <div class="stat-label">
               <span class="material-symbols-outlined" style="font-size: 18px; color: var(--primary);">local_drink</span>
@@ -745,7 +1115,7 @@
             </div>
             <div class="stat-value skeleton-text skeleton-mid" id="stat-goal-progress">--</div>
             <div class="stat-sub skeleton-text skeleton-wide" id="stat-goal-detail">Set a 24h goal</div>
-            <a class="stat-link" href="/goals" aria-label="Edit feeding goals">
+            <a class="stat-link" href="{{ base_path }}/goals" aria-label="Edit feeding goals">
               Edit goals
               <span class="material-symbols-outlined" style="font-size: 14px;">arrow_forward</span>
             </a>
@@ -774,12 +1144,43 @@
         </section>
         <div class="stats-range skeleton-text skeleton-wide" id="stat-window">Rolling 24h: --</div>
 
+        <section class="latest-card" aria-live="polite">
+          <div class="latest-header">
+            <div class="latest-title">
+              <span class="latest-dot" aria-hidden="true"></span>
+              Latest event
+            </div>
+            <div class="latest-meta" id="latest-relative">--</div>
+          </div>
+          <div class="latest-body" id="latest-body">
+            <div>
+              <div class="latest-type skeleton-text skeleton-mid" id="latest-type">--</div>
+              <div class="latest-time skeleton-text skeleton-wide" id="latest-time">--</div>
+            </div>
+            <div class="latest-details" id="latest-details"></div>
+            <div class="latest-notes" id="latest-notes" hidden></div>
+            <div class="latest-actions">
+              <button id="latest-edit" type="button">
+                <span class="material-symbols-outlined" aria-hidden="true">edit</span>
+                Edit
+              </button>
+              <button id="latest-delete" type="button">
+                <span class="material-symbols-outlined" aria-hidden="true">delete</span>
+                Delete
+              </button>
+            </div>
+          </div>
+          <div class="latest-empty" id="latest-empty" hidden>No entries yet.</div>
+        </section>
+
         <section class="chart-card">
           <div class="chart-header">
             <h3>Last 6 Hours</h3>
             <div class="chart-links">
               <a class="log-link" id="log-link" href="#">Event log</a>
               <a class="timeline-link" id="timeline-link" href="#">Timeline</a>
+              <a class="timeline-link" href="{{ base_path }}/calendar">Calendar</a>
+              <a class="timeline-link" id="milk-express-link" href="#">Milk express ledger</a>
             </div>
           </div>
           <div class="legend">
@@ -797,14 +1198,6 @@
               <span class="legend-dot" style="background: var(--primary);"></span>
               <span>Last feed</span>
               <span class="last-time skeleton-text" id="last-feed">--</span>
-            </div>
-            <div class="last-row">
-              <span class="legend-dot" style="background: #f6c453;"></span>
-              <span>Next feed</span>
-              <span class="last-actions">
-                <span class="last-time skeleton-text" id="next-feed">--</span>
-                <a class="shortcut-link is-disabled" id="next-feed-shortcut" aria-label="Run feed reminder shortcut">+ Reminder</a>
-              </span>
             </div>
             <div class="last-row">
               <span class="legend-dot" style="background: #7dd3fc;"></span>
@@ -835,6 +1228,70 @@
             <div class="user-hint">Saved on this device.</div>
           </form>
         </section>
+
+        <div class="edit-modal-backdrop" id="edit-entry-backdrop" hidden></div>
+        <div class="edit-modal" id="edit-entry-modal" role="dialog" aria-modal="true" aria-hidden="true" hidden>
+          <form class="edit-modal-card" id="edit-entry-form" novalidate>
+            <div class="edit-modal-header">
+              <div>
+                <div class="edit-modal-eyebrow">Event log</div>
+                <div class="edit-modal-title">Edit entry</div>
+              </div>
+              <button class="edit-modal-close" id="edit-entry-close" type="button" aria-label="Close">✕</button>
+            </div>
+            <div class="edit-field edit-field--type">
+              <label for="edit-entry-type">Type</label>
+              <select id="edit-entry-type"></select>
+            </div>
+            <div class="edit-field">
+              <label for="edit-entry-time">Date &amp; time</label>
+              <input id="edit-entry-time" type="datetime-local" step="60">
+            </div>
+            <div class="edit-number-grid edit-field--numbers">
+              <div class="edit-field">
+                <label for="edit-entry-duration">Duration (minutes)</label>
+                <input
+                  id="edit-entry-duration"
+                  type="number"
+                  min="0"
+                  step="1"
+                  inputmode="decimal"
+                  pattern="[0-9]*[.,]?[0-9]*"
+                >
+              </div>
+              <div class="edit-field">
+                <label for="edit-entry-expressed">Expressed (ml)</label>
+                <input
+                  id="edit-entry-expressed"
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  inputmode="decimal"
+                  pattern="[0-9]*[.,]?[0-9]*"
+                >
+              </div>
+              <div class="edit-field">
+                <label for="edit-entry-formula">Formula (ml)</label>
+                <input
+                  id="edit-entry-formula"
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  inputmode="decimal"
+                  pattern="[0-9]*[.,]?[0-9]*"
+                >
+              </div>
+            </div>
+            <div class="edit-field edit-field--notes">
+              <label for="edit-entry-notes">Comment</label>
+              <textarea id="edit-entry-notes" placeholder="Optional notes"></textarea>
+            </div>
+            <div class="edit-modal-actions">
+              <button type="button" id="edit-entry-cancel">Cancel</button>
+              <button class="primary" id="edit-entry-save" type="submit">Save</button>
+            </div>
+          </form>
+        </div>
       </main>
 
       <div class="nappy-backdrop" id="nappy-backdrop" aria-hidden="true"></div>
@@ -874,44 +1331,46 @@
               <span class="material-symbols-outlined" style="color: var(--primary); font-size: 30px;">water_drop</span>
               Feed
             </button>
-            <div class="feed-menu" id="feed-menu" aria-hidden="true">
-              <button class="feed-option" id="log-breastfeed" type="button">Start breastfed</button>
-              <button class="feed-option" id="log-feed-manual" type="button">Log feed</button>
-              <div class="feed-input">
-                <label for="expressed-ml">Expressed (ml)</label>
-                <div class="feed-input-row">
-                  <input
-                    class="feed-input-field"
-                    id="expressed-ml"
-                    type="number"
-                    min="0"
-                    step="0.1"
-                    inputmode="decimal"
-                    placeholder="0"
-                  >
-                  <button class="feed-option" id="log-expressed" type="button">Log</button>
-                </div>
-              </div>
-              <div class="feed-input">
-                <label for="formula-ml">Formula (ml)</label>
-                <div class="feed-input-row">
-                  <input
-                    class="feed-input-field"
-                    id="formula-ml"
-                    type="number"
-                    min="0"
-                    step="0.1"
-                    inputmode="decimal"
-                    placeholder="0"
-                  >
-                  <button class="feed-option" id="log-formula" type="button">Log</button>
-                </div>
-              </div>
-            </div>
+          </div>
+        </div>
+      </div>
+      <div class="feed-menu" id="feed-menu" aria-hidden="true">
+        <button class="feed-option" id="log-breastfeed" type="button">Start breastfed</button>
+        <button class="feed-option" id="log-feed-manual" type="button">Log feed</button>
+        <div class="feed-input">
+          <label for="expressed-ml">Expressed (ml)</label>
+          <div class="feed-input-row">
+            <input
+              class="feed-input-field"
+              id="expressed-ml"
+              type="number"
+              min="0"
+              step="0.1"
+              inputmode="decimal"
+              pattern="[0-9]*[.,]?[0-9]*"
+              placeholder="0"
+            >
+            <button class="feed-option" id="log-expressed" type="button">Log</button>
+          </div>
+        </div>
+        <div class="feed-input">
+          <label for="formula-ml">Formula (ml)</label>
+          <div class="feed-input-row">
+            <input
+              class="feed-input-field"
+              id="formula-ml"
+              type="number"
+              min="0"
+              step="0.1"
+              inputmode="decimal"
+              pattern="[0-9]*[.,]?[0-9]*"
+              placeholder="0"
+            >
+            <button class="feed-option" id="log-formula" type="button">Log</button>
           </div>
         </div>
       </div>
     </div>
-    <script src="/static/app.js"></script>
+    <script src="{{ base_path }}/static/app.js?v=2026-02-08-1"></script>
   </body>
 </html>

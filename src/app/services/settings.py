@@ -1,8 +1,10 @@
 from datetime import date, datetime, timezone
-import re
 import json
+import re
+from urllib.parse import urlparse
 
 from src.app.storage.db import get_connection
+from src.lib.validation import normalize_user_slug
 from src.app.storage.settings import get_settings as repo_get_settings
 from src.app.storage.settings import update_settings as repo_update_settings
 
@@ -94,6 +96,59 @@ def _normalize_behind_target_mode(value: object) -> str | None:
     return trimmed
 
 
+def _normalize_entry_webhook_url(value: object) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError("entry_webhook_url must be http(s) URL")
+    trimmed = value.strip()
+    if not trimmed:
+        return None
+    parsed = urlparse(trimmed)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise ValueError("entry_webhook_url must be http(s) URL")
+    return trimmed
+
+
+def _normalize_home_kpis_webhook_url(value: object) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError("home_kpis_webhook_url must be http(s) URL")
+    trimmed = value.strip()
+    if not trimmed:
+        return None
+    parsed = urlparse(trimmed)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise ValueError("home_kpis_webhook_url must be http(s) URL")
+    return trimmed
+
+
+def _normalize_default_user_slug(value: object) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError("default_user_slug must be a valid user slug")
+    trimmed = value.strip().lower()
+    if not trimmed:
+        return None
+    return normalize_user_slug(trimmed)
+
+
+def _normalize_pushcut_feed_due_url(value: object) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError("pushcut_feed_due_url must be http(s) URL")
+    trimmed = value.strip()
+    if not trimmed:
+        return None
+    parsed = urlparse(trimmed)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise ValueError("pushcut_feed_due_url must be http(s) URL")
+    return trimmed
+
+
 def get_settings(db_path: str) -> dict:
     with get_connection(db_path) as conn:
         return repo_get_settings(conn)
@@ -110,6 +165,22 @@ def update_settings(db_path: str, payload: dict) -> dict:
     if "custom_event_types" in payload:
         fields["custom_event_types"] = _normalize_custom_event_types(
             payload["custom_event_types"]
+        )
+    if "entry_webhook_url" in payload:
+        fields["entry_webhook_url"] = _normalize_entry_webhook_url(
+            payload["entry_webhook_url"]
+        )
+    if "home_kpis_webhook_url" in payload:
+        fields["home_kpis_webhook_url"] = _normalize_home_kpis_webhook_url(
+            payload["home_kpis_webhook_url"]
+        )
+    if "default_user_slug" in payload:
+        fields["default_user_slug"] = _normalize_default_user_slug(
+            payload["default_user_slug"]
+        )
+    if "pushcut_feed_due_url" in payload:
+        fields["pushcut_feed_due_url"] = _normalize_pushcut_feed_due_url(
+            payload["pushcut_feed_due_url"]
         )
     with get_connection(db_path) as conn:
         current = repo_get_settings(conn)

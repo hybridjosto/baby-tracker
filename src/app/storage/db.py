@@ -24,10 +24,14 @@ def init_db(db_path: str) -> None:
         _ensure_user_slug_column(conn)
         _ensure_feed_duration_column(conn)
         _ensure_feed_amount_columns(conn)
+        _ensure_entries_deleted_at_column(conn)
         _ensure_settings_table(conn)
+        _ensure_bottles_table(conn)
         _ensure_feeding_goals_table(conn)
+        _ensure_current_goal_view(conn)
         _ensure_reminders_table(conn)
         _ensure_default_reminders(conn)
+        _ensure_calendar_events_table(conn)
         conn.commit()
     finally:
         conn.close()
@@ -58,7 +62,8 @@ def _ensure_entry_type_constraint(conn: sqlite3.Connection) -> None:
             feed_duration_min REAL,
             caregiver_id INTEGER,
             created_at_utc TEXT NOT NULL,
-            updated_at_utc TEXT NOT NULL
+            updated_at_utc TEXT NOT NULL,
+            deleted_at_utc TEXT
         )
         """
     )
@@ -81,6 +86,9 @@ def _ensure_entry_type_constraint(conn: sqlite3.Connection) -> None:
     )
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_entries_user_slug ON entries (user_slug)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_entries_updated_at_utc ON entries (updated_at_utc DESC)"
     )
 
 
@@ -115,6 +123,17 @@ def _ensure_feed_amount_columns(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE entries ADD COLUMN formula_ml REAL")
 
 
+def _ensure_entries_deleted_at_column(conn: sqlite3.Connection) -> None:
+    columns = {
+        row["name"] for row in conn.execute("PRAGMA table_info(entries)").fetchall()
+    }
+    if "deleted_at_utc" not in columns:
+        conn.execute("ALTER TABLE entries ADD COLUMN deleted_at_utc TEXT")
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_entries_updated_at_utc ON entries (updated_at_utc DESC)"
+    )
+
+
 def _ensure_settings_table(conn: sqlite3.Connection) -> None:
     conn.execute(
         """
@@ -142,6 +161,18 @@ def _ensure_settings_table(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE baby_settings ADD COLUMN overnight_gap_max_hours REAL")
     if "behind_target_mode" not in columns:
         conn.execute("ALTER TABLE baby_settings ADD COLUMN behind_target_mode TEXT")
+    if "entry_webhook_url" not in columns:
+        conn.execute("ALTER TABLE baby_settings ADD COLUMN entry_webhook_url TEXT")
+    if "default_user_slug" not in columns:
+        conn.execute("ALTER TABLE baby_settings ADD COLUMN default_user_slug TEXT")
+    if "pushcut_feed_due_url" not in columns:
+        conn.execute("ALTER TABLE baby_settings ADD COLUMN pushcut_feed_due_url TEXT")
+    if "home_kpis_webhook_url" not in columns:
+        conn.execute("ALTER TABLE baby_settings ADD COLUMN home_kpis_webhook_url TEXT")
+    if "feed_due_last_entry_id" not in columns:
+        conn.execute("ALTER TABLE baby_settings ADD COLUMN feed_due_last_entry_id INTEGER")
+    if "feed_due_last_sent_at_utc" not in columns:
+        conn.execute("ALTER TABLE baby_settings ADD COLUMN feed_due_last_sent_at_utc TEXT")
     row = conn.execute("SELECT id FROM baby_settings WHERE id = 1").fetchone()
     if not row:
         now = datetime.now(timezone.utc).isoformat()
@@ -151,11 +182,45 @@ def _ensure_settings_table(conn: sqlite3.Connection) -> None:
                 (id, dob, feed_interval_min, custom_event_types,
                  feed_goal_min, feed_goal_max,
                  overnight_gap_min_hours, overnight_gap_max_hours,
-                 behind_target_mode, updated_at_utc)
-            VALUES (1, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, ?)
+                 behind_target_mode, entry_webhook_url, default_user_slug,
+                 pushcut_feed_due_url, home_kpis_webhook_url,
+                 feed_due_last_entry_id, feed_due_last_sent_at_utc,
+                 updated_at_utc)
+            VALUES (1, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, ?)
             """,
             (now,),
         )
+
+
+def _ensure_bottles_table(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS bottles (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            empty_weight_g REAL NOT NULL,
+            created_at_utc TEXT NOT NULL,
+            updated_at_utc TEXT NOT NULL,
+            deleted_at_utc TEXT
+        )
+        """
+    )
+    columns = {
+        row["name"] for row in conn.execute("PRAGMA table_info(bottles)").fetchall()
+    }
+    if "name" not in columns:
+        conn.execute("ALTER TABLE bottles ADD COLUMN name TEXT NOT NULL DEFAULT ''")
+    if "empty_weight_g" not in columns:
+        conn.execute("ALTER TABLE bottles ADD COLUMN empty_weight_g REAL NOT NULL DEFAULT 0")
+    if "created_at_utc" not in columns:
+        conn.execute("ALTER TABLE bottles ADD COLUMN created_at_utc TEXT NOT NULL DEFAULT ''")
+    if "updated_at_utc" not in columns:
+        conn.execute("ALTER TABLE bottles ADD COLUMN updated_at_utc TEXT NOT NULL DEFAULT ''")
+    if "deleted_at_utc" not in columns:
+        conn.execute("ALTER TABLE bottles ADD COLUMN deleted_at_utc TEXT")
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_bottles_updated_at_utc ON bottles (updated_at_utc DESC)"
+    )
 
 
 def _ensure_reminders_table(conn: sqlite3.Connection) -> None:
@@ -180,6 +245,34 @@ def _ensure_reminders_table(conn: sqlite3.Connection) -> None:
     )
 
 
+def _ensure_calendar_events_table(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS calendar_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            date_local TEXT NOT NULL,
+            start_time_local TEXT NOT NULL,
+            end_time_local TEXT,
+            location TEXT,
+            notes TEXT,
+            category TEXT NOT NULL,
+            recurrence TEXT NOT NULL,
+            recurrence_until_local TEXT,
+            created_at_utc TEXT NOT NULL,
+            updated_at_utc TEXT NOT NULL,
+            deleted_at_utc TEXT
+        )
+        """
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_calendar_events_date_local ON calendar_events (date_local)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_calendar_events_updated_at_utc ON calendar_events (updated_at_utc DESC)"
+    )
+
+
 def _ensure_feeding_goals_table(conn: sqlite3.Connection) -> None:
     conn.execute(
         """
@@ -195,6 +288,19 @@ def _ensure_feeding_goals_table(conn: sqlite3.Connection) -> None:
         """
         CREATE INDEX IF NOT EXISTS idx_feeding_goals_start_date
             ON feeding_goals (start_date DESC, created_at_utc DESC)
+        """
+    )
+
+
+def _ensure_current_goal_view(conn: sqlite3.Connection) -> None:
+    conn.execute("DROP VIEW IF EXISTS current_goal")
+    conn.execute(
+        """
+        CREATE VIEW current_goal AS
+        SELECT id, goal_ml, start_date, created_at_utc
+        FROM feeding_goals
+        ORDER BY datetime(created_at_utc) DESC, id DESC
+        LIMIT 1
         """
     )
 

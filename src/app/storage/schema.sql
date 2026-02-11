@@ -11,10 +11,12 @@ CREATE TABLE IF NOT EXISTS entries (
     feed_duration_min REAL,
     caregiver_id INTEGER,
     created_at_utc TEXT NOT NULL,
-    updated_at_utc TEXT NOT NULL
+    updated_at_utc TEXT NOT NULL,
+    deleted_at_utc TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_entries_timestamp_utc ON entries (timestamp_utc DESC);
+CREATE INDEX IF NOT EXISTS idx_entries_updated_at_utc ON entries (updated_at_utc DESC);
 
 CREATE TABLE IF NOT EXISTS baby_settings (
     id INTEGER PRIMARY KEY CHECK (id = 1),
@@ -26,10 +28,27 @@ CREATE TABLE IF NOT EXISTS baby_settings (
     overnight_gap_min_hours REAL,
     overnight_gap_max_hours REAL,
     behind_target_mode TEXT,
+    entry_webhook_url TEXT,
+    default_user_slug TEXT,
+    pushcut_feed_due_url TEXT,
+    home_kpis_webhook_url TEXT,
+    feed_due_last_entry_id INTEGER,
+    feed_due_last_sent_at_utc TEXT,
     updated_at_utc TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 INSERT OR IGNORE INTO baby_settings (id) VALUES (1);
+
+CREATE TABLE IF NOT EXISTS bottles (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    empty_weight_g REAL NOT NULL,
+    created_at_utc TEXT NOT NULL,
+    updated_at_utc TEXT NOT NULL,
+    deleted_at_utc TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_bottles_updated_at_utc ON bottles (updated_at_utc DESC);
 
 CREATE TABLE IF NOT EXISTS feeding_goals (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -40,6 +59,12 @@ CREATE TABLE IF NOT EXISTS feeding_goals (
 
 CREATE INDEX IF NOT EXISTS idx_feeding_goals_start_date
     ON feeding_goals (start_date DESC, created_at_utc DESC);
+
+CREATE VIEW IF NOT EXISTS current_goal AS
+SELECT id, goal_ml, start_date, created_at_utc
+FROM feeding_goals
+ORDER BY datetime(created_at_utc) DESC, id DESC
+LIMIT 1;
 
 CREATE TABLE IF NOT EXISTS reminders (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -56,6 +81,28 @@ CREATE TABLE IF NOT EXISTS reminders (
 
 CREATE INDEX IF NOT EXISTS idx_reminders_next_due_at_utc
     ON reminders (next_due_at_utc);
+
+CREATE TABLE IF NOT EXISTS calendar_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    date_local TEXT NOT NULL,
+    start_time_local TEXT NOT NULL,
+    end_time_local TEXT,
+    location TEXT,
+    notes TEXT,
+    category TEXT NOT NULL,
+    recurrence TEXT NOT NULL,
+    recurrence_until_local TEXT,
+    created_at_utc TEXT NOT NULL,
+    updated_at_utc TEXT NOT NULL,
+    deleted_at_utc TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_calendar_events_date_local
+    ON calendar_events (date_local);
+
+CREATE INDEX IF NOT EXISTS idx_calendar_events_updated_at_utc
+    ON calendar_events (updated_at_utc DESC);
 
 INSERT INTO reminders (
     name,

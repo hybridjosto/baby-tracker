@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import math
 import csv
 import io
@@ -8,9 +8,14 @@ from src.app.storage.db import get_connection
 from src.app.storage.entries import (
     create_entry as repo_create_entry,
     delete_entry as repo_delete_entry,
+    get_entry_by_client_event_id as repo_get_entry_by_client_event_id,
     list_entries as repo_list_entries,
+    list_entries_for_export as repo_list_entries_for_export,
+    list_entries_updated_since as repo_list_entries_updated_since,
     update_entry as repo_update_entry,
+    upsert_entry_by_client_event_id as repo_upsert_entry_by_client_event_id,
 )
+from src.app.services.settings import get_settings
 from src.lib.validation import (
     normalize_user_slug,
     validate_entry_payload,
@@ -105,7 +110,156 @@ def list_entries(
             since_utc=normalized_since,
             until_utc=normalized_until,
             entry_type=normalized_type,
+            include_deleted=False,
         )
+
+
+def get_latest_entry_by_type(
+    db_path: str, entry_type: str, user_slug: str | None = None
+) -> dict | None:
+    validate_entry_type(entry_type)
+    entries = list_entries(
+        db_path,
+        limit=1,
+        user_slug=user_slug,
+        entry_type=entry_type,
+    )
+    return entries[0] if entries else None
+
+
+def get_next_feed_time(db_path: str, user_slug: str | None = None) -> dict:
+    settings = get_settings(db_path)
+    feed_interval_min = settings.get("feed_interval_min")
+    latest_feed = get_latest_entry_by_type(db_path, "feed", user_slug=user_slug)
+    if not latest_feed or not isinstance(feed_interval_min, int):
+        return {"timestamp_utc": None, "source_entry_id": None}
+    last_timestamp = latest_feed.get("timestamp_utc")
+    if not isinstance(last_timestamp, str) or not last_timestamp.strip():
+        return {"timestamp_utc": None, "source_entry_id": None}
+    cleaned = last_timestamp.strip()
+    if cleaned.endswith("Z"):
+        cleaned = cleaned[:-1] + "+00:00"
+    parsed = datetime.fromisoformat(cleaned)
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    next_dt = parsed.astimezone(timezone.utc) + timedelta(minutes=feed_interval_min)
+    return {"timestamp_utc": next_dt.isoformat(), "source_entry_id": latest_feed["id"]}
+
+
+def get_entry_summary(db_path: str, user_slug: str | None = None) -> list[dict]:
+    last_feed = get_latest_entry_by_type(db_path, "feed", user_slug=user_slug)
+    last_wee = get_latest_entry_by_type(db_path, "wee", user_slug=user_slug)
+    last_poo = get_latest_entry_by_type(db_path, "poo", user_slug=user_slug)
+    next_feed = get_next_feed_time(db_path, user_slug=user_slug)
+    items = [
+        {"title": "Last feed", "date_time": _format_summary_dt(last_feed)},
+        {"title": "Last wee", "date_time": _format_summary_dt(last_wee)},
+        {"title": "Last poo", "date_time": _format_summary_dt(last_poo)},
+        {
+            "title": "Next feed",
+            "date_time": _format_timestamp_value(next_feed.get("timestamp_utc")),
+        },
+    ]
+    return items
+
+
+def build_entry_summary_text(items: list[dict]) -> str:
+    parts: list[str] = []
+    for item in items:
+        title = item.get("title") or ""
+        date_time = item.get("date_time") or "--"
+        parts.append(f"{title}: {date_time}")
+    return " · ".join(parts)
+
+
+def _format_summary_dt(entry: dict | None) -> str | None:
+    if not entry:
+        return None
+    return _format_timestamp_value(entry.get("timestamp_utc"))
+
+
+def _format_timestamp_value(value: str | None) -> str | None:
+    if not value:
+        return None
+    cleaned = value.strip()
+    if not cleaned:
+        return None
+    if cleaned.endswith("Z"):
+        cleaned = cleaned[:-1] + "+00:00"
+    parsed = datetime.fromisoformat(cleaned)
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M")
+
+
+def list_feed_amount_entries(
+    db_path: str,
+    limit: int = 50,
+    user_slug: str | None = None,
+    since_utc: str | None = None,
+    until_utc: str | None = None,
+) -> list[dict]:
+    entries = list_entries(
+        db_path,
+        limit=limit,
+        user_slug=user_slug,
+        since_utc=since_utc,
+        until_utc=until_utc,
+        entry_type="feed",
+    )
+    filtered: list[dict] = []
+    for entry in entries:
+        if entry.get("expressed_ml") is None or entry.get("formula_ml") is None:
+            continue
+        filtered.append(
+            {
+                "date": _format_entry_date(entry.get("timestamp_utc")),
+                "expressed_ml": entry.get("expressed_ml"),
+                "formula_ml": entry.get("formula_ml"),
+            }
+        )
+    return filtered
+
+
+def _format_entry_date(timestamp_utc: str | None) -> str:
+    if not timestamp_utc:
+        return ""
+    cleaned = timestamp_utc.strip()
+    if cleaned.endswith("Z"):
+        cleaned = cleaned[:-1] + "+00:00"
+    parsed = datetime.fromisoformat(cleaned)
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc).strftime("%Y %m%d")
+
+
+def export_entries_csv(db_path: str, user_slug: str | None = None) -> str:
+    normalized_slug = normalize_user_slug(user_slug) if user_slug else None
+    with get_connection(db_path) as conn:
+        entries = repo_list_entries_for_export(conn, user_slug=normalized_slug)
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    columns = [
+        "id",
+        "user_slug",
+        "type",
+        "timestamp_utc",
+        "client_event_id",
+        "notes",
+        "amount_ml",
+        "feed_duration_min",
+        "caregiver_id",
+        "created_at_utc",
+        "updated_at_utc",
+        "expressed_ml",
+        "formula_ml",
+        "deleted_at_utc",
+    ]
+    writer.writerow(columns)
+    for entry in entries:
+        writer.writerow([entry.get(column) for column in columns])
+    return output.getvalue()
 
 
 def import_entries_csv(db_path: str, user_slug: str, file_storage) -> dict:
@@ -241,6 +395,66 @@ def update_entry(db_path: str, entry_id: int, payload: dict) -> dict:
 
 def delete_entry(db_path: str, entry_id: int) -> None:
     with get_connection(db_path) as conn:
-        deleted = repo_delete_entry(conn, entry_id)
+        now = _now_utc_iso()
+        deleted = repo_delete_entry(conn, entry_id, now, now)
     if not deleted:
         raise EntryNotFoundError()
+
+
+def sync_entries(db_path: str, payload: dict) -> dict:
+    device_id = payload.get("device_id")
+    if not isinstance(device_id, str) or not device_id.strip():
+        raise ValueError("device_id is required")
+
+    cursor = payload.get("cursor")
+    if cursor is not None and not isinstance(cursor, str):
+        raise ValueError("cursor must be a string")
+    normalized_cursor = _normalize_filter_ts(cursor) if cursor else None
+
+    changes = payload.get("changes", [])
+    if changes is None:
+        changes = []
+    if not isinstance(changes, list):
+        raise ValueError("changes must be a list")
+
+    now = _now_utc_iso()
+    with get_connection(db_path) as conn:
+        for change in changes:
+            if not isinstance(change, dict):
+                raise ValueError("change must be an object")
+            action = change.get("action")
+            if action == "upsert":
+                entry = change.get("entry")
+                if not isinstance(entry, dict):
+                    raise ValueError("entry is required for upsert")
+                validated = validate_entry_payload(entry, require_client_event=True)
+                validated["user_slug"] = normalize_user_slug(entry.get("user_slug"))
+                if not validated.get("timestamp_utc"):
+                    validated["timestamp_utc"] = now
+                validated["created_at_utc"] = now
+                validated["updated_at_utc"] = now
+                validated["deleted_at_utc"] = entry.get("deleted_at_utc")
+                repo_upsert_entry_by_client_event_id(conn, validated)
+            elif action == "delete":
+                client_event_id = change.get("client_event_id")
+                if not isinstance(client_event_id, str) or not client_event_id.strip():
+                    raise ValueError("client_event_id is required for delete")
+                existing = repo_get_entry_by_client_event_id(conn, client_event_id)
+                if existing:
+                    repo_delete_entry(conn, existing["id"], now, now)
+            else:
+                raise ValueError("action must be 'upsert' or 'delete'")
+
+        query_cursor = normalized_cursor
+        if query_cursor is None:
+            query_cursor = (
+                datetime.now(timezone.utc) - timedelta(days=30)
+            ).isoformat()
+        updated_entries = repo_list_entries_updated_since(conn, query_cursor, limit=500)
+
+    next_cursor = cursor
+    if updated_entries:
+        next_cursor = max(entry["updated_at_utc"] for entry in updated_entries)
+    else:
+        next_cursor = now
+    return {"cursor": next_cursor, "entries": updated_entries}

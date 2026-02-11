@@ -1,12 +1,20 @@
 from pathlib import Path
+import os
 
-from flask import Flask, render_template
+from flask import Flask, render_template, send_from_directory
 
 from src.app.config import load_config
 from src.app.routes.entries import entries_api
+from src.app.routes.bottles import bottles_api
 from src.app.routes.goals import goals_api
 from src.app.routes.settings import settings_api
+from src.app.routes.calendar import calendar_api
+from src.app.routes.feed import feed_api
+from src.app.routes.pushcut import pushcut_api
+from src.app.routes.home_kpis import home_kpis_api
 from src.app.storage.db import init_db
+from src.app.services.feed_due import start_feed_due_scheduler
+from src.app.services.home_kpis import start_home_kpis_scheduler
 from src.lib.logging import configure_logging
 from src.lib.validation import normalize_user_slug, validate_entry_type
 
@@ -23,14 +31,22 @@ def create_app() -> Flask:
         __name__,
         template_folder=str(template_dir),
         static_folder=str(static_dir),
-        static_url_path="/static",
+        static_url_path=f"{config.base_path}/static",
     )
     app.config.update(DB_PATH=str(config.db_path))
 
     init_db(app.config["DB_PATH"])
-    app.register_blueprint(entries_api)
-    app.register_blueprint(goals_api)
-    app.register_blueprint(settings_api)
+    app.register_blueprint(entries_api, url_prefix=f"{config.base_path}/api")
+    app.register_blueprint(bottles_api, url_prefix=f"{config.base_path}/api")
+    app.register_blueprint(goals_api, url_prefix=f"{config.base_path}/api")
+    app.register_blueprint(settings_api, url_prefix=f"{config.base_path}/api")
+    app.register_blueprint(calendar_api, url_prefix=f"{config.base_path}/api")
+    app.register_blueprint(pushcut_api, url_prefix=f"{config.base_path}/api")
+    app.register_blueprint(feed_api, url_prefix=f"{config.base_path}/api")
+    app.register_blueprint(home_kpis_api, url_prefix=f"{config.base_path}/api")
+    if not os.getenv("PYTEST_CURRENT_TEST"):
+        start_feed_due_scheduler(app, config.feed_due_poll_seconds)
+        start_home_kpis_scheduler(app, config.home_kpis_poll_seconds)
 
     def render_log_page(
         user_slug: str,
@@ -58,11 +74,12 @@ def create_app() -> Flask:
                 log_subtitle=log_subtitle,
                 log_type=entry_type or "",
                 log_window_hours=log_window_hours,
+                base_path=config.base_path,
             ),
             status_code,
         )
 
-    @app.get("/")
+    @app.get(f"{config.base_path}/")
     def index():
         return render_template(
             "index.html",
@@ -70,9 +87,10 @@ def create_app() -> Flask:
             user_valid=False,
             user_message="Choose a user below (example: josh).",
             page="home",
+            base_path=config.base_path,
         )
 
-    @app.get("/log")
+    @app.get(f"{config.base_path}/log")
     def log_index():
         return render_log_page(
             user_slug="",
@@ -80,7 +98,7 @@ def create_app() -> Flask:
             user_message="Choose a user below (example: josh).",
         )
 
-    @app.get("/log/<entry_type>")
+    @app.get(f"{config.base_path}/log/<entry_type>")
     def log_type_index(entry_type: str):
         try:
             validate_entry_type(entry_type)
@@ -98,13 +116,23 @@ def create_app() -> Flask:
             entry_type=entry_type,
         )
 
-    @app.get("/settings")
+    @app.get(f"{config.base_path}/settings")
     def settings():
-        return render_template("settings.html", page="settings")
+        return render_template("settings.html", page="settings", base_path=config.base_path)
 
-    @app.get("/goals")
+    @app.get(f"{config.base_path}/goals")
     def goals():
-        return render_template("goals.html", page="goals")
+        return render_template("goals.html", page="goals", base_path=config.base_path)
+
+    @app.get(f"{config.base_path}/sw.js")
+    def service_worker():
+        response = send_from_directory(app.static_folder, "sw.js")
+        response.headers["Service-Worker-Allowed"] = f"{config.base_path}/"
+        return response
+
+    @app.get(f"{config.base_path}/apple-touch-icon.png")
+    def apple_touch_icon():
+        return send_from_directory(app_root, "apple-touch-icon.png")
 
     def render_summary_page(
         user_slug: str,
@@ -119,6 +147,7 @@ def create_app() -> Flask:
                 user_valid=user_valid,
                 user_message=user_message,
                 page="summary",
+                base_path=config.base_path,
             ),
             status_code,
         )
@@ -136,11 +165,86 @@ def create_app() -> Flask:
                 user_valid=user_valid,
                 user_message=user_message,
                 page="timeline",
+                base_path=config.base_path,
             ),
             status_code,
         )
 
-    @app.get("/summary")
+    def render_calendar_page(
+        user_slug: str,
+        user_valid: bool,
+        user_message: str,
+        status_code: int = 200,
+    ):
+        return (
+            render_template(
+                "calendar.html",
+                user_slug=user_slug,
+                user_valid=user_valid,
+                user_message=user_message,
+                page="calendar",
+                base_path=config.base_path,
+            ),
+            status_code,
+        )
+
+    def render_calendar_form_page(
+        user_slug: str,
+        user_valid: bool,
+        user_message: str,
+        event_id: int | None = None,
+        status_code: int = 200,
+    ):
+        return (
+            render_template(
+                "calendar_form.html",
+                user_slug=user_slug,
+                user_valid=user_valid,
+                user_message=user_message,
+                event_id=event_id,
+                page="calendar-form",
+                base_path=config.base_path,
+            ),
+            status_code,
+        )
+
+    def render_milk_express_page(
+        user_slug: str,
+        user_valid: bool,
+        user_message: str,
+        status_code: int = 200,
+    ):
+        return (
+            render_template(
+                "milk_express.html",
+                user_slug=user_slug,
+                user_valid=user_valid,
+                user_message=user_message,
+                page="milk-express",
+                base_path=config.base_path,
+            ),
+            status_code,
+        )
+
+    def render_bottles_page(
+        user_slug: str,
+        user_valid: bool,
+        user_message: str,
+        status_code: int = 200,
+    ):
+        return (
+            render_template(
+                "bottles.html",
+                user_slug=user_slug,
+                user_valid=user_valid,
+                user_message=user_message,
+                page="bottles",
+                base_path=config.base_path,
+            ),
+            status_code,
+        )
+
+    @app.get(f"{config.base_path}/summary")
     def summary():
         return render_summary_page(
             user_slug="",
@@ -148,7 +252,7 @@ def create_app() -> Flask:
             user_message="Choose a user below (example: josh).",
         )
 
-    @app.get("/timeline")
+    @app.get(f"{config.base_path}/timeline")
     def timeline():
         return render_timeline_page(
             user_slug="",
@@ -156,7 +260,48 @@ def create_app() -> Flask:
             user_message="Choose a user below (example: josh).",
         )
 
-    @app.get("/<user_slug>")
+    @app.get(f"{config.base_path}/calendar")
+    def calendar():
+        return render_calendar_page(
+            user_slug="",
+            user_valid=False,
+            user_message="Choose a user below (example: josh).",
+        )
+
+    @app.get(f"{config.base_path}/calendar/add")
+    def calendar_add():
+        return render_calendar_form_page(
+            user_slug="",
+            user_valid=False,
+            user_message="Choose a user below (example: josh).",
+        )
+
+    @app.get(f"{config.base_path}/calendar/edit/<int:event_id>")
+    def calendar_edit(event_id: int):
+        return render_calendar_form_page(
+            user_slug="",
+            user_valid=False,
+            user_message="Choose a user below (example: josh).",
+            event_id=event_id,
+        )
+
+    @app.get(f"{config.base_path}/milk-express")
+    def milk_express():
+        return render_milk_express_page(
+            user_slug="",
+            user_valid=False,
+            user_message="Choose a user below (example: josh).",
+        )
+
+    @app.get(f"{config.base_path}/bottles")
+    def bottles():
+        return render_bottles_page(
+            user_slug="",
+            user_valid=False,
+            user_message="Shared bottle library",
+        )
+
+    @app.get(f"{config.base_path}/<user_slug>")
     def user_home(user_slug: str):
         try:
             normalized = normalize_user_slug(user_slug)
@@ -168,6 +313,7 @@ def create_app() -> Flask:
                     user_valid=False,
                     user_message=str(exc),
                     page="home",
+                    base_path=config.base_path,
                 ),
                 400,
             )
@@ -177,9 +323,10 @@ def create_app() -> Flask:
             user_valid=True,
             user_message=f"Logging as {normalized}",
             page="home",
+            base_path=config.base_path,
         )
 
-    @app.get("/<user_slug>/summary")
+    @app.get(f"{config.base_path}/<user_slug>/summary")
     def user_summary(user_slug: str):
         try:
             normalized = normalize_user_slug(user_slug)
@@ -196,7 +343,7 @@ def create_app() -> Flask:
             user_message=f"Logging as {normalized}",
         )
 
-    @app.get("/<user_slug>/timeline")
+    @app.get(f"{config.base_path}/<user_slug>/timeline")
     def user_timeline(user_slug: str):
         try:
             normalized = normalize_user_slug(user_slug)
@@ -213,7 +360,41 @@ def create_app() -> Flask:
             user_message=f"Logging as {normalized}",
         )
 
-    @app.get("/<user_slug>/log")
+    @app.get(f"{config.base_path}/<user_slug>/milk-express")
+    def user_milk_express(user_slug: str):
+        try:
+            normalized = normalize_user_slug(user_slug)
+        except ValueError as exc:
+            return render_milk_express_page(
+                user_slug="",
+                user_valid=False,
+                user_message=str(exc),
+                status_code=400,
+            )
+        return render_milk_express_page(
+            user_slug=normalized,
+            user_valid=True,
+            user_message=f"Logging as {normalized}",
+        )
+
+    @app.get(f"{config.base_path}/<user_slug>/bottles")
+    def user_bottles(user_slug: str):
+        try:
+            normalized = normalize_user_slug(user_slug)
+        except ValueError as exc:
+            return render_bottles_page(
+                user_slug="",
+                user_valid=False,
+                user_message=str(exc),
+                status_code=400,
+            )
+        return render_bottles_page(
+            user_slug=normalized,
+            user_valid=False,
+            user_message="Shared bottle library",
+        )
+
+    @app.get(f"{config.base_path}/<user_slug>/log")
     def user_log(user_slug: str):
         try:
             normalized = normalize_user_slug(user_slug)
@@ -230,7 +411,7 @@ def create_app() -> Flask:
             user_message=f"Logging as {normalized}",
         )
 
-    @app.get("/<user_slug>/log/<entry_type>")
+    @app.get(f"{config.base_path}/<user_slug>/log/<entry_type>")
     def user_log_type(user_slug: str, entry_type: str):
         try:
             normalized = normalize_user_slug(user_slug)
@@ -252,7 +433,12 @@ def create_app() -> Flask:
     return app
 
 
+application = create_app()
+
+
 if __name__ == "__main__":
     cfg = load_config()
-    application = create_app()
-    application.run(host=cfg.host, port=cfg.port)
+    ssl_context = None
+    if cfg.tls_cert_path and cfg.tls_key_path:
+        ssl_context = (str(cfg.tls_cert_path), str(cfg.tls_key_path))
+    application.run(host=cfg.host, port=cfg.port, ssl_context=ssl_context)
