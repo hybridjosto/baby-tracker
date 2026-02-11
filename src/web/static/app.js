@@ -198,6 +198,12 @@ const latestNotesEl = document.getElementById("latest-notes");
 const latestEditBtn = document.getElementById("latest-edit");
 const latestDeleteBtn = document.getElementById("latest-delete");
 const statCardEls = document.querySelectorAll(".stat-card[data-log-type]");
+const nextFeedModalEl = document.getElementById("next-feed-modal");
+const nextFeedBackdropEl = document.getElementById("next-feed-backdrop");
+const nextFeedCloseEl = document.getElementById("next-feed-close");
+const nextFeedListEl = document.getElementById("next-feed-list");
+const nextFeedSubEl = document.getElementById("next-feed-sub");
+const nextFeedEmptyEl = document.getElementById("next-feed-empty");
 
 const timelineLinkEl = document.getElementById("timeline-link");
 
@@ -803,9 +809,20 @@ function initHomeHandlers() {
     });
   }
   bindTimestampPopup(lastFeedEl);
-  bindTimestampPopup(nextFeedEl);
+  bindNextFeedPopup(nextFeedEl);
   bindTimestampPopup(lastWeeEl);
   bindTimestampPopup(lastPooEl);
+  if (nextFeedBackdropEl) {
+    nextFeedBackdropEl.addEventListener("click", closeNextFeedModal);
+  }
+  if (nextFeedCloseEl) {
+    nextFeedCloseEl.addEventListener("click", closeNextFeedModal);
+  }
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && nextFeedModalEl && !nextFeedModalEl.hidden) {
+      closeNextFeedModal();
+    }
+  });
   if (feedBtn) {
     feedBtn.addEventListener("click", toggleFeedMenu);
   }
@@ -2186,6 +2203,14 @@ function formatTimeUntil(target) {
   return `in ${hours}h ${minutes}m`;
 }
 
+function formatFeedTime(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "--";
+  }
+  return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
+
 function buildFeedShortcutUrl(target) {
   const inputValue = toLocalDateTimeValue(target);
   if (!inputValue) {
@@ -2241,6 +2266,82 @@ function updateNextFeed() {
   }
   const shortcutUrl = buildFeedShortcutUrl(nextDate);
   setNextFeedShortcut(Boolean(shortcutUrl), shortcutUrl);
+}
+
+function bindNextFeedPopup(element) {
+  if (!element) {
+    return;
+  }
+  element.addEventListener("click", () => {
+    const intervalMinutes = getFeedIntervalMinutes();
+    const lastTimestamp = lastFeedEl ? lastFeedEl.dataset.timestamp : null;
+    const showEmpty = () => {
+      if (nextFeedListEl) {
+        nextFeedListEl.innerHTML = "";
+      }
+      if (nextFeedSubEl) {
+        nextFeedSubEl.textContent = "Every -- minutes";
+      }
+      if (nextFeedEmptyEl) {
+        nextFeedEmptyEl.hidden = false;
+      }
+      openNextFeedModal();
+    };
+    if (!intervalMinutes || !lastTimestamp) {
+      showEmpty();
+      return;
+    }
+    const lastDate = new Date(lastTimestamp);
+    if (Number.isNaN(lastDate.getTime())) {
+      showEmpty();
+      return;
+    }
+    if (nextFeedListEl) {
+      nextFeedListEl.innerHTML = "";
+    }
+    if (nextFeedEmptyEl) {
+      nextFeedEmptyEl.hidden = true;
+    }
+    if (nextFeedSubEl) {
+      nextFeedSubEl.textContent = `Every ${intervalMinutes} minutes`;
+    }
+    for (let i = 1; i <= 6; i += 1) {
+      const nextDate = new Date(lastDate.getTime() + intervalMinutes * 60000 * i);
+      const item = document.createElement("div");
+      item.className = "next-feed-item";
+      item.innerHTML = `
+        <span class="next-feed-dot" aria-hidden="true"></span>
+        <div class="next-feed-time">${formatFeedTime(nextDate)}</div>
+        <div class="next-feed-eta">${formatTimeUntil(nextDate)}</div>
+      `;
+      if (nextFeedListEl) {
+        nextFeedListEl.appendChild(item);
+      }
+    }
+    openNextFeedModal();
+  });
+}
+
+function openNextFeedModal() {
+  if (nextFeedModalEl) {
+    nextFeedModalEl.hidden = false;
+    nextFeedModalEl.setAttribute("aria-hidden", "false");
+  }
+  if (nextFeedBackdropEl) {
+    nextFeedBackdropEl.classList.add("open");
+    nextFeedBackdropEl.hidden = false;
+  }
+}
+
+function closeNextFeedModal() {
+  if (nextFeedModalEl) {
+    nextFeedModalEl.hidden = true;
+    nextFeedModalEl.setAttribute("aria-hidden", "true");
+  }
+  if (nextFeedBackdropEl) {
+    nextFeedBackdropEl.classList.remove("open");
+    nextFeedBackdropEl.hidden = true;
+  }
 }
 
 function bindTimestampPopup(element) {
@@ -6429,10 +6530,50 @@ if (userFormEl) {
 }
 void loadBabySettings();
 initializeUser();
+let swReloading = false;
+let swPrompted = false;
+
+function promptServiceWorkerUpdate(registration) {
+  if (!statusEl || swPrompted || !registration || !registration.waiting) {
+    return;
+  }
+  swPrompted = true;
+  setStatus("Update available. Tap to refresh.");
+  statusEl.addEventListener("click", () => {
+    if (!registration.waiting) {
+      return;
+    }
+    registration.waiting.postMessage({ type: "SKIP_WAITING" });
+  }, { once: true });
+}
+
 if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (swReloading) {
+      return;
+    }
+    swReloading = true;
+    window.location.reload();
+  });
   window.addEventListener("load", () => {
     navigator.serviceWorker
       .register(buildUrl("/sw.js"), { scope: buildUrl("/") })
+      .then((registration) => {
+        if (registration.waiting) {
+          promptServiceWorkerUpdate(registration);
+        }
+        registration.addEventListener("updatefound", () => {
+          const installing = registration.installing;
+          if (!installing) {
+            return;
+          }
+          installing.addEventListener("statechange", () => {
+            if (installing.state === "installed" && navigator.serviceWorker.controller) {
+              promptServiceWorkerUpdate(registration);
+            }
+          });
+        });
+      })
       .catch((err) => {
       console.warn("Service worker registration failed", err);
     });

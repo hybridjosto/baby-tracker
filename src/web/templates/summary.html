@@ -14,7 +14,7 @@
       href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@400,0"
       rel="stylesheet"
     >
-    <link rel="stylesheet" href="{{ base_path }}/static/styles.css?v=2026-02-08-1">
+    <link rel="stylesheet" href="{{ base_path }}/static/styles.css?v={{ static_version }}">
     <script>
       (() => {
         const stored = localStorage.getItem("baby-tracker-theme");
@@ -184,9 +184,15 @@
         font-size: 12px;
         color: var(--text-primary);
       }
+      html.dark .insight-cell {
+        color: #e6f2ea;
+      }
       .insight-cell strong {
         display: block;
         font-size: 13px;
+      }
+      html.dark .insight-cell strong {
+        color: #ffffff;
       }
       .insight-rhythm {
         display: grid;
@@ -778,6 +784,6 @@
         </form>
       </div>
     </div>
-    <script src="{{ base_path }}/static/app.js?v=2026-02-08-1"></script>
+    <script src="{{ base_path }}/static/app.js?v={{ static_version }}"></script>
   </body>
 </html>

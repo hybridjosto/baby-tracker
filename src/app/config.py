@@ -9,6 +9,7 @@ class AppConfig:
     host: str
     port: int
     base_path: str
+    static_version: str
     discord_webhook_url: str | None
     tls_cert_path: Path | None
     tls_key_path: Path | None
@@ -21,6 +22,7 @@ def load_config() -> AppConfig:
     host = os.getenv("BABY_TRACKER_HOST", "0.0.0.0")
     port = int(os.getenv("BABY_TRACKER_PORT", "8000"))
     base_path = _normalize_base_path(os.getenv("BABY_TRACKER_BASE_PATH", ""))
+    static_version = os.getenv("BABY_TRACKER_STATIC_VERSION", "dev")
     discord_webhook_url = os.getenv("BABY_TRACKER_DISCORD_WEBHOOK_URL")
     tls_cert_path_raw = os.getenv("BABY_TRACKER_TLS_CERT_PATH")
     tls_key_path_raw = os.getenv("BABY_TRACKER_TLS_KEY_PATH")
@@ -52,6 +54,7 @@ def load_config() -> AppConfig:
         host=host,
         port=port,
         base_path=base_path,
+        static_version=static_version,
         discord_webhook_url=discord_webhook_url,
         tls_cert_path=tls_cert_path,
         tls_key_path=tls_key_path,
