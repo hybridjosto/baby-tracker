@@ -803,7 +803,7 @@ function initHomeHandlers() {
     });
   }
   bindTimestampPopup(lastFeedEl);
-  bindTimestampPopup(nextFeedEl);
+  bindNextFeedPopup(nextFeedEl);
   bindTimestampPopup(lastWeeEl);
   bindTimestampPopup(lastPooEl);
   if (feedBtn) {
@@ -2241,6 +2241,31 @@ function updateNextFeed() {
   }
   const shortcutUrl = buildFeedShortcutUrl(nextDate);
   setNextFeedShortcut(Boolean(shortcutUrl), shortcutUrl);
+}
+
+function bindNextFeedPopup(element) {
+  if (!element) {
+    return;
+  }
+  element.addEventListener("click", () => {
+    const intervalMinutes = getFeedIntervalMinutes();
+    const lastTimestamp = lastFeedEl ? lastFeedEl.dataset.timestamp : null;
+    if (!intervalMinutes || !lastTimestamp) {
+      window.alert("Set feed interval in Settings to see upcoming feed times.");
+      return;
+    }
+    const lastDate = new Date(lastTimestamp);
+    if (Number.isNaN(lastDate.getTime())) {
+      window.alert("Next feed time is unavailable right now.");
+      return;
+    }
+    const lines = [];
+    for (let i = 1; i <= 6; i += 1) {
+      const nextDate = new Date(lastDate.getTime() + intervalMinutes * 60000 * i);
+      lines.push(`${i}. ${formatTimestamp(nextDate.toISOString())}`);
+    }
+    window.alert(`Next feeds:\n${lines.join("\n")}`);
+  });
 }
 
 function bindTimestampPopup(element) {
