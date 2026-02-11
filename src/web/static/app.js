@@ -6429,10 +6429,50 @@ if (userFormEl) {
 }
 void loadBabySettings();
 initializeUser();
+let swReloading = false;
+let swPrompted = false;
+
+function promptServiceWorkerUpdate(registration) {
+  if (!statusEl || swPrompted || !registration || !registration.waiting) {
+    return;
+  }
+  swPrompted = true;
+  setStatus("Update available. Tap to refresh.");
+  statusEl.addEventListener("click", () => {
+    if (!registration.waiting) {
+      return;
+    }
+    registration.waiting.postMessage({ type: "SKIP_WAITING" });
+  }, { once: true });
+}
+
 if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (swReloading) {
+      return;
+    }
+    swReloading = true;
+    window.location.reload();
+  });
   window.addEventListener("load", () => {
     navigator.serviceWorker
       .register(buildUrl("/sw.js"), { scope: buildUrl("/") })
+      .then((registration) => {
+        if (registration.waiting) {
+          promptServiceWorkerUpdate(registration);
+        }
+        registration.addEventListener("updatefound", () => {
+          const installing = registration.installing;
+          if (!installing) {
+            return;
+          }
+          installing.addEventListener("statechange", () => {
+            if (installing.state === "installed" && navigator.serviceWorker.controller) {
+              promptServiceWorkerUpdate(registration);
+            }
+          });
+        });
+      })
       .catch((err) => {
       console.warn("Service worker registration failed", err);
     });
