@@ -2279,7 +2279,7 @@ function normalizeFeedEntry(entry) {
   if (!entry || entry.type !== "feed") {
     return null;
   }
-  if (activeUser && entry.user_slug && entry.user_slug !== activeUser) {
+  if (pageType !== "timeline" && activeUser && entry.user_slug && entry.user_slug !== activeUser) {
     return null;
   }
   const timestamp = new Date(entry.timestamp_utc);
