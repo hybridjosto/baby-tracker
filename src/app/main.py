@@ -48,6 +48,10 @@ def create_app() -> Flask:
         start_feed_due_scheduler(app, config.feed_due_poll_seconds)
         start_home_kpis_scheduler(app, config.home_kpis_poll_seconds)
 
+    @app.context_processor
+    def inject_static_version():
+        return {"static_version": config.static_version}
+
     def render_log_page(
         user_slug: str,
         user_valid: bool,
@@ -126,8 +130,13 @@ def create_app() -> Flask:
 
     @app.get(f"{config.base_path}/sw.js")
     def service_worker():
-        response = send_from_directory(app.static_folder, "sw.js")
+        response = app.response_class(
+            render_template("sw.js", static_version=config.static_version),
+            content_type="application/javascript",
+        )
         response.headers["Service-Worker-Allowed"] = f"{config.base_path}/"
+        response.headers["Cache-Control"] = "no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
         return response
 
     @app.get(f"{config.base_path}/apple-touch-icon.png")
