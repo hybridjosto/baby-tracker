@@ -32,7 +32,8 @@ Environment variables:
 - `BABY_TRACKER_HOST`: bind host (default: `0.0.0.0`)
 - `BABY_TRACKER_PORT`: bind port (default: `8000`)
 - `BABY_TRACKER_BASE_PATH`: serve under a subpath (default: empty)
-- `BABY_TRACKER_STATIC_VERSION`: cache-busting version for static assets (default: `dev`)
+- `BABY_TRACKER_STATIC_VERSION`: cache-busting version for static assets (default: `dev`). Bump this on
+  each deploy so installed PWAs pick up the latest assets.
 - `BABY_TRACKER_FEED_DUE_POLL_SECONDS`: feed-due scheduler interval (default: `60`, set `0` to disable)
 - `BABY_TRACKER_HOME_KPIS_POLL_SECONDS`: home KPI scheduler interval (default: `900`, set `0` to disable)
 - `BABY_TRACKER_TLS_CERT_PATH`, `BABY_TRACKER_TLS_KEY_PATH`: TLS files (only used by the Flask dev

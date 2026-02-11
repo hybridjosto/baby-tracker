@@ -8,6 +8,7 @@ services:
       BABY_TRACKER_DB_PATH: /data/baby-tracker.sqlite
       BABY_TRACKER_HOST: 0.0.0.0
       BABY_TRACKER_PORT: 8000
+      BABY_TRACKER_STATIC_VERSION: "dev"
     volumes:
       - ./data:/data
     restart: unless-stopped
