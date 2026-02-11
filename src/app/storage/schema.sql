@@ -82,6 +82,28 @@ CREATE TABLE IF NOT EXISTS reminders (
 CREATE INDEX IF NOT EXISTS idx_reminders_next_due_at_utc
     ON reminders (next_due_at_utc);
 
+CREATE TABLE IF NOT EXISTS calendar_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    date_local TEXT NOT NULL,
+    start_time_local TEXT NOT NULL,
+    end_time_local TEXT,
+    location TEXT,
+    notes TEXT,
+    category TEXT NOT NULL,
+    recurrence TEXT NOT NULL,
+    recurrence_until_local TEXT,
+    created_at_utc TEXT NOT NULL,
+    updated_at_utc TEXT NOT NULL,
+    deleted_at_utc TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_calendar_events_date_local
+    ON calendar_events (date_local);
+
+CREATE INDEX IF NOT EXISTS idx_calendar_events_updated_at_utc
+    ON calendar_events (updated_at_utc DESC);
+
 INSERT INTO reminders (
     name,
     kind,
