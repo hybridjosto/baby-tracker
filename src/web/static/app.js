@@ -47,6 +47,11 @@ const breastfeedBannerEl = document.getElementById("breastfeed-banner");
 const breastfeedBannerTimerEl = document.getElementById("breastfeed-banner-timer");
 const breastfeedBannerMetaEl = document.getElementById("breastfeed-banner-meta");
 const breastfeedBannerActionEl = document.getElementById("breastfeed-banner-action");
+const feedToggleFormulaBtn = document.getElementById("feed-toggle-formula");
+const feedToggleExpressedBtn = document.getElementById("feed-toggle-expressed");
+const feedQuickBtns = document.querySelectorAll("[data-quick-ml]");
+const feedManualToggleBtn = document.getElementById("feed-manual-toggle");
+const feedManualWrap = document.getElementById("feed-manual");
 const manualFeedBtn = document.getElementById("log-feed-manual");
 const expressedInput = document.getElementById("expressed-ml");
 const expressedBtn = document.getElementById("log-expressed");
@@ -269,6 +274,7 @@ let editEntryModalResolver = null;
 let editEntryModalEntry = null;
 let editEntryModalMode = "full";
 let breastfeedHydrated = false;
+let quickFeedKind = "formula";
 
 const CUSTOM_TYPE_RE = /^[A-Za-z0-9][A-Za-z0-9 /-]{0,31}$/;
 const MILK_EXPRESS_TYPE = "milk express";
@@ -832,6 +838,36 @@ function initHomeHandlers() {
   if (breastfeedBannerActionEl) {
     breastfeedBannerActionEl.addEventListener("click", handleBreastfeedToggle);
   }
+  if (feedToggleFormulaBtn) {
+    feedToggleFormulaBtn.addEventListener("click", () => {
+      setQuickFeedKind("formula");
+    });
+  }
+  if (feedToggleExpressedBtn) {
+    feedToggleExpressedBtn.addEventListener("click", () => {
+      setQuickFeedKind("expressed");
+    });
+  }
+  if (feedQuickBtns.length > 0) {
+    feedQuickBtns.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const raw = btn.dataset.quickMl;
+        const amount = Number.parseFloat(raw);
+        if (!Number.isFinite(amount) || amount <= 0) {
+          return;
+        }
+        handleQuickLog(amount);
+      });
+    });
+  }
+  if (feedManualToggleBtn) {
+    feedManualToggleBtn.addEventListener("click", () => {
+      if (!feedManualWrap) {
+        return;
+      }
+      setManualVisible(feedManualWrap.hidden);
+    });
+  }
   if (manualFeedBtn) {
     manualFeedBtn.addEventListener("click", () => {
       if (!userValid) {
@@ -928,6 +964,7 @@ function initHomeHandlers() {
       closeFeedMenu();
     }
   });
+  setQuickFeedKind(quickFeedKind);
   if (!nextFeedTimer) {
     nextFeedTimer = window.setInterval(updateNextFeed, 60000);
   }
@@ -1617,6 +1654,16 @@ function openFeedMenu() {
   updateBreastfeedButton();
 }
 
+function setManualVisible(visible) {
+  if (!feedManualWrap) {
+    return;
+  }
+  feedManualWrap.hidden = !visible;
+  if (visible && expressedInput) {
+    expressedInput.focus();
+  }
+}
+
 function closeFeedMenu() {
   if (!feedMenu || !feedBtn) {
     return;
@@ -1627,6 +1674,7 @@ function closeFeedMenu() {
   if (feedBackdrop) {
     feedBackdrop.classList.remove("open");
   }
+  setManualVisible(false);
 }
 
 function toggleFeedMenu() {
@@ -1646,6 +1694,37 @@ function setStatus(message) {
   if (statusEl) {
     statusEl.textContent = message || "";
   }
+}
+
+function setQuickFeedKind(kind) {
+  quickFeedKind = kind === "expressed" ? "expressed" : "formula";
+  if (feedToggleFormulaBtn) {
+    feedToggleFormulaBtn.classList.toggle(
+      "is-active",
+      quickFeedKind === "formula",
+    );
+  }
+  if (feedToggleExpressedBtn) {
+    feedToggleExpressedBtn.classList.toggle(
+      "is-active",
+      quickFeedKind === "expressed",
+    );
+  }
+}
+
+function handleQuickLog(amountMl) {
+  if (!userValid) {
+    setStatus("Choose a user below to start logging.");
+    return;
+  }
+  const payload = buildEntryPayload("feed");
+  if (quickFeedKind === "expressed") {
+    payload.expressed_ml = amountMl;
+  } else {
+    payload.formula_ml = amountMl;
+  }
+  closeFeedMenu();
+  void saveEntry(payload);
 }
 
 function setLoadingState(isLoading) {
