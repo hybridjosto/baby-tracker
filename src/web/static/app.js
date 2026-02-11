@@ -2788,6 +2788,10 @@ function isMilkExpressType(value) {
   return normalizeEntryType(value) === MILK_EXPRESS_TYPE;
 }
 
+function isFeedType(value) {
+  return normalizeEntryType(value) === "feed";
+}
+
 function parseMilkExpressNotes(value) {
   if (typeof value !== "string") {
     return { ml: 0, minutes: 0 };
@@ -2950,7 +2954,7 @@ function renderSummaryStats(entries) {
   let expressedTotal = 0;
   let formulaTotal = 0;
   entries.forEach((entry) => {
-    if (entry.type === "feed") {
+    if (isFeedType(entry.type)) {
       if (isBreastfeedInProgress(entry)) {
         return;
       }
@@ -5099,7 +5103,7 @@ function renderStats(entries) {
     }
   };
   entries.forEach((entry) => {
-    if (entry.type === "feed") {
+    if (isFeedType(entry.type)) {
       if (isBreastfeedInProgress(entry)) {
         return;
       }
