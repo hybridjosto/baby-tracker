@@ -146,6 +146,40 @@ def get_next_feed_time(db_path: str, user_slug: str | None = None) -> dict:
     return {"timestamp_utc": next_dt.isoformat(), "source_entry_id": latest_feed["id"]}
 
 
+def get_next_feed_schedule(
+    db_path: str,
+    user_slug: str | None = None,
+    count: int = 6,
+) -> dict:
+    safe_count = max(1, min(count, 24))
+    settings = get_settings(db_path)
+    feed_interval_min = settings.get("feed_interval_min")
+    latest_feed = get_latest_entry_by_type(db_path, "feed", user_slug=user_slug)
+    if not latest_feed or not isinstance(feed_interval_min, int):
+        return {"interval_min": feed_interval_min, "source_entry_id": None, "items": []}
+    last_timestamp = latest_feed.get("timestamp_utc")
+    if not isinstance(last_timestamp, str) or not last_timestamp.strip():
+        return {"interval_min": feed_interval_min, "source_entry_id": None, "items": []}
+    cleaned = last_timestamp.strip()
+    if cleaned.endswith("Z"):
+        cleaned = cleaned[:-1] + "+00:00"
+    parsed = datetime.fromisoformat(cleaned)
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    baseline = parsed.astimezone(timezone.utc)
+
+    items: list[dict] = []
+    for index in range(1, safe_count + 1):
+        next_dt = baseline + timedelta(minutes=feed_interval_min * index)
+        items.append({"sequence": index, "timestamp_utc": next_dt.isoformat()})
+
+    return {
+        "interval_min": feed_interval_min,
+        "source_entry_id": latest_feed["id"],
+        "items": items,
+    }
+
+
 def get_entry_summary(db_path: str, user_slug: str | None = None) -> list[dict]:
     last_feed = get_latest_entry_by_type(db_path, "feed", user_slug=user_slug)
     last_wee = get_latest_entry_by_type(db_path, "wee", user_slug=user_slug)

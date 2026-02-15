@@ -8,6 +8,7 @@ from src.app.services.entries import (
     export_entries_csv,
     build_entry_summary_text,
     get_entry_summary,
+    get_next_feed_schedule,
     import_entries_csv,
     list_feed_amount_entries,
     list_entries,
@@ -97,6 +98,17 @@ def get_entries_summary_route():
     try:
         summary = get_entry_summary(_db_path())
         return jsonify({"items": summary, "summary": build_entry_summary_text(summary)})
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+
+@entries_api.get("/entries/feed-schedule")
+def get_next_feed_schedule_route():
+    user_slug = request.args.get("user_slug")
+    count = request.args.get("count", default=6, type=int)
+    try:
+        schedule = get_next_feed_schedule(_db_path(), user_slug=user_slug, count=count)
+        return jsonify(schedule)
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
 

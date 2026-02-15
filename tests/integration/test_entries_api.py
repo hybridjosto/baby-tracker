@@ -270,6 +270,68 @@ def test_entries_summary_returns_latest_entries(client):
     }
 
 
+def test_feed_schedule_returns_next_six_feeds(client):
+    client.patch("/api/settings", json={"feed_interval_min": 120})
+    created = client.post(
+        "/api/users/suz/entries",
+        json={
+            "type": "feed",
+            "client_event_id": "evt-feed-schedule-1",
+            "timestamp_utc": "2024-01-01T08:00:00+00:00",
+        },
+    ).get_json()
+
+    response = client.get("/api/entries/feed-schedule")
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["interval_min"] == 120
+    assert payload["source_entry_id"] == created["id"]
+    assert payload["items"] == [
+        {"sequence": 1, "timestamp_utc": "2024-01-01T10:00:00+00:00"},
+        {"sequence": 2, "timestamp_utc": "2024-01-01T12:00:00+00:00"},
+        {"sequence": 3, "timestamp_utc": "2024-01-01T14:00:00+00:00"},
+        {"sequence": 4, "timestamp_utc": "2024-01-01T16:00:00+00:00"},
+        {"sequence": 5, "timestamp_utc": "2024-01-01T18:00:00+00:00"},
+        {"sequence": 6, "timestamp_utc": "2024-01-01T20:00:00+00:00"},
+    ]
+
+
+def test_feed_schedule_supports_user_slug_and_count(client):
+    client.patch("/api/settings", json={"feed_interval_min": 90})
+    client.post(
+        "/api/users/suz/entries",
+        json={
+            "type": "feed",
+            "client_event_id": "evt-feed-schedule-suz",
+            "timestamp_utc": "2024-01-01T01:00:00+00:00",
+        },
+    )
+    client.post(
+        "/api/users/rob/entries",
+        json={
+            "type": "feed",
+            "client_event_id": "evt-feed-schedule-rob",
+            "timestamp_utc": "2024-01-01T03:00:00+00:00",
+        },
+    )
+
+    response = client.get("/api/entries/feed-schedule?user_slug=suz&count=2")
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["interval_min"] == 90
+    assert [item["timestamp_utc"] for item in payload["items"]] == [
+        "2024-01-01T02:30:00+00:00",
+        "2024-01-01T04:00:00+00:00",
+    ]
+
+
+def test_feed_schedule_empty_without_interval_or_feed(client):
+    response = client.get("/api/entries/feed-schedule")
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload == {"interval_min": None, "source_entry_id": None, "items": []}
+
+
 def test_list_feed_amount_entries_output_returns_all_users(client):
     client.post(
         "/api/users/suz/entries",
