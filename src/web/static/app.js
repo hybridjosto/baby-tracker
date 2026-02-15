@@ -527,14 +527,6 @@ function startMiscTimedEventTicker() {
   miscTimedEventTickerId = window.setInterval(updateMiscTimedEventControls, 30000);
 }
 
-function getTimedEventStartNote(type) {
-  return `${formatEntryTypeLabel(type)} (started)`;
-}
-
-function getTimedEventCompleteNote(type) {
-  return formatEntryTypeLabel(type);
-}
-
 function updateTimedEventBanner(startInfo, durationMinutes) {
   if (
     !timedEventBannerEl
@@ -755,8 +747,11 @@ function isTimedEventInProgress(entry) {
     return false;
   }
   const normalizedType = normalizeEntryType(entry.type);
+  const duration = Number.parseFloat(entry.feed_duration_min);
+  const hasDuration = Number.isFinite(duration) && duration >= 0;
   return TIMED_EVENT_TYPES.includes(normalizedType)
-    && entry.notes === getTimedEventStartNote(normalizedType);
+    && !entry.deleted_at_utc
+    && !hasDuration;
 }
 
 function selectActiveTimedEventEntry(entries) {
@@ -6080,7 +6075,7 @@ async function getTimedEventEntryForUpdate(startInfo) {
     user_slug: (startInfo && startInfo.startedBy) || activeUser || null,
     type: eventType,
     timestamp_utc: startIso,
-    notes: getTimedEventStartNote(eventType),
+    notes: null,
     amount_ml: null,
     expressed_ml: null,
     formula_ml: null,
@@ -6142,7 +6137,6 @@ async function handleTimedEventToggle(selectedType) {
     const start = new Date();
     const payload = buildEntryPayload(normalizedType);
     payload.timestamp_utc = start.toISOString();
-    payload.notes = getTimedEventStartNote(normalizedType);
     payload.feed_duration_min = null;
     setTimedEventStart(start, normalizedType, activeUser || null, payload.client_event_id);
     updateMiscTimedEventControls();
@@ -6162,7 +6156,6 @@ async function handleTimedEventToggle(selectedType) {
   await commitEntryUpdate(entry, {
     type: startInfo.type,
     feed_duration_min: durationMinutes,
-    notes: getTimedEventCompleteNote(startInfo.type),
   }, {
     online: `${label} ended (syncing...)`,
     offline: `${label} ended offline`,
