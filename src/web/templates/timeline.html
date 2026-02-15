@@ -418,6 +418,31 @@
         letter-spacing: 0.1em;
         color: var(--text-secondary);
       }
+      .timeline-actions {
+        margin-top: 10px;
+        display: flex;
+        gap: 8px;
+      }
+      .timeline-action {
+        border: 1px solid var(--border-light);
+        background: var(--surface-soft);
+        color: var(--text-primary);
+        border-radius: 999px;
+        padding: 4px 10px;
+        font-size: 11px;
+        cursor: pointer;
+      }
+      html.dark .timeline-action {
+        border-color: var(--border-dark);
+        background: rgba(255, 255, 255, 0.08);
+        color: #d3e4d7;
+      }
+      .timeline-action-delete {
+        color: #b91c1c;
+      }
+      html.dark .timeline-action-delete {
+        color: #fca5a5;
+      }
       .timeline-loading {
         margin: 14px auto 0;
         display: none;
@@ -596,34 +621,6 @@
           </button>
         </div>
       </header>
-
-      <section class="ruler-wrap" id="ruler-wrap">
-        <div class="ruler-header">
-          <h2 class="ruler-title">Rolling 24h Feed Window</h2>
-          <div class="ruler-actions">
-            <div class="ruler-legend">
-              <span><i class="ruler-dot" style="background: var(--ruler-expressed);"></i>Expressed</span>
-              <span><i class="ruler-dot" style="background: var(--ruler-formula);"></i>Formula</span>
-            </div>
-            <button class="ruler-toggle active" id="ruler-snap-toggle" type="button">Snap to feeds</button>
-            <button class="ruler-now" id="ruler-now-btn" type="button">Jump to now</button>
-          </div>
-        </div>
-        <div class="ruler-body" id="ruler-body">
-          <canvas id="ruler-canvas"></canvas>
-          <div class="ruler-readout" id="ruler-readout">
-            <h3>Rolling 24h</h3>
-            <div class="ruler-metric" id="ruler-total">0 ml</div>
-            <div class="ruler-detail" id="ruler-detail">Expressed 0 ml · Formula 0 ml</div>
-            <div class="ruler-goal" id="ruler-goal">0% of 700 ml goal</div>
-          </div>
-        </div>
-        <div class="ruler-labels">
-          <span id="ruler-start">--</span>
-          <span id="ruler-end">--</span>
-        </div>
-        <div class="ruler-empty" id="ruler-empty">No feed entries in the last 7 days.</div>
-      </section>
 
       <section class="timeline-wrap" id="timeline-wrap">
         <div class="timeline-track" id="timeline-track"></div>
