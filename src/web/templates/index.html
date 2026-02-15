@@ -1154,6 +1154,21 @@
       .breastfeed-banner.is-active {
         display: flex;
       }
+      .timed-event-banner {
+        background: linear-gradient(135deg, rgba(249, 115, 22, 0.2), rgba(217, 70, 239, 0.08));
+        border: 1px solid rgba(249, 115, 22, 0.35);
+      }
+      html.dark .timed-event-banner {
+        background: linear-gradient(135deg, rgba(249, 115, 22, 0.16), rgba(217, 70, 239, 0.06));
+        border-color: rgba(249, 115, 22, 0.42);
+      }
+      .timed-event-banner .pulse-dot {
+        background: #f97316;
+        box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.55);
+      }
+      .timed-event-banner .banner-timer {
+        color: #f97316;
+      }
       html.dark .breastfeed-banner {
         background: linear-gradient(135deg, rgba(19, 236, 91, 0.16), rgba(16, 185, 129, 0.06));
         border-color: rgba(19, 236, 91, 0.4);
@@ -1268,6 +1283,24 @@
           <div class="banner-timer" id="breastfeed-banner-timer">-- min</div>
           <button class="banner-action" id="breastfeed-banner-action" type="button">
             End breastfeeding
+          </button>
+        </section>
+        <section
+          class="breastfeed-banner timed-event-banner"
+          id="timed-event-banner"
+          role="status"
+          aria-live="polite"
+        >
+          <div class="banner-left">
+            <div class="banner-title">
+              <span class="pulse-dot" aria-hidden="true"></span>
+              <span id="timed-event-banner-title">Timed event active</span>
+            </div>
+            <div class="banner-meta" id="timed-event-banner-meta">Started by --</div>
+          </div>
+          <div class="banner-timer" id="timed-event-banner-timer">-- min</div>
+          <button class="banner-action" id="timed-event-banner-action" type="button">
+            End timed event
           </button>
         </section>
         <section class="stats">

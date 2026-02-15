@@ -49,6 +49,11 @@ const breastfeedBannerEl = document.getElementById("breastfeed-banner");
 const breastfeedBannerTimerEl = document.getElementById("breastfeed-banner-timer");
 const breastfeedBannerMetaEl = document.getElementById("breastfeed-banner-meta");
 const breastfeedBannerActionEl = document.getElementById("breastfeed-banner-action");
+const timedEventBannerEl = document.getElementById("timed-event-banner");
+const timedEventBannerTitleEl = document.getElementById("timed-event-banner-title");
+const timedEventBannerTimerEl = document.getElementById("timed-event-banner-timer");
+const timedEventBannerMetaEl = document.getElementById("timed-event-banner-meta");
+const timedEventBannerActionEl = document.getElementById("timed-event-banner-action");
 const feedToggleFormulaBtn = document.getElementById("feed-toggle-formula");
 const feedToggleExpressedBtn = document.getElementById("feed-toggle-expressed");
 const feedQuickBtns = document.querySelectorAll("[data-quick-ml]");
@@ -279,6 +284,7 @@ let editEntryModalResolver = null;
 let editEntryModalEntry = null;
 let editEntryModalMode = "full";
 let breastfeedHydrated = false;
+let timedEventHydrated = false;
 let quickFeedKind = "formula";
 
 const CUSTOM_TYPE_RE = /^[A-Za-z0-9][A-Za-z0-9 /-]{0,31}$/;
@@ -529,12 +535,61 @@ function getTimedEventCompleteNote(type) {
   return formatEntryTypeLabel(type);
 }
 
-function updateMiscTimedEventControls() {
-  if (!miscTimedEventTypeSelectEl || !miscTimedEventToggleBtn) {
-    stopMiscTimedEventTicker();
+function updateTimedEventBanner(startInfo, durationMinutes) {
+  if (
+    !timedEventBannerEl
+    || !timedEventBannerTitleEl
+    || !timedEventBannerTimerEl
+    || !timedEventBannerMetaEl
+  ) {
     return;
   }
+  if (!startInfo) {
+    timedEventBannerEl.classList.remove("is-active");
+    timedEventBannerTitleEl.textContent = "Timed event active";
+    timedEventBannerTimerEl.textContent = "-- min";
+    timedEventBannerMetaEl.textContent = "Started by --";
+    if (timedEventBannerActionEl) {
+      timedEventBannerActionEl.disabled = false;
+      timedEventBannerActionEl.removeAttribute("title");
+      timedEventBannerActionEl.textContent = "End timed event";
+    }
+    return;
+  }
+  const label = formatEntryTypeLabel(startInfo.type);
+  const startedBy = startInfo.startedBy || "--";
+  const meta = userValid
+    ? `Started by ${startedBy}`
+    : `Started by ${startedBy} · Choose a user to stop`;
+  timedEventBannerEl.classList.add("is-active");
+  timedEventBannerTitleEl.textContent = `${label} active`;
+  timedEventBannerTimerEl.textContent = `${durationMinutes} min`;
+  timedEventBannerMetaEl.textContent = meta;
+  if (timedEventBannerActionEl) {
+    timedEventBannerActionEl.disabled = !userValid;
+    timedEventBannerActionEl.textContent = `End ${label}`;
+    timedEventBannerActionEl.title = userValid
+      ? `End ${label.toLowerCase()}`
+      : "Choose a user to log the event";
+  }
+}
+
+function updateMiscTimedEventControls() {
   const startInfo = getTimedEventStart();
+  if (!miscTimedEventTypeSelectEl || !miscTimedEventToggleBtn) {
+    if (startInfo && startInfo.start) {
+      const durationMinutes = Math.max(
+        0,
+        Math.round((Date.now() - startInfo.start.getTime()) / 60000),
+      );
+      updateTimedEventBanner(startInfo, durationMinutes);
+      startMiscTimedEventTicker();
+    } else {
+      updateTimedEventBanner(null, 0);
+      stopMiscTimedEventTicker();
+    }
+    return;
+  }
   if (startInfo && startInfo.start) {
     const durationMinutes = Math.max(
       0,
@@ -547,6 +602,7 @@ function updateMiscTimedEventControls() {
     miscTimedEventToggleBtn.disabled = !userValid;
     const starter = startInfo.startedBy ? ` by ${startInfo.startedBy}` : "";
     miscTimedEventToggleBtn.title = `Started${starter} ${formatTimestamp(startInfo.start.toISOString())}`;
+    updateTimedEventBanner(startInfo, durationMinutes);
     startMiscTimedEventTicker();
     return;
   }
@@ -557,6 +613,7 @@ function updateMiscTimedEventControls() {
   miscTimedEventToggleBtn.textContent = "Start timed event";
   miscTimedEventToggleBtn.disabled = !userValid;
   miscTimedEventToggleBtn.removeAttribute("title");
+  updateTimedEventBanner(null, 0);
   stopMiscTimedEventTicker();
 }
 
@@ -693,6 +750,75 @@ function updateBreastfeedStateFromSync(entries) {
   }
 }
 
+function isTimedEventInProgress(entry) {
+  if (!entry) {
+    return false;
+  }
+  const normalizedType = normalizeEntryType(entry.type);
+  return TIMED_EVENT_TYPES.includes(normalizedType)
+    && entry.notes === getTimedEventStartNote(normalizedType);
+}
+
+function selectActiveTimedEventEntry(entries) {
+  if (!Array.isArray(entries) || !entries.length) {
+    return null;
+  }
+  let selected = null;
+  let selectedTime = 0;
+  entries.forEach((entry) => {
+    if (!isTimedEventInProgress(entry)) {
+      return;
+    }
+    const ts = new Date(entry.timestamp_utc);
+    if (Number.isNaN(ts.getTime())) {
+      return;
+    }
+    const time = ts.getTime();
+    if (!selected || time > selectedTime) {
+      selected = entry;
+      selectedTime = time;
+    }
+  });
+  return selected;
+}
+
+function updateTimedEventStateFromSync(entries) {
+  if (!Array.isArray(entries) || !entries.length) {
+    return;
+  }
+  const activeEntry = selectActiveTimedEventEntry(entries);
+  const current = getTimedEventStart();
+  if (activeEntry) {
+    const start = new Date(activeEntry.timestamp_utc);
+    if (!Number.isNaN(start.getTime())) {
+      const type = normalizeEntryType(activeEntry.type);
+      const startedBy = activeEntry.user_slug || null;
+      const clientEventId = activeEntry.client_event_id || null;
+      if (
+        !current
+        || current.clientEventId !== clientEventId
+        || current.start.getTime() !== start.getTime()
+        || current.startedBy !== startedBy
+        || current.type !== type
+      ) {
+        setTimedEventStart(start, type, startedBy, clientEventId);
+      }
+      updateMiscTimedEventControls();
+      return;
+    }
+  }
+  if (current && current.clientEventId) {
+    const completedMatch = entries.find((entry) => {
+      return entry.client_event_id === current.clientEventId
+        && !isTimedEventInProgress(entry);
+    });
+    if (completedMatch) {
+      clearTimedEventStart();
+      updateMiscTimedEventControls();
+    }
+  }
+}
+
 async function hydrateBreastfeedFromLocalEntries() {
   if (breastfeedHydrated) {
     return;
@@ -715,6 +841,34 @@ async function hydrateBreastfeedFromLocalEntries() {
         activeEntry.client_event_id || null,
       );
       updateBreastfeedButton();
+    }
+  }
+}
+
+async function hydrateTimedEventFromLocalEntries() {
+  if (timedEventHydrated) {
+    return;
+  }
+  timedEventHydrated = true;
+  if (getTimedEventStart()) {
+    return;
+  }
+  const entries = await listEntriesLocalSafe({ limit: 200 });
+  if (!entries) {
+    return;
+  }
+  const activeEntry = selectActiveTimedEventEntry(entries);
+  if (activeEntry) {
+    const start = new Date(activeEntry.timestamp_utc);
+    const type = normalizeEntryType(activeEntry.type);
+    if (!Number.isNaN(start.getTime()) && TIMED_EVENT_TYPES.includes(type)) {
+      setTimedEventStart(
+        start,
+        type,
+        activeEntry.user_slug || null,
+        activeEntry.client_event_id || null,
+      );
+      updateMiscTimedEventControls();
     }
   }
 }
@@ -993,6 +1147,15 @@ function initHomeHandlers() {
   }
   if (breastfeedBannerActionEl) {
     breastfeedBannerActionEl.addEventListener("click", handleBreastfeedToggle);
+  }
+  if (timedEventBannerActionEl) {
+    timedEventBannerActionEl.addEventListener("click", () => {
+      const active = getTimedEventStart();
+      const type = active && active.type ? active.type : (miscTimedEventTypeSelectEl
+        ? miscTimedEventTypeSelectEl.value
+        : TIMED_EVENT_TYPES[0]);
+      void handleTimedEventToggle(type);
+    });
   }
   if (feedToggleFormulaBtn) {
     feedToggleFormulaBtn.addEventListener("click", () => {
@@ -1626,6 +1789,7 @@ function applyUserState() {
   initLinks();
   updateUserDisplay();
   void hydrateBreastfeedFromLocalEntries();
+  void hydrateTimedEventFromLocalEntries();
   updateBreastfeedButton();
   updateMiscTimedEventControls();
   if (userFormEl) {
@@ -2248,6 +2412,7 @@ async function syncNow() {
     const data = await response.json();
     await applyServerEntries(data.entries || []);
     updateBreastfeedStateFromSync(data.entries || []);
+    updateTimedEventStateFromSync(data.entries || []);
     await setSyncCursor(data.cursor);
     await clearOutbox(outbox.map((item) => item.key));
     if (changes.length) {
