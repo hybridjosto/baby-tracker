@@ -511,6 +511,155 @@
         font-size: 13px;
         color: var(--text-secondary);
       }
+      .ruler-wrap {
+        position: relative;
+        margin-top: 16px;
+        border-radius: 16px;
+        padding: 14px;
+        border: 1px solid var(--border-light);
+        background: #ffffff;
+        --ruler-expressed: #13ec5b;
+        --ruler-formula: #f8b13c;
+        --ruler-track: #e0e7e1;
+        --ruler-window: rgba(19, 236, 91, 0.12);
+        --ruler-anchor: #0f1a12;
+      }
+      html.dark .ruler-wrap {
+        border-color: var(--border-dark);
+        background: var(--card-dark);
+        --ruler-expressed: #28f278;
+        --ruler-formula: #f5b453;
+        --ruler-track: rgba(255, 255, 255, 0.12);
+        --ruler-window: rgba(19, 236, 91, 0.16);
+        --ruler-anchor: #f2f6f4;
+      }
+      .ruler-header {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 10px;
+      }
+      .ruler-title {
+        margin: 0;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.14em;
+        color: var(--text-secondary);
+      }
+      .ruler-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+      }
+      .ruler-legend {
+        display: flex;
+        gap: 10px;
+        font-size: 11px;
+        color: var(--text-secondary);
+      }
+      .ruler-legend span {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .ruler-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        display: inline-block;
+      }
+      .ruler-toggle,
+      .ruler-now {
+        border: 1px solid var(--border-light);
+        border-radius: 999px;
+        padding: 5px 10px;
+        background: var(--surface-soft);
+        color: var(--text-primary);
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        cursor: pointer;
+      }
+      .ruler-toggle.active {
+        background: var(--text-primary);
+        color: #f3f6f4;
+      }
+      html.dark .ruler-toggle,
+      html.dark .ruler-now {
+        border-color: var(--border-dark);
+        background: rgba(255, 255, 255, 0.08);
+        color: #d3e4d7;
+      }
+      .ruler-body {
+        position: relative;
+        height: 170px;
+      }
+      #ruler-canvas {
+        width: 100%;
+        height: 170px;
+        display: block;
+        touch-action: pan-y;
+      }
+      .ruler-readout {
+        position: absolute;
+        top: 6px;
+        min-width: 170px;
+        padding: 10px 12px;
+        border-radius: 12px;
+        background: rgba(20, 22, 28, 0.92);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: 0 10px 24px rgba(0, 0, 0, 0.3);
+        pointer-events: none;
+        transform: translateX(-50%);
+        color: #f3f6f4;
+      }
+      .ruler-readout h3 {
+        margin: 0;
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.14em;
+        color: rgba(243, 246, 244, 0.7);
+      }
+      .ruler-metric {
+        font-size: 18px;
+        font-weight: 700;
+        margin-top: 4px;
+      }
+      .ruler-detail,
+      .ruler-goal {
+        margin-top: 4px;
+        font-size: 12px;
+      }
+      .ruler-goal {
+        font-weight: 700;
+      }
+      .ruler-labels {
+        margin-top: 8px;
+        display: flex;
+        justify-content: space-between;
+        font-size: 11px;
+        color: var(--text-secondary);
+      }
+      .ruler-empty {
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 12px;
+        font-size: 12px;
+        color: var(--text-secondary);
+      }
+      @media (max-width: 540px) {
+        .ruler-header {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+        .ruler-actions {
+          justify-content: flex-start;
+        }
+      }
       .status {
         font-size: 12px;
         color: var(--text-secondary);
@@ -763,6 +912,34 @@
             <div class="trend-label">Expressed ml</div>
             <div class="trend-bars" id="express-trend-bars"></div>
           </div>
+        </section>
+
+        <section class="ruler-wrap" id="ruler-wrap">
+          <div class="ruler-header">
+            <h2 class="ruler-title">Rolling 24h Feed Window</h2>
+            <div class="ruler-actions">
+              <div class="ruler-legend">
+                <span><i class="ruler-dot" style="background: var(--ruler-expressed);"></i>Expressed</span>
+                <span><i class="ruler-dot" style="background: var(--ruler-formula);"></i>Formula</span>
+              </div>
+              <button class="ruler-toggle active" id="ruler-snap-toggle" type="button">Snap to feeds</button>
+              <button class="ruler-now" id="ruler-now-btn" type="button">Jump to now</button>
+            </div>
+          </div>
+          <div class="ruler-body" id="ruler-body">
+            <canvas id="ruler-canvas"></canvas>
+            <div class="ruler-readout" id="ruler-readout">
+              <h3>Rolling 24h</h3>
+              <div class="ruler-metric" id="ruler-total">0 ml</div>
+              <div class="ruler-detail" id="ruler-detail">Expressed 0 ml · Formula 0 ml</div>
+              <div class="ruler-goal" id="ruler-goal">0% of 700 ml goal</div>
+            </div>
+          </div>
+          <div class="ruler-labels">
+            <span id="ruler-start">--</span>
+            <span id="ruler-end">--</span>
+          </div>
+          <div class="ruler-empty" id="ruler-empty">No feed entries in the last 7 days.</div>
         </section>
 
         <div class="status" id="status"></div>

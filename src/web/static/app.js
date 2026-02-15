@@ -1042,6 +1042,7 @@ function initSummaryHandlers() {
     refreshBtn.addEventListener("click", () => {
       if (userValid) {
         void loadSummaryEntries();
+        void loadRulerFeeds({ reset: true });
       }
     });
   }
@@ -1064,6 +1065,7 @@ function initSummaryHandlers() {
       });
     });
   }
+  initRulerHandlers();
 }
 
 function initSettingsHandlers() {
@@ -2784,7 +2786,8 @@ function onRulerClick(event) {
 }
 
 function initRulerHandlers() {
-  if (rulerInitialized || pageType !== "timeline" || !rulerCanvasEl) {
+  const supportsRuler = pageType === "timeline" || pageType === "summary";
+  if (rulerInitialized || !supportsRuler || !rulerCanvasEl) {
     return;
   }
   rulerInitialized = true;
@@ -4582,6 +4585,28 @@ function buildTimelineCard(entry, staggerIndex) {
     content.appendChild(byline);
   }
 
+  const actions = document.createElement("div");
+  actions.className = "timeline-actions";
+
+  const editBtn = document.createElement("button");
+  editBtn.type = "button";
+  editBtn.className = "timeline-action timeline-action-edit";
+  editBtn.textContent = "Edit";
+  editBtn.addEventListener("click", () => {
+    void editEntry(entry);
+  });
+
+  const deleteBtn = document.createElement("button");
+  deleteBtn.type = "button";
+  deleteBtn.className = "timeline-action timeline-action-delete";
+  deleteBtn.textContent = "Delete";
+  deleteBtn.addEventListener("click", () => {
+    void deleteEntry(entry);
+  });
+
+  actions.append(editBtn, deleteBtn);
+  content.appendChild(actions);
+
   card.append(icon, content);
   return card;
 }
@@ -4683,7 +4708,6 @@ function initTimelineHandlers() {
   if (refreshBtn) {
     refreshBtn.addEventListener("click", () => {
       void loadTimelineEntries({ reset: true });
-      void loadRulerFeeds({ reset: true });
     });
   }
   if (timelineWrapEl && timelineSentinelEl) {
@@ -4697,7 +4721,23 @@ function initTimelineHandlers() {
     );
     timelineObserver.observe(timelineSentinelEl);
   }
-  initRulerHandlers();
+}
+
+async function refreshEntriesForCurrentPage() {
+  if (pageType === "log") {
+    await loadLogEntries();
+    return;
+  }
+  if (pageType === "timeline") {
+    await loadTimelineEntries({ reset: true });
+    return;
+  }
+  if (pageType === "summary") {
+    await loadSummaryEntries();
+    await loadRulerFeeds({ reset: true });
+    return;
+  }
+  await loadHomeEntries();
 }
 
 const CALENDAR_CATEGORY_LABELS = {
@@ -5603,14 +5643,16 @@ async function addEntry(type) {
       payload.feed_duration_min = minutes;
     }
   }
-  const noteInput = window.prompt("Comment (optional)", "");
-  if (noteInput === null) {
-    setStatus("");
-    return;
-  }
-  const trimmedNote = noteInput.trim();
-  if (trimmedNote) {
-    payload.notes = trimmedNote;
+  if (type !== "wee" && type !== "poo") {
+    const noteInput = window.prompt("Comment (optional)", "");
+    if (noteInput === null) {
+      setStatus("");
+      return;
+    }
+    const trimmedNote = noteInput.trim();
+    if (trimmedNote) {
+      payload.notes = trimmedNote;
+    }
   }
   await saveEntry(payload);
 }
@@ -6002,11 +6044,7 @@ async function commitEntryUpdate(entry, payload, messages) {
       setStatus(messages.online);
       await syncNow();
     }
-    if (pageType === "log") {
-      await loadLogEntries();
-    } else {
-      await loadHomeEntries();
-    }
+    await refreshEntriesForCurrentPage();
   } catch (err) {
     setStatus(messages.error);
   }
@@ -6223,11 +6261,7 @@ async function deleteEntry(entry) {
       setStatus("Deleted (syncing...)");
       await syncNow();
     }
-    if (pageType === "log") {
-      await loadLogEntries();
-    } else {
-      await loadHomeEntries();
-    }
+    await refreshEntriesForCurrentPage();
   } catch (err) {
     setStatus("Error: unable to delete entry");
   }
