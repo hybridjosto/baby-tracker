@@ -3,7 +3,10 @@ import pytest
 from src.lib.validation import validate_entry_type
 
 
-@pytest.mark.parametrize("entry_type", ["feed", "poo", "wee", "room/body temp"])
+@pytest.mark.parametrize(
+    "entry_type",
+    ["feed", "poo", "wee", "sleep", "cry", "room/body temp"],
+)
 def test_validate_entry_type_accepts_known_types(entry_type):
     validate_entry_type(entry_type)
 

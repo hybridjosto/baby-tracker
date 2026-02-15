@@ -13,6 +13,8 @@ const USER_KEY = "baby-tracker-user";
 const BREASTFEED_TIMER_KEY = "baby-tracker-breastfeed-start";
 const BREASTFEED_IN_PROGRESS_NOTE = "Breastfeeding (started)";
 const BREASTFEED_COMPLETE_NOTE = "Breastfed";
+const TIMED_EVENT_TIMER_KEY = "baby-tracker-timed-event-start";
+const TIMED_EVENT_TYPES = ["sleep", "cry"];
 const OFFLINE_WINDOW_DAYS = 30;
 const DB_NAME = "baby-tracker";
 const DB_VERSION = 1;
@@ -260,6 +262,9 @@ let babyDob = null;
 let feedIntervalMinutes = null;
 let customEventTypes = [];
 let breastfeedTickerId = null;
+let miscTimedEventTickerId = null;
+let miscTimedEventTypeSelectEl = null;
+let miscTimedEventToggleBtn = null;
 let hasLoadedHomeEntries = false;
 let hasLoadedLogEntries = false;
 let hasLoadedSummaryEntries = false;
@@ -344,6 +349,48 @@ function getBreastfeedStorageKey() {
   return BREASTFEED_TIMER_KEY;
 }
 
+function getTimedEventStorageKey() {
+  return TIMED_EVENT_TIMER_KEY;
+}
+
+function parseTimedEventPayload(raw, key) {
+  if (!raw) {
+    return null;
+  }
+  let parsed = null;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (err) {
+    parsed = null;
+  }
+  if (!parsed || typeof parsed !== "object" || !parsed.start_at || !parsed.event_type) {
+    if (key) {
+      window.localStorage.removeItem(key);
+    }
+    return null;
+  }
+  const start = new Date(parsed.start_at);
+  if (Number.isNaN(start.getTime())) {
+    if (key) {
+      window.localStorage.removeItem(key);
+    }
+    return null;
+  }
+  const eventType = normalizeEntryType(parsed.event_type);
+  if (!TIMED_EVENT_TYPES.includes(eventType)) {
+    if (key) {
+      window.localStorage.removeItem(key);
+    }
+    return null;
+  }
+  return {
+    start,
+    type: eventType,
+    startedBy: parsed.started_by || null,
+    clientEventId: parsed.client_event_id || null,
+  };
+}
+
 function parseBreastfeedPayload(raw, key) {
   if (!raw) {
     return null;
@@ -378,6 +425,15 @@ function parseBreastfeedPayload(raw, key) {
   return { start: legacyStart, startedBy: null, clientEventId: null };
 }
 
+function getTimedEventStart() {
+  const key = getTimedEventStorageKey();
+  if (!key) {
+    return null;
+  }
+  const raw = window.localStorage.getItem(key);
+  return parseTimedEventPayload(raw, key);
+}
+
 function getBreastfeedStart() {
   const key = getBreastfeedStorageKey();
   if (!key) {
@@ -404,6 +460,20 @@ function getBreastfeedStart() {
   return null;
 }
 
+function setTimedEventStart(start, eventType, startedBy, clientEventId) {
+  const key = getTimedEventStorageKey();
+  if (!key) {
+    return;
+  }
+  const payload = {
+    start_at: start.toISOString(),
+    event_type: normalizeEntryType(eventType),
+    started_by: startedBy || null,
+    client_event_id: clientEventId || null,
+  };
+  window.localStorage.setItem(key, JSON.stringify(payload));
+}
+
 function setBreastfeedStart(start, startedBy, clientEventId) {
   const key = getBreastfeedStorageKey();
   if (!key) {
@@ -417,6 +487,14 @@ function setBreastfeedStart(start, startedBy, clientEventId) {
   window.localStorage.setItem(key, JSON.stringify(payload));
 }
 
+function clearTimedEventStart() {
+  const key = getTimedEventStorageKey();
+  if (!key) {
+    return;
+  }
+  window.localStorage.removeItem(key);
+}
+
 function clearBreastfeedStart() {
   const key = getBreastfeedStorageKey();
   if (!key) {
@@ -426,6 +504,60 @@ function clearBreastfeedStart() {
   if (activeUser) {
     window.localStorage.removeItem(`${BREASTFEED_TIMER_KEY}:${activeUser}`);
   }
+}
+
+function stopMiscTimedEventTicker() {
+  if (miscTimedEventTickerId === null) {
+    return;
+  }
+  window.clearInterval(miscTimedEventTickerId);
+  miscTimedEventTickerId = null;
+}
+
+function startMiscTimedEventTicker() {
+  if (miscTimedEventTickerId !== null) {
+    return;
+  }
+  miscTimedEventTickerId = window.setInterval(updateMiscTimedEventControls, 30000);
+}
+
+function getTimedEventStartNote(type) {
+  return `${formatEntryTypeLabel(type)} (started)`;
+}
+
+function getTimedEventCompleteNote(type) {
+  return formatEntryTypeLabel(type);
+}
+
+function updateMiscTimedEventControls() {
+  if (!miscTimedEventTypeSelectEl || !miscTimedEventToggleBtn) {
+    stopMiscTimedEventTicker();
+    return;
+  }
+  const startInfo = getTimedEventStart();
+  if (startInfo && startInfo.start) {
+    const durationMinutes = Math.max(
+      0,
+      Math.round((Date.now() - startInfo.start.getTime()) / 60000),
+    );
+    const label = formatEntryTypeLabel(startInfo.type);
+    miscTimedEventTypeSelectEl.value = startInfo.type;
+    miscTimedEventTypeSelectEl.disabled = true;
+    miscTimedEventToggleBtn.textContent = `End ${label} (${durationMinutes} min)`;
+    miscTimedEventToggleBtn.disabled = !userValid;
+    const starter = startInfo.startedBy ? ` by ${startInfo.startedBy}` : "";
+    miscTimedEventToggleBtn.title = `Started${starter} ${formatTimestamp(startInfo.start.toISOString())}`;
+    startMiscTimedEventTicker();
+    return;
+  }
+  miscTimedEventTypeSelectEl.disabled = false;
+  if (!TIMED_EVENT_TYPES.includes(miscTimedEventTypeSelectEl.value)) {
+    miscTimedEventTypeSelectEl.value = TIMED_EVENT_TYPES[0];
+  }
+  miscTimedEventToggleBtn.textContent = "Start timed event";
+  miscTimedEventToggleBtn.disabled = !userValid;
+  miscTimedEventToggleBtn.removeAttribute("title");
+  stopMiscTimedEventTicker();
 }
 
 function stopBreastfeedTicker() {
@@ -686,7 +818,36 @@ function renderMiscMenu() {
     return;
   }
   miscMenu.innerHTML = "";
-  customEventTypes.forEach((type) => {
+  const timedWrap = document.createElement("div");
+  timedWrap.className = "misc-timer-wrap";
+
+  const timedTypeSelect = document.createElement("select");
+  timedTypeSelect.className = "nappy-option misc-option";
+  TIMED_EVENT_TYPES.forEach((type) => {
+    const option = document.createElement("option");
+    option.value = type;
+    option.textContent = formatEntryTypeLabel(type);
+    timedTypeSelect.appendChild(option);
+  });
+
+  const timedToggleBtn = document.createElement("button");
+  timedToggleBtn.type = "button";
+  timedToggleBtn.className = "nappy-option misc-option";
+  timedToggleBtn.addEventListener("click", () => {
+    void handleTimedEventToggle(timedTypeSelect.value);
+  });
+
+  timedWrap.appendChild(timedTypeSelect);
+  timedWrap.appendChild(timedToggleBtn);
+  miscMenu.appendChild(timedWrap);
+
+  miscTimedEventTypeSelectEl = timedTypeSelect;
+  miscTimedEventToggleBtn = timedToggleBtn;
+  updateMiscTimedEventControls();
+
+  customEventTypes
+    .filter((type) => !TIMED_EVENT_TYPES.includes(normalizeEntryType(type)))
+    .forEach((type) => {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "nappy-option misc-option";
@@ -696,10 +857,8 @@ function renderMiscMenu() {
       addEntry(type);
     });
     miscMenu.appendChild(button);
-  });
-  if (!customEventTypes.length) {
-    miscMenu.setAttribute("aria-hidden", "true");
-  }
+    });
+  miscMenu.setAttribute("aria-hidden", "true");
 }
 
 function applyCustomEventTypes() {
@@ -707,10 +866,7 @@ function applyCustomEventTypes() {
   renderMiscMenu();
   renderSummaryTypeOptions();
   if (miscBtn) {
-    toggleDisabled(miscBtn, !userValid || customEventTypes.length === 0);
-  }
-  if (!customEventTypes.length) {
-    closeMiscMenu();
+    toggleDisabled(miscBtn, !userValid);
   }
 }
 
@@ -1453,7 +1609,7 @@ function applyUserState() {
   const allowSharedPage = allowTimeline || pageType === "calendar" || pageType === "calendar-form";
   toggleDisabled(feedBtn, !userValid);
   toggleDisabled(nappyBtn, !userValid);
-  toggleDisabled(miscBtn, !userValid || customEventTypes.length === 0);
+  toggleDisabled(miscBtn, !userValid);
   toggleDisabled(pooBtn, !userValid);
   toggleDisabled(weeBtn, !userValid);
   toggleDisabled(refreshBtn, false);
@@ -1471,6 +1627,7 @@ function applyUserState() {
   updateUserDisplay();
   void hydrateBreastfeedFromLocalEntries();
   updateBreastfeedButton();
+  updateMiscTimedEventControls();
   if (userFormEl) {
     userFormEl.hidden = userValid || allowSharedPage;
   }
@@ -2220,6 +2377,9 @@ function getTimelineTypeConfig(type) {
   }
   if (normalized.includes("sleep") || normalized.includes("nap")) {
     return { color: "#a78bfa", icon: "bedtime" };
+  }
+  if (normalized.includes("cry")) {
+    return { color: "#f97316", icon: "mood_bad" };
   }
 
   const pick = palette[hashString(normalized || "event") % palette.length];
@@ -3888,7 +4048,7 @@ function renderSummaryTypeOptions() {
   }
   const current = summaryTypeSelectEl.value || summaryType || "all";
   summaryTypeSelectEl.innerHTML = "";
-  const baseOptions = ["all", "feed", "wee", "poo"];
+  const baseOptions = ["all", "feed", "wee", "poo", ...TIMED_EVENT_TYPES];
   const options = [...baseOptions, ...customEventTypes];
   options.forEach((value) => {
     const option = document.createElement("option");
@@ -5738,6 +5898,35 @@ async function getBreastfeedEntryForUpdate(startInfo) {
   };
 }
 
+async function getTimedEventEntryForUpdate(startInfo) {
+  if (startInfo && startInfo.clientEventId) {
+    const localEntry = await getEntryLocal(startInfo.clientEventId);
+    if (localEntry) {
+      return localEntry;
+    }
+  }
+  const start = startInfo && startInfo.start ? startInfo.start : new Date();
+  const startIso = start.toISOString();
+  const eventType = normalizeEntryType(startInfo && startInfo.type ? startInfo.type : TIMED_EVENT_TYPES[0]);
+  return {
+    client_event_id: startInfo && startInfo.clientEventId
+      ? startInfo.clientEventId
+      : generateId(),
+    user_slug: (startInfo && startInfo.startedBy) || activeUser || null,
+    type: eventType,
+    timestamp_utc: startIso,
+    notes: getTimedEventStartNote(eventType),
+    amount_ml: null,
+    expressed_ml: null,
+    formula_ml: null,
+    feed_duration_min: null,
+    caregiver_id: null,
+    created_at_utc: startIso,
+    updated_at_utc: startIso,
+    deleted_at_utc: null,
+  };
+}
+
 async function handleBreastfeedToggle() {
   if (!userValid) {
     setStatus("Choose a user below to start logging.");
@@ -5770,6 +5959,49 @@ async function handleBreastfeedToggle() {
     online: "Breastfeed ended (syncing...)",
     offline: "Breastfeed ended offline",
     error: "Error: unable to end breastfeeding",
+  });
+}
+
+async function handleTimedEventToggle(selectedType) {
+  if (!userValid) {
+    setStatus("Choose a user below to start logging.");
+    return;
+  }
+  const normalizedType = normalizeEntryType(selectedType);
+  if (!TIMED_EVENT_TYPES.includes(normalizedType)) {
+    setStatus("Choose a timed event type.");
+    return;
+  }
+  const startInfo = getTimedEventStart();
+  if (!startInfo) {
+    const start = new Date();
+    const payload = buildEntryPayload(normalizedType);
+    payload.timestamp_utc = start.toISOString();
+    payload.notes = getTimedEventStartNote(normalizedType);
+    payload.feed_duration_min = null;
+    setTimedEventStart(start, normalizedType, activeUser || null, payload.client_event_id);
+    updateMiscTimedEventControls();
+    closeMiscMenu();
+    setStatus(`${formatEntryTypeLabel(normalizedType)} started`);
+    await saveEntry(payload);
+    return;
+  }
+
+  const now = new Date();
+  const durationMinutes = Math.max(0, Math.round((now - startInfo.start) / 60000));
+  const entry = await getTimedEventEntryForUpdate(startInfo);
+  clearTimedEventStart();
+  updateMiscTimedEventControls();
+  closeMiscMenu();
+  const label = formatEntryTypeLabel(startInfo.type);
+  await commitEntryUpdate(entry, {
+    type: startInfo.type,
+    feed_duration_min: durationMinutes,
+    notes: getTimedEventCompleteNote(startInfo.type),
+  }, {
+    online: `${label} ended (syncing...)`,
+    offline: `${label} ended offline`,
+    error: `Error: unable to end ${label.toLowerCase()}`,
   });
 }
 
@@ -5806,7 +6038,7 @@ function renderEditEntryTypeOptions(currentType) {
     return;
   }
   const normalizedCurrent = String(currentType || "").trim().toLowerCase();
-  const baseOptions = ["feed", "wee", "poo", "milk express"];
+  const baseOptions = ["feed", "wee", "poo", "milk express", ...TIMED_EVENT_TYPES];
   const options = [...new Set([...baseOptions, ...customEventTypes])].filter(Boolean);
   if (normalizedCurrent && !options.includes(normalizedCurrent)) {
     options.push(normalizedCurrent);
