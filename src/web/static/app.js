@@ -6222,13 +6222,13 @@ function updateEditEntryFieldVisibility(type) {
   const isExpress = isMilkExpressType(normalized);
   const numbersWrap = editEntryModalEl.querySelector(".edit-field--numbers");
   if (numbersWrap) {
-    numbersWrap.style.display = isFeed || isExpress ? "grid" : "none";
+    numbersWrap.style.display = "grid";
   }
   const durationField = editEntryDurationEl ? editEntryDurationEl.closest(".edit-field") : null;
   const expressedField = editEntryExpressedEl ? editEntryExpressedEl.closest(".edit-field") : null;
   const formulaField = editEntryFormulaEl ? editEntryFormulaEl.closest(".edit-field") : null;
   if (durationField) {
-    durationField.style.display = isFeed || isExpress ? "grid" : "none";
+    durationField.style.display = "grid";
   }
   if (expressedField) {
     expressedField.style.display = isFeed || isExpress ? "grid" : "none";
@@ -6298,13 +6298,12 @@ function initEditEntryModalHandlers() {
         return;
       }
       const payload = { type: nextType, timestamp_utc: nextDate.toISOString() };
+      const duration = parseOptionalNumberInput(editEntryDurationEl, "Duration");
+      if (!duration.valid) {
+        return;
+      }
+      payload.feed_duration_min = duration.hasValue ? duration.value : null;
       if (nextType === "feed") {
-        const duration = parseOptionalNumberInput(editEntryDurationEl, "Duration");
-        if (!duration.valid) {
-          return;
-        }
-        payload.feed_duration_min = duration.hasValue ? duration.value : null;
-
         const expressed = parseOptionalNumberInput(editEntryExpressedEl, "Expressed amount");
         if (!expressed.valid) {
           return;
@@ -6335,11 +6334,6 @@ function initEditEntryModalHandlers() {
         if (editEntryModalEntry.amount_ml !== null && editEntryModalEntry.amount_ml !== undefined) {
           payload.amount_ml = null;
         }
-      } else if (
-        editEntryModalEntry.feed_duration_min !== null
-        && editEntryModalEntry.feed_duration_min !== undefined
-      ) {
-        payload.feed_duration_min = null;
       }
       if (nextType !== "feed" && !isMilkExpressType(nextType)) {
         if (editEntryModalEntry.expressed_ml !== null && editEntryModalEntry.expressed_ml !== undefined) {
@@ -6469,26 +6463,26 @@ async function editEntry(entry) {
     return;
   }
   const payload = { type: nextType, timestamp_utc: nextTime };
-  if (nextType === "feed") {
-    const currentDuration =
-      entry.feed_duration_min !== null && entry.feed_duration_min !== undefined
-        ? String(entry.feed_duration_min)
-        : "";
-    const durationInput = window.prompt("Feed duration (minutes)", currentDuration);
-    if (durationInput === null) {
+  const currentDuration =
+    entry.feed_duration_min !== null && entry.feed_duration_min !== undefined
+      ? String(entry.feed_duration_min)
+      : "";
+  const durationInput = window.prompt("Duration (minutes)", currentDuration);
+  if (durationInput === null) {
+    return;
+  }
+  const trimmedDuration = durationInput.trim();
+  if (trimmedDuration === "") {
+    payload.feed_duration_min = null;
+  } else {
+    const minutes = Number.parseFloat(trimmedDuration);
+    if (!Number.isFinite(minutes) || minutes < 0) {
+      setStatus("Duration must be a non-negative number");
       return;
     }
-    const trimmed = durationInput.trim();
-    if (trimmed === "") {
-      payload.feed_duration_min = null;
-    } else {
-      const minutes = Number.parseFloat(trimmed);
-      if (!Number.isFinite(minutes) || minutes < 0) {
-        setStatus("Duration must be a non-negative number");
-        return;
-      }
-      payload.feed_duration_min = minutes;
-    }
+    payload.feed_duration_min = minutes;
+  }
+  if (nextType === "feed") {
     const currentExpressed =
       entry.expressed_ml !== null && entry.expressed_ml !== undefined
         ? String(entry.expressed_ml)
@@ -6548,35 +6542,12 @@ async function editEntry(entry) {
       }
       payload.expressed_ml = amount;
     }
-    const currentDuration =
-      entry.feed_duration_min !== null && entry.feed_duration_min !== undefined
-        ? String(entry.feed_duration_min)
-        : (Number.isFinite(fallback.minutes) && fallback.minutes > 0
-          ? String(fallback.minutes)
-          : "");
-    const durationInput = window.prompt("Duration (minutes)", currentDuration);
-    if (durationInput === null) {
-      return;
-    }
-    const trimmedDuration = durationInput.trim();
-    if (trimmedDuration === "") {
-      payload.feed_duration_min = null;
-    } else {
-      const minutes = Number.parseFloat(trimmedDuration);
-      if (!Number.isFinite(minutes) || minutes < 0) {
-        setStatus("Duration must be a non-negative number");
-        return;
-      }
-      payload.feed_duration_min = minutes;
-    }
     if (entry.formula_ml !== null && entry.formula_ml !== undefined) {
       payload.formula_ml = null;
     }
     if (entry.amount_ml !== null && entry.amount_ml !== undefined) {
       payload.amount_ml = null;
     }
-  } else if (entry.feed_duration_min !== null && entry.feed_duration_min !== undefined) {
-    payload.feed_duration_min = null;
   }
   if (nextType !== "feed" && !isMilkExpressType(nextType)) {
     if (entry.expressed_ml !== null && entry.expressed_ml !== undefined) {
