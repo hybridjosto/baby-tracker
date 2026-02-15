@@ -5603,14 +5603,16 @@ async function addEntry(type) {
       payload.feed_duration_min = minutes;
     }
   }
-  const noteInput = window.prompt("Comment (optional)", "");
-  if (noteInput === null) {
-    setStatus("");
-    return;
-  }
-  const trimmedNote = noteInput.trim();
-  if (trimmedNote) {
-    payload.notes = trimmedNote;
+  if (type !== "wee" && type !== "poo") {
+    const noteInput = window.prompt("Comment (optional)", "");
+    if (noteInput === null) {
+      setStatus("");
+      return;
+    }
+    const trimmedNote = noteInput.trim();
+    if (trimmedNote) {
+      payload.notes = trimmedNote;
+    }
   }
   await saveEntry(payload);
 }
