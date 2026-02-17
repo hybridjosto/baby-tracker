@@ -35,6 +35,8 @@ const RESERVED_USER_SLUGS = new Set([
   "bottles",
 ]);
 const themeToggleBtn = document.getElementById("theme-toggle");
+const navMenuToggleBtn = document.getElementById("nav-menu-toggle");
+const navMenuPanelEl = document.getElementById("nav-menu-panel");
 const userFormEl = document.getElementById("user-form");
 const userInputEl = document.getElementById("user-input");
 const userMessageEl = document.getElementById("today-label")
@@ -6915,6 +6917,51 @@ function initLinks() {
   }
 }
 
+function setNavMenuOpen(open) {
+  if (!navMenuToggleBtn || !navMenuPanelEl) {
+    return;
+  }
+  navMenuToggleBtn.setAttribute("aria-expanded", open ? "true" : "false");
+  navMenuPanelEl.setAttribute("aria-hidden", open ? "false" : "true");
+  navMenuPanelEl.classList.toggle("open", open);
+}
+
+function initNavMenuHandlers() {
+  if (!navMenuToggleBtn || !navMenuPanelEl) {
+    return;
+  }
+  setNavMenuOpen(false);
+
+  navMenuToggleBtn.addEventListener("click", (event) => {
+    event.stopPropagation();
+    const isOpen = navMenuPanelEl.classList.contains("open");
+    setNavMenuOpen(!isOpen);
+  });
+
+  navMenuPanelEl.addEventListener("click", (event) => {
+    const target = event.target instanceof Element ? event.target.closest(".nav-menu-item") : null;
+    if (target) {
+      setNavMenuOpen(false);
+    }
+  });
+
+  document.addEventListener("click", (event) => {
+    if (!(event.target instanceof Element)) {
+      return;
+    }
+    if (navMenuPanelEl.contains(event.target) || navMenuToggleBtn.contains(event.target)) {
+      return;
+    }
+    setNavMenuOpen(false);
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      setNavMenuOpen(false);
+    }
+  });
+}
+
 async function loadBabySettings() {
   try {
     const response = await fetch(buildUrl("/api/settings"));
@@ -6996,6 +7043,7 @@ async function saveBabySettings(patch) {
 }
 
 applyTheme(getPreferredTheme());
+initNavMenuHandlers();
 if (themeToggleBtn) {
   themeToggleBtn.addEventListener("click", toggleTheme);
 }

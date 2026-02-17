@@ -59,8 +59,7 @@
         align-items: center;
         flex-wrap: wrap;
       }
-      .nav-actions a,
-      .nav-actions button {
+      .nav-icon {
         color: var(--text-primary);
         text-decoration: none;
         border: 1px solid var(--border-light);
@@ -72,21 +71,16 @@
         display: grid;
         place-items: center;
       }
-      .nav-actions button {
+      .nav-icon {
         cursor: pointer;
       }
-      .nav-actions .material-symbols-outlined {
+      .nav-icon .material-symbols-outlined {
         font-size: 16px;
       }
-      html.dark .nav-actions a,
-      html.dark .nav-actions button {
+      html.dark .nav-icon {
         border-color: var(--border-dark);
         background: rgba(255, 255, 255, 0.08);
         color: #d3e4d7;
-      }
-      .nav-icon {
-        width: 40px;
-        height: 40px;
       }
       .timeline-wrap {
         position: relative;
@@ -565,30 +559,44 @@
           <div class="user-chip" id="user-message">{{ user_message }}</div>
         </div>
         <div class="nav-actions">
-          <a class="nav-icon" id="home-link" href="#" aria-label="Home" title="Home">
-            <span class="material-symbols-outlined">home</span>
-          </a>
-          <a class="nav-icon" id="log-link" href="#" aria-label="Event log" title="Event log">
-            <span class="material-symbols-outlined">list_alt</span>
-          </a>
-          <a class="nav-icon" id="summary-link" href="{{ base_path }}/summary" aria-label="Summary" title="Summary">
-            <span class="material-symbols-outlined">query_stats</span>
-          </a>
-          <a class="nav-icon" href="{{ base_path }}/calendar" aria-label="Calendar" title="Calendar">
-            <span class="material-symbols-outlined">calendar_month</span>
-          </a>
-          <a class="nav-icon" id="bottles-link" href="{{ base_path }}/bottles" aria-label="Bottle library" title="Bottle library">
-            <span class="material-symbols-outlined">local_drink</span>
-          </a>
-          <button class="nav-icon" id="refresh-btn" type="button" aria-label="Refresh timeline" title="Refresh timeline">
-            <span class="material-symbols-outlined">refresh</span>
+          <button class="nav-menu-toggle" id="nav-menu-toggle" type="button" aria-label="Open navigation menu" aria-haspopup="true" aria-expanded="false" aria-controls="nav-menu-panel">
+            <span class="material-symbols-outlined" aria-hidden="true">menu</span>
+            <span>Menu</span>
           </button>
-          <a class="nav-icon" href="{{ base_path }}/settings" aria-label="Settings" title="Settings">
-            <span class="material-symbols-outlined">settings</span>
-          </a>
-          <button class="nav-icon" id="theme-toggle" type="button" aria-label="Switch to light mode">
-            <span class="material-symbols-outlined">dark_mode</span>
-          </button>
+          <div class="nav-menu-panel" id="nav-menu-panel" role="menu" aria-hidden="true">
+            <a class="nav-menu-item" id="home-link" href="#" role="menuitem">
+              <span class="material-symbols-outlined" aria-hidden="true">home</span>
+              <span class="nav-menu-label">Home</span>
+            </a>
+            <a class="nav-menu-item" id="log-link" href="#" role="menuitem">
+              <span class="material-symbols-outlined" aria-hidden="true">list_alt</span>
+              <span class="nav-menu-label">Event log</span>
+            </a>
+            <a class="nav-menu-item" id="summary-link" href="{{ base_path }}/summary" role="menuitem">
+              <span class="material-symbols-outlined" aria-hidden="true">query_stats</span>
+              <span class="nav-menu-label">Summary</span>
+            </a>
+            <a class="nav-menu-item" href="{{ base_path }}/calendar" role="menuitem">
+              <span class="material-symbols-outlined" aria-hidden="true">calendar_month</span>
+              <span class="nav-menu-label">Calendar</span>
+            </a>
+            <a class="nav-menu-item" id="bottles-link" href="{{ base_path }}/bottles" role="menuitem">
+              <span class="material-symbols-outlined" aria-hidden="true">local_drink</span>
+              <span class="nav-menu-label">Bottle library</span>
+            </a>
+            <button class="nav-menu-item" id="refresh-btn" type="button" role="menuitem">
+              <span class="material-symbols-outlined" aria-hidden="true">refresh</span>
+              <span class="nav-menu-label">Refresh timeline</span>
+            </button>
+            <a class="nav-menu-item" href="{{ base_path }}/settings" role="menuitem">
+              <span class="material-symbols-outlined" aria-hidden="true">settings</span>
+              <span class="nav-menu-label">Settings</span>
+            </a>
+            <button class="nav-menu-item" id="theme-toggle" type="button" role="menuitem" aria-label="Switch to light mode">
+              <span class="material-symbols-outlined" aria-hidden="true">dark_mode</span>
+              <span class="nav-menu-label">Theme</span>
+            </button>
+          </div>
         </div>
       </header>
 
