@@ -88,8 +88,10 @@ html.dark .card {
 .nav-actions {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
+  gap: 6px;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  color: var(--text-primary);
   position: relative;
 }
 
