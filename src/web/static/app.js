@@ -3926,6 +3926,46 @@ function computeDiaperStats(entries) {
   };
 }
 
+function computeSleepStats(entries) {
+  let durationTotal = 0;
+  let count = 0;
+  entries.forEach((entry) => {
+    if (!isSleepType(entry.type)) {
+      return;
+    }
+    const duration = Number.parseFloat(entry.feed_duration_min);
+    if (Number.isFinite(duration) && duration > 0) {
+      durationTotal += duration;
+      count += 1;
+    }
+  });
+  return {
+    count,
+    durationTotal,
+  };
+}
+
+function computeWindowDaySpan(windowEntries, sinceMs, untilMs) {
+  if (Number.isFinite(sinceMs)) {
+    return Math.max(1, Math.ceil((untilMs - sinceMs) / 86400000));
+  }
+  if (!Array.isArray(windowEntries) || !windowEntries.length) {
+    return 1;
+  }
+  let earliestMs = Number.POSITIVE_INFINITY;
+  windowEntries.forEach((entry) => {
+    const ts = new Date(entry.timestamp_utc);
+    const ms = ts.getTime();
+    if (!Number.isNaN(ms) && ms < earliestMs) {
+      earliestMs = ms;
+    }
+  });
+  if (!Number.isFinite(earliestMs)) {
+    return 1;
+  }
+  return Math.max(1, Math.ceil((untilMs - earliestMs) / 86400000));
+}
+
 function renderSummaryInsights(entries, anchorEnd) {
   if (!entries.length) {
     if (insightLastFeedEl) {
@@ -4043,7 +4083,13 @@ function renderSummaryInsights(entries, anchorEnd) {
     const feedStats = computeFeedStats(windowEntries);
     const expressStats = computeExpressStats(windowEntries);
     const diaperStats = computeDiaperStats(windowEntries);
+    const sleepStats = computeSleepStats(windowEntries);
+    const daySpan = computeWindowDaySpan(windowEntries, sinceMs, untilMs);
     const avgGapText = feedStats.avgGap ? formatDurationMinutes(feedStats.avgGap) : "--";
+    const avgFeedTotalText = feedStats.count
+      ? formatMl((feedStats.expressedTotal + feedStats.formulaTotal) / feedStats.count)
+      : "--";
+    const sleepAvgPerDayText = formatDurationMinutes(sleepStats.durationTotal / daySpan);
     const expressAvgText = expressStats.count
       ? formatMl(expressStats.totalMl / expressStats.count)
       : "--";
@@ -4104,6 +4150,8 @@ function renderSummaryInsights(entries, anchorEnd) {
         spec.label,
         `${feedStats.count}`,
         avgGapText,
+        avgFeedTotalText,
+        sleepAvgPerDayText,
         formatDurationMinutes(feedStats.durationTotal),
         `${formatMl(expressStats.totalMl)} • ${expressStats.count}x`,
         expressAvgText,
