@@ -98,6 +98,8 @@ const summaryFormulaEl = document.getElementById("summary-formula-amount");
 const summaryFormulaAvgEl = document.getElementById("summary-formula-avg");
 const summaryTotalIntakeEl = document.getElementById("summary-total-intake-amount");
 const summaryTotalIntakeAvgEl = document.getElementById("summary-total-intake-avg");
+const summarySleepDurationEl = document.getElementById("summary-sleep-duration");
+const summarySleepDurationAvgEl = document.getElementById("summary-sleep-duration-avg");
 const milkExpressCountEl = document.getElementById("milk-express-count");
 const milkExpressTotalsEl = document.getElementById("milk-express-totals");
 const milkExpressListEl = document.getElementById("milk-express-list");
@@ -3307,6 +3309,10 @@ function isFeedType(value) {
   return normalizeEntryType(value) === "feed";
 }
 
+function isSleepType(value) {
+  return normalizeEntryType(value) === "sleep";
+}
+
 function parseMilkExpressNotes(value) {
   if (typeof value !== "string") {
     return { ml: 0, minutes: 0 };
@@ -3468,6 +3474,8 @@ function renderSummaryStats(entries) {
   let durationTotal = 0;
   let expressedTotal = 0;
   let formulaTotal = 0;
+  let sleepCount = 0;
+  let sleepDurationTotal = 0;
   entries.forEach((entry) => {
     if (isFeedType(entry.type)) {
       if (isBreastfeedInProgress(entry)) {
@@ -3487,12 +3495,22 @@ function renderSummaryStats(entries) {
         formulaTotal += formula;
       }
     }
+    if (isSleepType(entry.type)) {
+      const sleepDuration = Number.parseFloat(entry.feed_duration_min);
+      if (Number.isFinite(sleepDuration) && sleepDuration > 0) {
+        sleepCount += 1;
+        sleepDurationTotal += sleepDuration;
+      }
+    }
   });
   const totalIntake = expressedTotal + formulaTotal;
   summaryFeedDurationEl.textContent = formatDurationMinutes(durationTotal);
   summaryExpressedEl.textContent = formatMl(expressedTotal);
   summaryFormulaEl.textContent = formatMl(formulaTotal);
   summaryTotalIntakeEl.textContent = formatMl(totalIntake);
+  if (summarySleepDurationEl) {
+    summarySleepDurationEl.textContent = formatDurationMinutes(sleepDurationTotal);
+  }
   if (summaryFeedDurationAvgEl) {
     summaryFeedDurationAvgEl.textContent = `Avg / feed: ${formatAverageDuration(
       durationTotal,
@@ -3515,6 +3533,12 @@ function renderSummaryStats(entries) {
     summaryTotalIntakeAvgEl.textContent = `Avg / feed: ${formatAverageMl(
       totalIntake,
       feedCount,
+    )}`;
+  }
+  if (summarySleepDurationAvgEl) {
+    summarySleepDurationAvgEl.textContent = `Avg / sleep: ${formatAverageDuration(
+      sleepDurationTotal,
+      sleepCount,
     )}`;
   }
 }
