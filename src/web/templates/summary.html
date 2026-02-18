@@ -157,10 +157,10 @@
       .insight-table-head,
       .insight-row {
         display: grid;
-        grid-template-columns: 0.9fr repeat(5, minmax(0, 1fr));
+        grid-template-columns: 0.9fr repeat(7, minmax(0, 1fr));
         gap: 8px;
         align-items: center;
-        min-width: 520px;
+        min-width: 700px;
       }
       .insight-table-head {
         font-size: 10px;
@@ -809,6 +809,11 @@
             <div class="summary-value skeleton-text skeleton-mid" id="summary-total-intake-amount">0 ml</div>
             <div class="summary-sub skeleton-text skeleton-wide" id="summary-total-intake-avg">Avg / feed: --</div>
           </div>
+          <div class="summary-card">
+            <div class="summary-label">Total sleep time</div>
+            <div class="summary-value skeleton-text skeleton-mid" id="summary-sleep-duration">0 min</div>
+            <div class="summary-sub skeleton-text skeleton-wide" id="summary-sleep-duration-avg">Avg / sleep: --</div>
+          </div>
         </section>
 
         <section class="summary-panel">
@@ -894,45 +899,13 @@
               <div>Window</div>
               <div>Feeds</div>
               <div>Avg gap</div>
+              <div>Avg feed total</div>
+              <div>Sleep avg / day</div>
               <div>Feed mins</div>
               <div>Express</div>
               <div>Avg express</div>
             </div>
             <div id="insight-timeframe-body"></div>
-          </div>
-        </section>
-
-        <section class="summary-panel">
-          <div class="summary-panel-header">
-            <h2>Daily rhythm</h2>
-            <div class="summary-panel-meta">All time</div>
-          </div>
-          <div class="insight-rhythm">
-            <div class="rhythm-block">
-              <div class="rhythm-title">Feeds by hour</div>
-              <div class="hour-grid" id="feed-hour-grid"></div>
-              <div class="hour-labels"><span>12a</span><span>6a</span><span>12p</span><span>6p</span><span>11p</span></div>
-            </div>
-            <div class="rhythm-block">
-              <div class="rhythm-title">Express by hour</div>
-              <div class="hour-grid" id="express-hour-grid"></div>
-              <div class="hour-labels"><span>12a</span><span>6a</span><span>12p</span><span>6p</span><span>11p</span></div>
-            </div>
-          </div>
-        </section>
-
-        <section class="summary-panel">
-          <div class="summary-panel-header">
-            <h2>Last 14 days trend</h2>
-            <div class="summary-panel-meta">Feeds + express</div>
-          </div>
-          <div class="trend-row">
-            <div class="trend-label">Feed count</div>
-            <div class="trend-bars" id="feed-trend-bars"></div>
-          </div>
-          <div class="trend-row">
-            <div class="trend-label">Expressed ml</div>
-            <div class="trend-bars" id="express-trend-bars"></div>
           </div>
         </section>
 

@@ -98,6 +98,8 @@ const summaryFormulaEl = document.getElementById("summary-formula-amount");
 const summaryFormulaAvgEl = document.getElementById("summary-formula-avg");
 const summaryTotalIntakeEl = document.getElementById("summary-total-intake-amount");
 const summaryTotalIntakeAvgEl = document.getElementById("summary-total-intake-avg");
+const summarySleepDurationEl = document.getElementById("summary-sleep-duration");
+const summarySleepDurationAvgEl = document.getElementById("summary-sleep-duration-avg");
 const milkExpressCountEl = document.getElementById("milk-express-count");
 const milkExpressTotalsEl = document.getElementById("milk-express-totals");
 const milkExpressListEl = document.getElementById("milk-express-list");
@@ -127,10 +129,6 @@ const insightDiaper7El = document.getElementById("insight-diaper-7");
 const insightDiaper7SubEl = document.getElementById("insight-diaper-7-sub");
 const insightAnchorLabelEl = document.getElementById("insight-anchor-label");
 const insightTimeframeBodyEl = document.getElementById("insight-timeframe-body");
-const feedHourGridEl = document.getElementById("feed-hour-grid");
-const expressHourGridEl = document.getElementById("express-hour-grid");
-const feedTrendBarsEl = document.getElementById("feed-trend-bars");
-const expressTrendBarsEl = document.getElementById("express-trend-bars");
 
 const timelineWrapEl = document.getElementById("timeline-wrap");
 const timelineTrackEl = document.getElementById("timeline-track");
@@ -3307,6 +3305,10 @@ function isFeedType(value) {
   return normalizeEntryType(value) === "feed";
 }
 
+function isSleepType(value) {
+  return normalizeEntryType(value) === "sleep";
+}
+
 function parseMilkExpressNotes(value) {
   if (typeof value !== "string") {
     return { ml: 0, minutes: 0 };
@@ -3468,6 +3470,8 @@ function renderSummaryStats(entries) {
   let durationTotal = 0;
   let expressedTotal = 0;
   let formulaTotal = 0;
+  let sleepCount = 0;
+  let sleepDurationTotal = 0;
   entries.forEach((entry) => {
     if (isFeedType(entry.type)) {
       if (isBreastfeedInProgress(entry)) {
@@ -3487,12 +3491,22 @@ function renderSummaryStats(entries) {
         formulaTotal += formula;
       }
     }
+    if (isSleepType(entry.type)) {
+      const sleepDuration = Number.parseFloat(entry.feed_duration_min);
+      if (Number.isFinite(sleepDuration) && sleepDuration > 0) {
+        sleepCount += 1;
+        sleepDurationTotal += sleepDuration;
+      }
+    }
   });
   const totalIntake = expressedTotal + formulaTotal;
   summaryFeedDurationEl.textContent = formatDurationMinutes(durationTotal);
   summaryExpressedEl.textContent = formatMl(expressedTotal);
   summaryFormulaEl.textContent = formatMl(formulaTotal);
   summaryTotalIntakeEl.textContent = formatMl(totalIntake);
+  if (summarySleepDurationEl) {
+    summarySleepDurationEl.textContent = formatDurationMinutes(sleepDurationTotal);
+  }
   if (summaryFeedDurationAvgEl) {
     summaryFeedDurationAvgEl.textContent = `Avg / feed: ${formatAverageDuration(
       durationTotal,
@@ -3515,6 +3529,12 @@ function renderSummaryStats(entries) {
     summaryTotalIntakeAvgEl.textContent = `Avg / feed: ${formatAverageMl(
       totalIntake,
       feedCount,
+    )}`;
+  }
+  if (summarySleepDurationAvgEl) {
+    summarySleepDurationAvgEl.textContent = `Avg / sleep: ${formatAverageDuration(
+      sleepDurationTotal,
+      sleepCount,
     )}`;
   }
 }
@@ -3906,54 +3926,44 @@ function computeDiaperStats(entries) {
   };
 }
 
-function buildHourCounts(entries, isExpress = false) {
-  const counts = new Array(24).fill(0);
+function computeSleepStats(entries) {
+  let durationTotal = 0;
+  let count = 0;
   entries.forEach((entry) => {
-    if (isExpress && !isMilkExpressType(entry.type)) {
+    if (!isSleepType(entry.type)) {
       return;
     }
-    if (!isExpress && entry.type !== "feed") {
-      return;
+    const duration = Number.parseFloat(entry.feed_duration_min);
+    if (Number.isFinite(duration) && duration > 0) {
+      durationTotal += duration;
+      count += 1;
     }
+  });
+  return {
+    count,
+    durationTotal,
+  };
+}
+
+function computeWindowDaySpan(windowEntries, sinceMs, untilMs) {
+  if (Number.isFinite(sinceMs)) {
+    return Math.max(1, Math.ceil((untilMs - sinceMs) / 86400000));
+  }
+  if (!Array.isArray(windowEntries) || !windowEntries.length) {
+    return 1;
+  }
+  let earliestMs = Number.POSITIVE_INFINITY;
+  windowEntries.forEach((entry) => {
     const ts = new Date(entry.timestamp_utc);
-    if (Number.isNaN(ts.getTime())) {
-      return;
+    const ms = ts.getTime();
+    if (!Number.isNaN(ms) && ms < earliestMs) {
+      earliestMs = ms;
     }
-    counts[ts.getHours()] += 1;
   });
-  return counts;
-}
-
-function renderHourGrid(container, counts, variantClass) {
-  if (!container) {
-    return;
+  if (!Number.isFinite(earliestMs)) {
+    return 1;
   }
-  container.innerHTML = "";
-  const max = Math.max(...counts, 1);
-  counts.forEach((count, hour) => {
-    const bar = document.createElement("div");
-    bar.className = variantClass ? `hour-bar ${variantClass}` : "hour-bar";
-    const height = Math.max(6, (count / max) * 52);
-    bar.style.height = `${height}px`;
-    bar.title = `${hour}:00 • ${count}`;
-    container.appendChild(bar);
-  });
-}
-
-function renderTrendBars(container, values, variantClass) {
-  if (!container) {
-    return;
-  }
-  container.innerHTML = "";
-  const max = Math.max(...values, 1);
-  values.forEach((value, idx) => {
-    const bar = document.createElement("div");
-    bar.className = variantClass ? `trend-bar ${variantClass}` : "trend-bar";
-    const height = Math.max(6, (value / max) * 44);
-    bar.style.height = `${height}px`;
-    bar.title = `Day ${idx + 1}: ${value}`;
-    container.appendChild(bar);
-  });
+  return Math.max(1, Math.ceil((untilMs - earliestMs) / 86400000));
 }
 
 function renderSummaryInsights(entries, anchorEnd) {
@@ -4008,18 +4018,6 @@ function renderSummaryInsights(entries, anchorEnd) {
     }
     if (insightTimeframeBodyEl) {
       insightTimeframeBodyEl.innerHTML = "";
-    }
-    if (feedHourGridEl) {
-      feedHourGridEl.innerHTML = "";
-    }
-    if (expressHourGridEl) {
-      expressHourGridEl.innerHTML = "";
-    }
-    if (feedTrendBarsEl) {
-      feedTrendBarsEl.innerHTML = "";
-    }
-    if (expressTrendBarsEl) {
-      expressTrendBarsEl.innerHTML = "";
     }
     return;
   }
@@ -4085,7 +4083,13 @@ function renderSummaryInsights(entries, anchorEnd) {
     const feedStats = computeFeedStats(windowEntries);
     const expressStats = computeExpressStats(windowEntries);
     const diaperStats = computeDiaperStats(windowEntries);
+    const sleepStats = computeSleepStats(windowEntries);
+    const daySpan = computeWindowDaySpan(windowEntries, sinceMs, untilMs);
     const avgGapText = feedStats.avgGap ? formatDurationMinutes(feedStats.avgGap) : "--";
+    const avgFeedTotalText = feedStats.count
+      ? formatMl((feedStats.expressedTotal + feedStats.formulaTotal) / feedStats.count)
+      : "--";
+    const sleepAvgPerDayText = formatDurationMinutes(sleepStats.durationTotal / daySpan);
     const expressAvgText = expressStats.count
       ? formatMl(expressStats.totalMl / expressStats.count)
       : "--";
@@ -4146,6 +4150,8 @@ function renderSummaryInsights(entries, anchorEnd) {
         spec.label,
         `${feedStats.count}`,
         avgGapText,
+        avgFeedTotalText,
+        sleepAvgPerDayText,
         formatDurationMinutes(feedStats.durationTotal),
         `${formatMl(expressStats.totalMl)} • ${expressStats.count}x`,
         expressAvgText,
@@ -4165,37 +4171,6 @@ function renderSummaryInsights(entries, anchorEnd) {
       insightTimeframeBodyEl.appendChild(row);
     }
   });
-
-  renderHourGrid(feedHourGridEl, buildHourCounts(entries, false), "");
-  renderHourGrid(expressHourGridEl, buildHourCounts(entries, true), "express");
-
-  const dayTotals = new Map();
-  const expressTotals = new Map();
-  entries.forEach((entry) => {
-    const ts = new Date(entry.timestamp_utc);
-    if (Number.isNaN(ts.getTime())) {
-      return;
-    }
-    const key = formatDateInputValue(ts);
-    if (entry.type === "feed") {
-      dayTotals.set(key, (dayTotals.get(key) || 0) + 1);
-    }
-    if (isMilkExpressType(entry.type)) {
-      const { ml } = getMilkExpressAmounts(entry);
-      expressTotals.set(key, (expressTotals.get(key) || 0) + (Number.isFinite(ml) ? ml : 0));
-    }
-  });
-
-  const trendDays = [];
-  for (let i = 13; i >= 0; i -= 1) {
-    const day = new Date(anchorEnd);
-    day.setDate(day.getDate() - i);
-    trendDays.push(formatDateInputValue(day));
-  }
-  const feedTrendValues = trendDays.map((key) => dayTotals.get(key) || 0);
-  const expressTrendValues = trendDays.map((key) => Math.round(expressTotals.get(key) || 0));
-  renderTrendBars(feedTrendBarsEl, feedTrendValues, "");
-  renderTrendBars(expressTrendBarsEl, expressTrendValues, "express");
 }
 
 function getSummaryTypeColor(type) {
