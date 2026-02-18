@@ -297,9 +297,19 @@ const CHART_CONFIG = {
   height: 150,
   paddingX: 16,
   axisY: 122,
-  feedY: 70,
-  pooY: 100,
-  weeY: 40,
+  sleepY: 22,
+  weeY: 42,
+  feedY: 62,
+  cryY: 82,
+  pooY: 102,
+};
+
+const CHART_EVENT_TYPES = {
+  sleep: { y: CHART_CONFIG.sleepY, color: "#7c83ff" },
+  wee: { y: CHART_CONFIG.weeY, color: "#7dd3fc" },
+  feed: { y: CHART_CONFIG.feedY, color: "#13ec5b" },
+  cry: { y: CHART_CONFIG.cryY, color: "#fb7185" },
+  poo: { y: CHART_CONFIG.pooY, color: "#fbbf24" },
 };
 
 function getPreferredTheme() {
@@ -4548,7 +4558,7 @@ function renderChart(entries, windowBounds) {
   chartEmptyEl.style.display = "none";
 
   const svgNS = "http://www.w3.org/2000/svg";
-  const { width, height, paddingX, axisY, feedY, pooY, weeY } = CHART_CONFIG;
+  const { width, height, paddingX, axisY } = CHART_CONFIG;
 
   const axisLine = document.createElementNS(svgNS, "line");
   axisLine.setAttribute("x1", paddingX);
@@ -4570,6 +4580,13 @@ function renderChart(entries, windowBounds) {
     const label = tick % 1 === 0 ? `${tick}` : tick.toFixed(1);
     return `${label}h`;
   });
+
+  const formatChartTickTime = (date) => {
+    const hours = date.getHours();
+    const minutes = String(date.getMinutes()).padStart(2, "0");
+    return `${hours}:${minutes}`;
+  };
+
   labels.forEach((label, idx) => {
     const x = paddingX + ((width - paddingX * 2) / 4) * idx;
     const tick = document.createElementNS(svgNS, "line");
@@ -4581,25 +4598,50 @@ function renderChart(entries, windowBounds) {
     tick.setAttribute("stroke-width", "1");
     chartSvg.appendChild(tick);
 
-    const text = document.createElementNS(svgNS, "text");
-    text.setAttribute("x", x);
-    text.setAttribute("y", height - 8);
-    text.setAttribute("fill", "#8b857e");
-    text.setAttribute("font-size", "10");
-    text.setAttribute("text-anchor", "middle");
-    text.textContent = label;
-    chartSvg.appendChild(text);
+    const relativeText = document.createElementNS(svgNS, "text");
+    relativeText.setAttribute("x", x);
+    relativeText.setAttribute("y", height - 16);
+    relativeText.setAttribute("fill", "#8b857e");
+    relativeText.setAttribute("font-size", "10");
+    relativeText.setAttribute("text-anchor", "middle");
+    relativeText.textContent = label;
+    chartSvg.appendChild(relativeText);
+
+    const tickTime = new Date(windowBounds.until.getTime() - ticks[idx] * 3600000);
+    const absoluteText = document.createElementNS(svgNS, "text");
+    absoluteText.setAttribute("x", x);
+    absoluteText.setAttribute("y", height - 4);
+    absoluteText.setAttribute("fill", "#8b857e");
+    absoluteText.setAttribute("font-size", "10");
+    absoluteText.setAttribute("text-anchor", "middle");
+    absoluteText.textContent = formatChartTickTime(tickTime);
+    chartSvg.appendChild(absoluteText);
   });
 
   const startMs = windowBounds.since.getTime();
   const spanMs = windowBounds.until.getTime() - startMs;
+
+  const formatChartDuration = (minutesValue) => {
+    const rounded = Math.round(minutesValue);
+    const hours = Math.floor(rounded / 60);
+    const minutes = rounded % 60;
+    if (!hours) {
+      return `${minutes}m`;
+    }
+    if (!minutes) {
+      return `${hours}h`;
+    }
+    return `${hours}h ${minutes}m`;
+  };
 
   entries.forEach((entry) => {
     const timestamp = new Date(entry.timestamp_utc);
     if (Number.isNaN(timestamp.getTime())) {
       return;
     }
-    if (!["feed", "poo", "wee"].includes(entry.type)) {
+    const entryType = normalizeEntryType(entry.type);
+    const eventMeta = CHART_EVENT_TYPES[entryType];
+    if (!eventMeta) {
       return;
     }
     const ratio = (timestamp.getTime() - startMs) / spanMs;
@@ -4607,15 +4649,8 @@ function renderChart(entries, windowBounds) {
       return;
     }
     const x = paddingX + ratio * (width - paddingX * 2);
-    let y = pooY;
-    let color = "#fbbf24";
-    if (entry.type === "feed") {
-      y = feedY;
-      color = "#13ec5b";
-    } else if (entry.type === "wee") {
-      y = weeY;
-      color = "#7dd3fc";
-    }
+    const y = eventMeta.y;
+    const color = eventMeta.color;
 
     const stem = document.createElementNS(svgNS, "line");
     stem.setAttribute("x1", x);
@@ -4625,6 +4660,37 @@ function renderChart(entries, windowBounds) {
     stem.setAttribute("stroke", "#e1d8cc");
     stem.setAttribute("stroke-width", "1");
     chartSvg.appendChild(stem);
+
+    const duration = Number.parseFloat(entry.feed_duration_min);
+    if ((entryType === "sleep" || entryType === "cry") && Number.isFinite(duration) && duration > 0) {
+      const chartSpanPx = width - paddingX * 2;
+      const durationRatio = (duration * 60000) / spanMs;
+      const durationWidthPx = Math.max(10, durationRatio * chartSpanPx);
+      const barStartX = x + 3;
+      const barEndX = Math.min(width - paddingX, barStartX + durationWidthPx);
+      if (barEndX > barStartX) {
+        const durationBar = document.createElementNS(svgNS, "line");
+        durationBar.setAttribute("x1", barStartX);
+        durationBar.setAttribute("x2", barEndX);
+        durationBar.setAttribute("y1", y);
+        durationBar.setAttribute("y2", y);
+        durationBar.setAttribute("stroke", color);
+        durationBar.setAttribute("stroke-width", "7");
+        durationBar.setAttribute("stroke-linecap", "round");
+        durationBar.setAttribute("opacity", "0.35");
+        chartSvg.appendChild(durationBar);
+
+        const durationLabel = document.createElementNS(svgNS, "text");
+        durationLabel.setAttribute("x", barEndX);
+        durationLabel.setAttribute("y", Math.max(10, y - 7));
+        durationLabel.setAttribute("fill", color);
+        durationLabel.setAttribute("font-size", "9");
+        durationLabel.setAttribute("font-weight", "700");
+        durationLabel.setAttribute("text-anchor", "end");
+        durationLabel.textContent = formatChartDuration(duration);
+        chartSvg.appendChild(durationLabel);
+      }
+    }
 
     const dot = document.createElementNS(svgNS, "circle");
     dot.setAttribute("cx", x);
