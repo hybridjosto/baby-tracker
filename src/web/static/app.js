@@ -129,10 +129,6 @@ const insightDiaper7El = document.getElementById("insight-diaper-7");
 const insightDiaper7SubEl = document.getElementById("insight-diaper-7-sub");
 const insightAnchorLabelEl = document.getElementById("insight-anchor-label");
 const insightTimeframeBodyEl = document.getElementById("insight-timeframe-body");
-const feedHourGridEl = document.getElementById("feed-hour-grid");
-const expressHourGridEl = document.getElementById("express-hour-grid");
-const feedTrendBarsEl = document.getElementById("feed-trend-bars");
-const expressTrendBarsEl = document.getElementById("express-trend-bars");
 
 const timelineWrapEl = document.getElementById("timeline-wrap");
 const timelineTrackEl = document.getElementById("timeline-track");
@@ -3930,56 +3926,6 @@ function computeDiaperStats(entries) {
   };
 }
 
-function buildHourCounts(entries, isExpress = false) {
-  const counts = new Array(24).fill(0);
-  entries.forEach((entry) => {
-    if (isExpress && !isMilkExpressType(entry.type)) {
-      return;
-    }
-    if (!isExpress && entry.type !== "feed") {
-      return;
-    }
-    const ts = new Date(entry.timestamp_utc);
-    if (Number.isNaN(ts.getTime())) {
-      return;
-    }
-    counts[ts.getHours()] += 1;
-  });
-  return counts;
-}
-
-function renderHourGrid(container, counts, variantClass) {
-  if (!container) {
-    return;
-  }
-  container.innerHTML = "";
-  const max = Math.max(...counts, 1);
-  counts.forEach((count, hour) => {
-    const bar = document.createElement("div");
-    bar.className = variantClass ? `hour-bar ${variantClass}` : "hour-bar";
-    const height = Math.max(6, (count / max) * 52);
-    bar.style.height = `${height}px`;
-    bar.title = `${hour}:00 • ${count}`;
-    container.appendChild(bar);
-  });
-}
-
-function renderTrendBars(container, values, variantClass) {
-  if (!container) {
-    return;
-  }
-  container.innerHTML = "";
-  const max = Math.max(...values, 1);
-  values.forEach((value, idx) => {
-    const bar = document.createElement("div");
-    bar.className = variantClass ? `trend-bar ${variantClass}` : "trend-bar";
-    const height = Math.max(6, (value / max) * 44);
-    bar.style.height = `${height}px`;
-    bar.title = `Day ${idx + 1}: ${value}`;
-    container.appendChild(bar);
-  });
-}
-
 function renderSummaryInsights(entries, anchorEnd) {
   if (!entries.length) {
     if (insightLastFeedEl) {
@@ -4032,18 +3978,6 @@ function renderSummaryInsights(entries, anchorEnd) {
     }
     if (insightTimeframeBodyEl) {
       insightTimeframeBodyEl.innerHTML = "";
-    }
-    if (feedHourGridEl) {
-      feedHourGridEl.innerHTML = "";
-    }
-    if (expressHourGridEl) {
-      expressHourGridEl.innerHTML = "";
-    }
-    if (feedTrendBarsEl) {
-      feedTrendBarsEl.innerHTML = "";
-    }
-    if (expressTrendBarsEl) {
-      expressTrendBarsEl.innerHTML = "";
     }
     return;
   }
@@ -4189,37 +4123,6 @@ function renderSummaryInsights(entries, anchorEnd) {
       insightTimeframeBodyEl.appendChild(row);
     }
   });
-
-  renderHourGrid(feedHourGridEl, buildHourCounts(entries, false), "");
-  renderHourGrid(expressHourGridEl, buildHourCounts(entries, true), "express");
-
-  const dayTotals = new Map();
-  const expressTotals = new Map();
-  entries.forEach((entry) => {
-    const ts = new Date(entry.timestamp_utc);
-    if (Number.isNaN(ts.getTime())) {
-      return;
-    }
-    const key = formatDateInputValue(ts);
-    if (entry.type === "feed") {
-      dayTotals.set(key, (dayTotals.get(key) || 0) + 1);
-    }
-    if (isMilkExpressType(entry.type)) {
-      const { ml } = getMilkExpressAmounts(entry);
-      expressTotals.set(key, (expressTotals.get(key) || 0) + (Number.isFinite(ml) ? ml : 0));
-    }
-  });
-
-  const trendDays = [];
-  for (let i = 13; i >= 0; i -= 1) {
-    const day = new Date(anchorEnd);
-    day.setDate(day.getDate() - i);
-    trendDays.push(formatDateInputValue(day));
-  }
-  const feedTrendValues = trendDays.map((key) => dayTotals.get(key) || 0);
-  const expressTrendValues = trendDays.map((key) => Math.round(expressTotals.get(key) || 0));
-  renderTrendBars(feedTrendBarsEl, feedTrendValues, "");
-  renderTrendBars(expressTrendBarsEl, expressTrendValues, "express");
 }
 
 function getSummaryTypeColor(type) {
