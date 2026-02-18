@@ -4580,6 +4580,13 @@ function renderChart(entries, windowBounds) {
     const label = tick % 1 === 0 ? `${tick}` : tick.toFixed(1);
     return `${label}h`;
   });
+
+  const formatChartTickTime = (date) => {
+    const hours = date.getHours();
+    const minutes = String(date.getMinutes()).padStart(2, "0");
+    return `${hours}:${minutes}`;
+  };
+
   labels.forEach((label, idx) => {
     const x = paddingX + ((width - paddingX * 2) / 4) * idx;
     const tick = document.createElementNS(svgNS, "line");
@@ -4591,14 +4598,24 @@ function renderChart(entries, windowBounds) {
     tick.setAttribute("stroke-width", "1");
     chartSvg.appendChild(tick);
 
-    const text = document.createElementNS(svgNS, "text");
-    text.setAttribute("x", x);
-    text.setAttribute("y", height - 8);
-    text.setAttribute("fill", "#8b857e");
-    text.setAttribute("font-size", "10");
-    text.setAttribute("text-anchor", "middle");
-    text.textContent = label;
-    chartSvg.appendChild(text);
+    const relativeText = document.createElementNS(svgNS, "text");
+    relativeText.setAttribute("x", x);
+    relativeText.setAttribute("y", height - 20);
+    relativeText.setAttribute("fill", "#8b857e");
+    relativeText.setAttribute("font-size", "10");
+    relativeText.setAttribute("text-anchor", "middle");
+    relativeText.textContent = label;
+    chartSvg.appendChild(relativeText);
+
+    const tickTime = new Date(windowBounds.until.getTime() - ticks[idx] * 3600000);
+    const absoluteText = document.createElementNS(svgNS, "text");
+    absoluteText.setAttribute("x", x);
+    absoluteText.setAttribute("y", height - 8);
+    absoluteText.setAttribute("fill", "#8b857e");
+    absoluteText.setAttribute("font-size", "10");
+    absoluteText.setAttribute("text-anchor", "middle");
+    absoluteText.textContent = formatChartTickTime(tickTime);
+    chartSvg.appendChild(absoluteText);
   });
 
   const startMs = windowBounds.since.getTime();
