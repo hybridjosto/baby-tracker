@@ -4646,30 +4646,33 @@ function renderChart(entries, windowBounds) {
 
     const duration = Number.parseFloat(entry.feed_duration_min);
     if ((entryType === "sleep" || entryType === "cry") && Number.isFinite(duration) && duration > 0) {
-      const durationPixels = Math.max(10, Math.min(46, duration * 0.9));
-      const durationTopY = Math.max(10, y - durationPixels);
+      const chartSpanPx = width - paddingX * 2;
+      const durationRatio = (duration * 60000) / spanMs;
+      const durationWidthPx = Math.max(10, durationRatio * chartSpanPx);
+      const barStartX = x + 3;
+      const barEndX = Math.min(width - paddingX, barStartX + durationWidthPx);
+      if (barEndX > barStartX) {
+        const durationBar = document.createElementNS(svgNS, "line");
+        durationBar.setAttribute("x1", barStartX);
+        durationBar.setAttribute("x2", barEndX);
+        durationBar.setAttribute("y1", y);
+        durationBar.setAttribute("y2", y);
+        durationBar.setAttribute("stroke", color);
+        durationBar.setAttribute("stroke-width", "7");
+        durationBar.setAttribute("stroke-linecap", "round");
+        durationBar.setAttribute("opacity", "0.35");
+        chartSvg.appendChild(durationBar);
 
-      const durationLine = document.createElementNS(svgNS, "line");
-      durationLine.setAttribute("x1", x);
-      durationLine.setAttribute("x2", x);
-      durationLine.setAttribute("y1", y);
-      durationLine.setAttribute("y2", durationTopY);
-      durationLine.setAttribute("stroke", color);
-      durationLine.setAttribute("stroke-width", "4");
-      durationLine.setAttribute("stroke-linecap", "round");
-      durationLine.setAttribute("opacity", "0.35");
-      chartSvg.appendChild(durationLine);
-
-      const durationLabel = document.createElementNS(svgNS, "text");
-      const preferRightLabel = x < width - paddingX - 24;
-      durationLabel.setAttribute("x", preferRightLabel ? x + 6 : x - 6);
-      durationLabel.setAttribute("y", Math.max(10, durationTopY - 3));
-      durationLabel.setAttribute("fill", color);
-      durationLabel.setAttribute("font-size", "9");
-      durationLabel.setAttribute("font-weight", "700");
-      durationLabel.setAttribute("text-anchor", preferRightLabel ? "start" : "end");
-      durationLabel.textContent = formatChartDuration(duration);
-      chartSvg.appendChild(durationLabel);
+        const durationLabel = document.createElementNS(svgNS, "text");
+        durationLabel.setAttribute("x", barEndX);
+        durationLabel.setAttribute("y", Math.max(10, y - 7));
+        durationLabel.setAttribute("fill", color);
+        durationLabel.setAttribute("font-size", "9");
+        durationLabel.setAttribute("font-weight", "700");
+        durationLabel.setAttribute("text-anchor", "end");
+        durationLabel.textContent = formatChartDuration(duration);
+        chartSvg.appendChild(durationLabel);
+      }
     }
 
     const dot = document.createElementNS(svgNS, "circle");
