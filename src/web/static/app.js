@@ -4600,7 +4600,7 @@ function renderChart(entries, windowBounds) {
 
     const relativeText = document.createElementNS(svgNS, "text");
     relativeText.setAttribute("x", x);
-    relativeText.setAttribute("y", height - 20);
+    relativeText.setAttribute("y", height - 16);
     relativeText.setAttribute("fill", "#8b857e");
     relativeText.setAttribute("font-size", "10");
     relativeText.setAttribute("text-anchor", "middle");
@@ -4610,7 +4610,7 @@ function renderChart(entries, windowBounds) {
     const tickTime = new Date(windowBounds.until.getTime() - ticks[idx] * 3600000);
     const absoluteText = document.createElementNS(svgNS, "text");
     absoluteText.setAttribute("x", x);
-    absoluteText.setAttribute("y", height - 8);
+    absoluteText.setAttribute("y", height - 4);
     absoluteText.setAttribute("fill", "#8b857e");
     absoluteText.setAttribute("font-size", "10");
     absoluteText.setAttribute("text-anchor", "middle");
