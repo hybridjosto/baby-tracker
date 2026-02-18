@@ -297,9 +297,19 @@ const CHART_CONFIG = {
   height: 150,
   paddingX: 16,
   axisY: 122,
-  feedY: 70,
-  pooY: 100,
-  weeY: 40,
+  sleepY: 22,
+  weeY: 42,
+  feedY: 62,
+  cryY: 82,
+  pooY: 102,
+};
+
+const CHART_EVENT_TYPES = {
+  sleep: { y: CHART_CONFIG.sleepY, color: "#7c83ff" },
+  wee: { y: CHART_CONFIG.weeY, color: "#7dd3fc" },
+  feed: { y: CHART_CONFIG.feedY, color: "#13ec5b" },
+  cry: { y: CHART_CONFIG.cryY, color: "#fb7185" },
+  poo: { y: CHART_CONFIG.pooY, color: "#fbbf24" },
 };
 
 function getPreferredTheme() {
@@ -4548,7 +4558,7 @@ function renderChart(entries, windowBounds) {
   chartEmptyEl.style.display = "none";
 
   const svgNS = "http://www.w3.org/2000/svg";
-  const { width, height, paddingX, axisY, feedY, pooY, weeY } = CHART_CONFIG;
+  const { width, height, paddingX, axisY } = CHART_CONFIG;
 
   const axisLine = document.createElementNS(svgNS, "line");
   axisLine.setAttribute("x1", paddingX);
@@ -4594,12 +4604,27 @@ function renderChart(entries, windowBounds) {
   const startMs = windowBounds.since.getTime();
   const spanMs = windowBounds.until.getTime() - startMs;
 
+  const formatChartDuration = (minutesValue) => {
+    const rounded = Math.round(minutesValue);
+    const hours = Math.floor(rounded / 60);
+    const minutes = rounded % 60;
+    if (!hours) {
+      return `${minutes}m`;
+    }
+    if (!minutes) {
+      return `${hours}h`;
+    }
+    return `${hours}h ${minutes}m`;
+  };
+
   entries.forEach((entry) => {
     const timestamp = new Date(entry.timestamp_utc);
     if (Number.isNaN(timestamp.getTime())) {
       return;
     }
-    if (!["feed", "poo", "wee"].includes(entry.type)) {
+    const entryType = normalizeEntryType(entry.type);
+    const eventMeta = CHART_EVENT_TYPES[entryType];
+    if (!eventMeta) {
       return;
     }
     const ratio = (timestamp.getTime() - startMs) / spanMs;
@@ -4607,15 +4632,8 @@ function renderChart(entries, windowBounds) {
       return;
     }
     const x = paddingX + ratio * (width - paddingX * 2);
-    let y = pooY;
-    let color = "#fbbf24";
-    if (entry.type === "feed") {
-      y = feedY;
-      color = "#13ec5b";
-    } else if (entry.type === "wee") {
-      y = weeY;
-      color = "#7dd3fc";
-    }
+    const y = eventMeta.y;
+    const color = eventMeta.color;
 
     const stem = document.createElementNS(svgNS, "line");
     stem.setAttribute("x1", x);
@@ -4625,6 +4643,34 @@ function renderChart(entries, windowBounds) {
     stem.setAttribute("stroke", "#e1d8cc");
     stem.setAttribute("stroke-width", "1");
     chartSvg.appendChild(stem);
+
+    const duration = Number.parseFloat(entry.feed_duration_min);
+    if ((entryType === "sleep" || entryType === "cry") && Number.isFinite(duration) && duration > 0) {
+      const durationPixels = Math.max(10, Math.min(46, duration * 0.9));
+      const durationTopY = Math.max(10, y - durationPixels);
+
+      const durationLine = document.createElementNS(svgNS, "line");
+      durationLine.setAttribute("x1", x);
+      durationLine.setAttribute("x2", x);
+      durationLine.setAttribute("y1", y);
+      durationLine.setAttribute("y2", durationTopY);
+      durationLine.setAttribute("stroke", color);
+      durationLine.setAttribute("stroke-width", "4");
+      durationLine.setAttribute("stroke-linecap", "round");
+      durationLine.setAttribute("opacity", "0.35");
+      chartSvg.appendChild(durationLine);
+
+      const durationLabel = document.createElementNS(svgNS, "text");
+      const preferRightLabel = x < width - paddingX - 24;
+      durationLabel.setAttribute("x", preferRightLabel ? x + 6 : x - 6);
+      durationLabel.setAttribute("y", Math.max(10, durationTopY - 3));
+      durationLabel.setAttribute("fill", color);
+      durationLabel.setAttribute("font-size", "9");
+      durationLabel.setAttribute("font-weight", "700");
+      durationLabel.setAttribute("text-anchor", preferRightLabel ? "start" : "end");
+      durationLabel.textContent = formatChartDuration(duration);
+      chartSvg.appendChild(durationLabel);
+    }
 
     const dot = document.createElementNS(svgNS, "circle");
     dot.setAttribute("cx", x);
