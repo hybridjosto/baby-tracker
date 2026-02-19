@@ -591,7 +591,7 @@
       }
       .ruler-body {
         position: relative;
-        height: 170px;
+        height: 242px;
       }
       #ruler-canvas {
         width: 100%;
@@ -601,7 +601,7 @@
       }
       .ruler-readout {
         position: absolute;
-        top: 6px;
+        top: 178px;
         min-width: 170px;
         padding: 10px 12px;
         border-radius: 12px;
@@ -914,8 +914,7 @@
             <h2 class="ruler-title">Rolling 24h Feed Window</h2>
             <div class="ruler-actions">
               <div class="ruler-legend">
-                <span><i class="ruler-dot" style="background: var(--ruler-expressed);"></i>Expressed</span>
-                <span><i class="ruler-dot" style="background: var(--ruler-formula);"></i>Formula</span>
+                <span><i class="ruler-dot" style="background: var(--ruler-expressed);"></i>Total volume</span>
               </div>
               <button class="ruler-toggle active" id="ruler-snap-toggle" type="button">Snap to feeds</button>
               <button class="ruler-now" id="ruler-now-btn" type="button">Jump to now</button>
@@ -926,7 +925,7 @@
             <div class="ruler-readout" id="ruler-readout">
               <h3>Rolling 24h</h3>
               <div class="ruler-metric" id="ruler-total">0 ml</div>
-              <div class="ruler-detail" id="ruler-detail">Expressed 0 ml · Formula 0 ml</div>
+              <div class="ruler-detail" id="ruler-detail">Total feed volume in trailing 24h window</div>
               <div class="ruler-goal" id="ruler-goal">0% of 700 ml goal</div>
             </div>
           </div>
