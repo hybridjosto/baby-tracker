@@ -1110,12 +1110,16 @@ let rulerGoalMl = 700;
 let rulerEntries = [];
 let rulerAnchorTs = Date.now();
 let rulerDragStartX = 0;
+let rulerDragStartY = 0;
 let rulerDragStartAnchor = 0;
 let rulerDragging = false;
+let rulerPointerId = null;
+let rulerHasDragged = false;
 let rulerStretch = 0;
 let rulerMinTs = null;
 let rulerMaxTs = null;
 let rulerSnapToFeeds = true;
+let rulerFeedHitTargets = [];
 
 function initHomeHandlers() {
   if (homeInitialized || pageType !== "home") {
@@ -2791,9 +2795,6 @@ function normalizeFeedEntry(entry) {
   if (!entry || entry.type !== "feed") {
     return null;
   }
-  if (pageType !== "timeline" && activeUser && entry.user_slug && entry.user_slug !== activeUser) {
-    return null;
-  }
   const timestamp = new Date(entry.timestamp_utc);
   if (Number.isNaN(timestamp.getTime())) {
     return null;
@@ -2924,6 +2925,32 @@ function updateRulerReadout(data, anchorX) {
   rulerReadoutEl.style.left = `${clamped}px`;
 }
 
+function pickRulerAnchorFromCanvasX(canvasX) {
+  if (!rulerCanvasEl) {
+    return null;
+  }
+  const rect = rulerCanvasEl.getBoundingClientRect();
+  if (!rect.width) {
+    return null;
+  }
+  const hitRadiusPx = 12;
+  let nearestHit = null;
+  let nearestDist = Number.POSITIVE_INFINITY;
+  rulerFeedHitTargets.forEach((target) => {
+    const dist = Math.abs(target.x - canvasX);
+    if (dist <= hitRadiusPx && dist < nearestDist) {
+      nearestDist = dist;
+      nearestHit = target;
+    }
+  });
+  if (nearestHit) {
+    return nearestHit.ts;
+  }
+  const ratio = Math.max(0, Math.min(1, canvasX / rect.width));
+  const span = (rulerMaxTs || Date.now()) - (rulerMinTs || Date.now() - RULER_DAYS_BACK * 24 * 60 * 60 * 1000);
+  return (rulerMinTs || Date.now() - RULER_DAYS_BACK * 24 * 60 * 60 * 1000) + ratio * span;
+}
+
 function drawRuler() {
   if (!rulerCanvasEl || !rulerEntries || !rulerEntries.length) {
     if (rulerCanvasEl) {
@@ -2981,10 +3008,12 @@ function drawRuler() {
   const buckets = buildRulerBuckets().filter((bucket) => (
     bucket.ts >= minTs && bucket.ts <= maxTs
   ));
+  rulerFeedHitTargets = [];
 
   buckets.forEach((bucket) => {
     const ratio = (bucket.ts - minTs) / span;
     const x = padding + ratio * trackWidth;
+    rulerFeedHitTargets.push({ x: x / scale, ts: bucket.ts });
     const baseHeight = 10 * scale;
     const totalH = baseHeight + Math.min(44 * scale, bucket.total * 0.22 * scale);
 
@@ -3023,15 +3052,20 @@ async function loadRulerFeeds({ reset } = {}) {
   rulerMinTs = window.since.getTime();
   rulerMaxTs = window.until.getTime();
   try {
-    const [entries, currentGoal] = await Promise.all([
-      loadEntriesWithFallback({
-        limit: 200,
+    const [serverEntries, localEntries, currentGoal] = await Promise.all([
+      fetchEntriesInWindow({
+        since: window.sinceIso,
+        until: window.untilIso,
+        type: "feed",
+      }),
+      listEntriesLocalSafe({
         since: window.sinceIso,
         until: window.untilIso,
         type: "feed",
       }),
       loadCurrentGoal(),
     ]);
+    const entries = serverEntries.length ? serverEntries : (localEntries || []);
     rulerGoalMl = currentGoal && Number.isFinite(currentGoal.goal_ml)
       ? currentGoal.goal_ml
       : rulerGoalMl;
@@ -3053,20 +3087,33 @@ async function loadRulerFeeds({ reset } = {}) {
 }
 
 function onRulerPointerDown(event) {
-  if (!rulerCanvasEl) {
+  if (!rulerCanvasEl || (event.pointerType === "mouse" && event.button !== 0)) {
     return;
   }
+  rulerPointerId = event.pointerId;
   rulerDragging = true;
-  rulerDragStartX = event.clientX || (event.touches ? event.touches[0].clientX : 0);
+  rulerHasDragged = false;
+  rulerDragStartX = event.clientX;
+  rulerDragStartY = event.clientY;
   rulerDragStartAnchor = rulerAnchorTs;
+  try {
+    rulerCanvasEl.setPointerCapture(event.pointerId);
+  } catch (err) {
+    // Ignore capture failures and continue with best-effort dragging.
+  }
 }
 
 function onRulerPointerMove(event) {
-  if (!rulerDragging || !rulerCanvasEl) {
+  if (!rulerDragging || !rulerCanvasEl || event.pointerId !== rulerPointerId) {
     return;
   }
-  const x = event.clientX || (event.touches ? event.touches[0].clientX : 0);
-  const dx = x - rulerDragStartX;
+  const dx = event.clientX - rulerDragStartX;
+  const dy = event.clientY - rulerDragStartY;
+  const dragDistance = Math.hypot(dx, dy);
+  if (!rulerHasDragged && dragDistance < 8) {
+    return;
+  }
+  rulerHasDragged = true;
   const rect = rulerCanvasEl.getBoundingClientRect();
   const ratio = dx / rect.width;
   const span = (rulerMaxTs || Date.now()) - (rulerMinTs || Date.now() - RULER_DAYS_BACK * 24 * 60 * 60 * 1000);
@@ -3078,14 +3125,32 @@ function onRulerPointerMove(event) {
 }
 
 function onRulerPointerUp() {
-  if (!rulerDragging) {
+  if (!rulerDragging || !rulerCanvasEl) {
     return;
   }
+  if (rulerPointerId !== null) {
+    try {
+      rulerCanvasEl.releasePointerCapture(rulerPointerId);
+    } catch (err) {
+      // Ignore capture release failures.
+    }
+  }
+  const pointerId = rulerPointerId;
   rulerDragging = false;
   rulerStretch = 0;
-  if (rulerSnapToFeeds) {
+  if (rulerHasDragged && rulerSnapToFeeds) {
     rulerAnchorTs = nearestRulerFeedTs(rulerAnchorTs);
+  } else if (!rulerHasDragged && pointerId !== null) {
+    // Treat a short movement as a tap/click.
+    const canvasRect = rulerCanvasEl.getBoundingClientRect();
+    const canvasX = rulerDragStartX - canvasRect.left;
+    const targetTs = pickRulerAnchorFromCanvasX(canvasX);
+    if (Number.isFinite(targetTs)) {
+      rulerAnchorTs = rulerSnapToFeeds ? nearestRulerFeedTs(targetTs) : targetTs;
+    }
   }
+  rulerPointerId = null;
+  rulerHasDragged = false;
   clampRulerAnchor();
   drawRuler();
 }
@@ -3097,16 +3162,8 @@ function jumpRulerToNow() {
 }
 
 function onRulerClick(event) {
-  if (!rulerCanvasEl) {
-    return;
-  }
-  const rect = rulerCanvasEl.getBoundingClientRect();
-  const ratio = (event.clientX - rect.left) / rect.width;
-  const span = (rulerMaxTs || Date.now()) - (rulerMinTs || Date.now() - RULER_DAYS_BACK * 24 * 60 * 60 * 1000);
-  const targetTs = (rulerMinTs || Date.now() - RULER_DAYS_BACK * 24 * 60 * 60 * 1000) + ratio * span;
-  rulerAnchorTs = rulerSnapToFeeds ? nearestRulerFeedTs(targetTs) : targetTs;
-  clampRulerAnchor();
-  drawRuler();
+  // Kept for backwards compatibility with existing call-sites; pointerup handles tap/click.
+  onRulerPointerUp(event);
 }
 
 function initRulerHandlers() {
@@ -3115,13 +3172,10 @@ function initRulerHandlers() {
     return;
   }
   rulerInitialized = true;
-  rulerCanvasEl.addEventListener("mousedown", onRulerPointerDown);
-  rulerCanvasEl.addEventListener("mousemove", onRulerPointerMove);
-  window.addEventListener("mouseup", onRulerPointerUp);
-  rulerCanvasEl.addEventListener("touchstart", onRulerPointerDown, { passive: true });
-  rulerCanvasEl.addEventListener("touchmove", onRulerPointerMove, { passive: true });
-  rulerCanvasEl.addEventListener("touchend", onRulerPointerUp);
-  rulerCanvasEl.addEventListener("click", onRulerClick);
+  rulerCanvasEl.addEventListener("pointerdown", onRulerPointerDown);
+  rulerCanvasEl.addEventListener("pointermove", onRulerPointerMove);
+  rulerCanvasEl.addEventListener("pointerup", onRulerPointerUp);
+  rulerCanvasEl.addEventListener("pointercancel", onRulerPointerUp);
   if (rulerSnapToggleEl) {
     rulerSnapToggleEl.addEventListener("click", () => {
       rulerSnapToFeeds = !rulerSnapToFeeds;
@@ -4398,6 +4452,36 @@ async function fetchAllEntriesUntil(untilIso) {
       break;
     }
     batchUntil = decrementIsoTimestamp(oldest.timestamp_utc);
+  }
+  return entries;
+}
+
+async function fetchEntriesInWindow(params) {
+  const limit = 500;
+  const since = params && params.since ? params.since : undefined;
+  const type = params && params.type ? params.type : undefined;
+  let batchUntil = params && params.until ? params.until : undefined;
+  let entries = [];
+  for (let page = 0; page < 100; page += 1) {
+    const batch = await fetchEntries({
+      limit,
+      since,
+      until: batchUntil,
+      type,
+    });
+    entries = entries.concat(batch);
+    if (batch.length < limit) {
+      break;
+    }
+    const oldest = batch[batch.length - 1];
+    if (!oldest || !oldest.timestamp_utc) {
+      break;
+    }
+    const nextUntil = decrementIsoTimestamp(oldest.timestamp_utc);
+    if (!nextUntil || nextUntil === batchUntil) {
+      break;
+    }
+    batchUntil = nextUntil;
   }
   return entries;
 }

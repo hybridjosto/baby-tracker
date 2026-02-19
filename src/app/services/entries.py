@@ -92,7 +92,7 @@ def list_entries(
     until_utc: str | None = None,
     entry_type: str | None = None,
 ) -> list[dict]:
-    safe_limit = max(1, min(limit, 200))
+    safe_limit = max(1, limit)
     normalized_slug = normalize_user_slug(user_slug) if user_slug else None
     normalized_since = _normalize_filter_ts(since_utc)
     normalized_until = _normalize_filter_ts(until_utc)
