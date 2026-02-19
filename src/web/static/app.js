@@ -4672,7 +4672,8 @@ function renderChart(entries, windowBounds) {
   });
 
   const startMs = windowBounds.since.getTime();
-  const spanMs = windowBounds.until.getTime() - startMs;
+  const untilMs = windowBounds.until.getTime();
+  const spanMs = untilMs - startMs;
 
   const formatChartDuration = (minutesValue) => {
     const rounded = Math.round(minutesValue);
@@ -4697,30 +4698,23 @@ function renderChart(entries, windowBounds) {
     if (!eventMeta) {
       return;
     }
-    const ratio = (timestamp.getTime() - startMs) / spanMs;
-    if (ratio < 0 || ratio > 1) {
-      return;
-    }
+    const eventStartMs = timestamp.getTime();
+    const ratio = (eventStartMs - startMs) / spanMs;
+    const startInWindow = ratio >= 0 && ratio <= 1;
     const x = paddingX + ratio * (width - paddingX * 2);
     const y = eventMeta.y;
     const color = eventMeta.color;
 
-    const stem = document.createElementNS(svgNS, "line");
-    stem.setAttribute("x1", x);
-    stem.setAttribute("x2", x);
-    stem.setAttribute("y1", y);
-    stem.setAttribute("y2", axisY);
-    stem.setAttribute("stroke", "#e1d8cc");
-    stem.setAttribute("stroke-width", "1");
-    chartSvg.appendChild(stem);
-
     const duration = Number.parseFloat(entry.feed_duration_min);
     if ((entryType === "sleep" || entryType === "cry") && Number.isFinite(duration) && duration > 0) {
-      const chartSpanPx = width - paddingX * 2;
-      const durationRatio = (duration * 60000) / spanMs;
-      const durationWidthPx = Math.max(10, durationRatio * chartSpanPx);
-      const barStartX = x + 3;
-      const barEndX = Math.min(width - paddingX, barStartX + durationWidthPx);
+      const durationMs = duration * 60000;
+      const eventEndMs = eventStartMs + durationMs;
+      const clippedStartMs = Math.max(startMs, eventStartMs);
+      const clippedEndMs = Math.min(untilMs, eventEndMs);
+      const clippedStartRatio = (clippedStartMs - startMs) / spanMs;
+      const clippedEndRatio = (clippedEndMs - startMs) / spanMs;
+      const barStartX = paddingX + clippedStartRatio * (width - paddingX * 2);
+      const barEndX = paddingX + clippedEndRatio * (width - paddingX * 2);
       if (barEndX > barStartX) {
         const durationBar = document.createElementNS(svgNS, "line");
         durationBar.setAttribute("x1", barStartX);
@@ -4745,6 +4739,18 @@ function renderChart(entries, windowBounds) {
       }
     }
 
+    if (!startInWindow) {
+      return;
+    }
+    const stem = document.createElementNS(svgNS, "line");
+    stem.setAttribute("x1", x);
+    stem.setAttribute("x2", x);
+    stem.setAttribute("y1", y);
+    stem.setAttribute("y2", axisY);
+    stem.setAttribute("stroke", "#e1d8cc");
+    stem.setAttribute("stroke-width", "1");
+    chartSvg.appendChild(stem);
+
     const dot = document.createElementNS(svgNS, "circle");
     dot.setAttribute("cx", x);
     dot.setAttribute("cy", y);
@@ -4754,6 +4760,29 @@ function renderChart(entries, windowBounds) {
     dot.setAttribute("stroke-width", "1");
     chartSvg.appendChild(dot);
   });
+}
+
+function entryOverlapsChartWindow(entry, chartWindow) {
+  const timestamp = new Date(entry.timestamp_utc);
+  if (Number.isNaN(timestamp.getTime())) {
+    return false;
+  }
+  const entryType = normalizeEntryType(entry.type);
+  const startMs = timestamp.getTime();
+  const sinceMs = chartWindow.since.getTime();
+  const untilMs = chartWindow.until.getTime();
+  if (startMs >= sinceMs && startMs <= untilMs) {
+    return true;
+  }
+  if (entryType !== "sleep" && entryType !== "cry") {
+    return false;
+  }
+  const duration = Number.parseFloat(entry.feed_duration_min);
+  if (!Number.isFinite(duration) || duration <= 0) {
+    return false;
+  }
+  const endMs = startMs + duration * 60000;
+  return endMs >= sinceMs && startMs <= untilMs;
 }
 
 function renderLogEntries(entries) {
@@ -6824,10 +6853,7 @@ async function loadHomeEntries() {
       until: statsWindow.untilIso,
     });
     if (cachedEntries) {
-      const cachedChartEntries = cachedEntries.filter((entry) => {
-        const ts = new Date(entry.timestamp_utc);
-        return ts >= chartWindow.since && ts <= chartWindow.until;
-      });
+      const cachedChartEntries = cachedEntries.filter((entry) => entryOverlapsChartWindow(entry, chartWindow));
       renderChart(cachedChartEntries, chartWindow);
       renderStats(cachedEntries);
       renderGoalComparison();
@@ -6853,10 +6879,7 @@ async function loadHomeEntries() {
       loadLatestEntryWithFallback(),
     ]);
     activeFeedingGoal = currentGoal;
-    const chartEntries = entries.filter((entry) => {
-      const ts = new Date(entry.timestamp_utc);
-      return ts >= chartWindow.since && ts <= chartWindow.until;
-    });
+    const chartEntries = entries.filter((entry) => entryOverlapsChartWindow(entry, chartWindow));
     renderChart(chartEntries, chartWindow);
     renderStats(entries);
     renderGoalComparison();
