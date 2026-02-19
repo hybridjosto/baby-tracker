@@ -2798,13 +2798,16 @@ function normalizeFeedEntry(entry) {
   if (Number.isNaN(timestamp.getTime())) {
     return null;
   }
+  const amount = Number.isFinite(entry.amount_ml) ? entry.amount_ml : 0;
   const expressed = Number.isFinite(entry.expressed_ml) ? entry.expressed_ml : 0;
   const formula = Number.isFinite(entry.formula_ml) ? entry.formula_ml : 0;
-  if (!expressed && !formula) {
+  const total = amount + expressed + formula;
+  if (!total) {
     return null;
   }
   return {
     ts: timestamp.getTime(),
+    total,
     expressed,
     formula,
   };
@@ -2816,9 +2819,10 @@ function buildRulerBuckets() {
     const bucketTs = Math.round(entry.ts / RULER_BUCKET_MS) * RULER_BUCKET_MS;
     const key = bucketTs.toString();
     if (!buckets.has(key)) {
-      buckets.set(key, { ts: bucketTs, expressed: 0, formula: 0 });
+      buckets.set(key, { ts: bucketTs, total: 0, expressed: 0, formula: 0 });
     }
     const bucket = buckets.get(key);
+    bucket.total += entry.total;
     bucket.expressed += entry.expressed;
     bucket.formula += entry.formula;
   });
@@ -2828,10 +2832,12 @@ function buildRulerBuckets() {
 function computeRulerWindow(anchor, stretch = 0) {
   const windowMs = RULER_WINDOW_MS * (1 + stretch);
   const start = anchor - windowMs;
+  let total = 0;
   let expressed = 0;
   let formula = 0;
   rulerEntries.forEach((entry) => {
     if (entry.ts >= start && entry.ts <= anchor) {
+      total += entry.total;
       expressed += entry.expressed;
       formula += entry.formula;
     }
@@ -2839,9 +2845,9 @@ function computeRulerWindow(anchor, stretch = 0) {
   return {
     start,
     end: anchor,
+    total,
     expressed,
     formula,
-    total: expressed + formula,
     windowMs,
   };
 }
@@ -2867,7 +2873,7 @@ function clampRulerAnchor() {
     return;
   }
   const minAnchor = rulerMinTs + RULER_WINDOW_MS;
-  const maxAnchor = rulerMaxTs;
+  const maxAnchor = Math.max(rulerMaxTs, Date.now());
   if (rulerAnchorTs < minAnchor) {
     rulerAnchorTs = minAnchor;
   }
@@ -2894,7 +2900,7 @@ function updateRulerReadout(data, anchorX) {
     rulerTotalEl.textContent = formatMl(data.total);
   }
   if (rulerDetailEl) {
-    rulerDetailEl.textContent = `Expressed ${formatMl(data.expressed)} · Formula ${formatMl(data.formula)}`;
+    rulerDetailEl.textContent = "Total feed volume in trailing 24h window";
   }
   const goalValue = Number.isFinite(rulerGoalMl) && rulerGoalMl > 0 ? rulerGoalMl : 0;
   const goalPct = goalValue ? Math.min(200, Math.round((data.total / goalValue) * 100)) : 0;
@@ -2911,8 +2917,9 @@ function updateRulerReadout(data, anchorX) {
     return;
   }
   const rect = rulerBodyEl.getBoundingClientRect();
-  const minX = 90;
-  const maxX = rect.width - 90;
+  const halfReadout = rulerReadoutEl.offsetWidth / 2;
+  const minX = Math.max(8, halfReadout + 8);
+  const maxX = Math.min(rect.width - 8, rect.width - halfReadout - 8);
   const clamped = Math.max(minX, Math.min(maxX, anchorX));
   rulerReadoutEl.style.left = `${clamped}px`;
 }
@@ -2957,7 +2964,6 @@ function drawRuler() {
   const span = Math.max(1, maxTs - minTs);
 
   const expressedColor = getCssVar("--ruler-expressed", "#13ec5b");
-  const formulaColor = getCssVar("--ruler-formula", "#f8b13c");
   const trackColor = getCssVar("--ruler-track", "#e0e7e1");
   const windowColor = getCssVar("--ruler-window", "rgba(19, 236, 91, 0.12)");
   const anchorColor = getCssVar("--ruler-anchor", "#0f1a12");
@@ -2980,24 +2986,15 @@ function drawRuler() {
     const ratio = (bucket.ts - minTs) / span;
     const x = padding + ratio * trackWidth;
     const baseHeight = 10 * scale;
-    const expressedH = baseHeight + Math.min(38 * scale, bucket.expressed * 0.34 * scale);
-    const formulaH = baseHeight + Math.min(30 * scale, bucket.formula * 0.3 * scale);
+    const totalH = baseHeight + Math.min(44 * scale, bucket.total * 0.22 * scale);
 
-    if (bucket.formula > 0) {
-      ctx.strokeStyle = formulaColor;
-      ctx.lineWidth = 3 * scale;
-      ctx.beginPath();
-      ctx.moveTo(x, trackY + baseHeight * 0.2);
-      ctx.lineTo(x, trackY + formulaH);
-      ctx.stroke();
-    }
-
-    if (bucket.expressed > 0) {
+    if (bucket.total > 0) {
+      // Draw total volume as a single metric line to align with rolling total readout.
       ctx.strokeStyle = expressedColor;
       ctx.lineWidth = 3 * scale;
       ctx.beginPath();
       ctx.moveTo(x, trackY - baseHeight * 0.2);
-      ctx.lineTo(x, trackY - expressedH);
+      ctx.lineTo(x, trackY - totalH);
       ctx.stroke();
     }
   });
@@ -3095,9 +3092,6 @@ function onRulerPointerUp() {
 
 function jumpRulerToNow() {
   rulerAnchorTs = Date.now();
-  if (rulerSnapToFeeds) {
-    rulerAnchorTs = nearestRulerFeedTs(rulerAnchorTs);
-  }
   clampRulerAnchor();
   drawRuler();
 }
