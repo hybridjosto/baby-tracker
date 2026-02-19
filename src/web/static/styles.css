@@ -95,6 +95,10 @@ html.dark .card {
   position: relative;
 }
 
+html.dark .nav-actions {
+  color: #d3e4d7;
+}
+
 .user-chip {
   display: inline-flex;
   align-items: center;
