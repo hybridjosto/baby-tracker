@@ -48,3 +48,48 @@ def test_create_feeding_goal_rejects_invalid_payload(client):
 
     missing = client.post("/api/feeding-goals", json={})
     assert missing.status_code == 400
+
+
+def test_update_feeding_goal_updates_amount_and_start_date(client):
+    created = client.post(
+        "/api/feeding-goals",
+        json={"goal_ml": 650, "start_date": "2024-01-05"},
+    ).get_json()
+
+    response = client.patch(
+        f"/api/feeding-goals/{created['id']}",
+        json={"goal_ml": 700, "start_date": "2024-02-01"},
+    )
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["id"] == created["id"]
+    assert payload["goal_ml"] == 700.0
+    assert payload["start_date"] == "2024-02-01"
+
+
+def test_update_feeding_goal_returns_404_for_missing_goal(client):
+    response = client.patch(
+        "/api/feeding-goals/999999",
+        json={"goal_ml": 700},
+    )
+    assert response.status_code == 404
+    assert response.get_json()["error"] == "not_found"
+
+
+def test_delete_feeding_goal_removes_goal(client):
+    created = client.post(
+        "/api/feeding-goals",
+        json={"goal_ml": 650, "start_date": "2024-01-05"},
+    ).get_json()
+
+    response = client.delete(f"/api/feeding-goals/{created['id']}")
+    assert response.status_code == 204
+
+    listed = client.get("/api/feeding-goals").get_json()
+    assert listed == []
+
+
+def test_delete_feeding_goal_returns_404_for_missing_goal(client):
+    response = client.delete("/api/feeding-goals/999999")
+    assert response.status_code == 404
+    assert response.get_json()["error"] == "not_found"

@@ -114,6 +114,26 @@
         font-size: 16px;
         font-weight: 700;
       }
+      .goal-actions {
+        display: flex;
+        gap: 8px;
+      }
+      .goal-action-btn {
+        border: 1px solid var(--border-light);
+        border-radius: 10px;
+        padding: 6px 10px;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--text-primary);
+        background: #ffffff;
+        cursor: pointer;
+      }
+      html.dark .goal-action-btn {
+        border-color: var(--border-dark);
+        background: rgba(255, 255, 255, 0.08);
+        color: #f3f6f4;
+      }
       .status {
         margin-top: 12px;
         font-size: 12px;

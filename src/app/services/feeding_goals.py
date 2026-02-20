@@ -2,8 +2,15 @@ from datetime import date, datetime, timezone
 
 from src.app.storage.db import get_connection
 from src.app.storage.feeding_goals import create_goal as repo_create_goal
+from src.app.storage.feeding_goals import delete_goal as repo_delete_goal
 from src.app.storage.feeding_goals import get_current_goal as repo_get_current_goal
+from src.app.storage.feeding_goals import get_goal as repo_get_goal
 from src.app.storage.feeding_goals import list_goals as repo_list_goals
+from src.app.storage.feeding_goals import update_goal as repo_update_goal
+
+
+class FeedingGoalNotFoundError(Exception):
+    pass
 
 
 def _now_utc_iso() -> str:
@@ -54,3 +61,26 @@ def create_goal(db_path: str, payload: dict) -> dict:
     }
     with get_connection(db_path) as conn:
         return repo_create_goal(conn, fields)
+
+
+def update_goal(db_path: str, goal_id: int, payload: dict) -> dict:
+    fields: dict = {}
+    if "goal_ml" in payload:
+        fields["goal_ml"] = _normalize_goal_ml(payload["goal_ml"])
+    if "start_date" in payload:
+        fields["start_date"] = _normalize_start_date(payload["start_date"])
+    with get_connection(db_path) as conn:
+        existing = repo_get_goal(conn, goal_id)
+        if not existing:
+            raise FeedingGoalNotFoundError()
+        updated = repo_update_goal(conn, goal_id, fields)
+    if not updated:
+        raise FeedingGoalNotFoundError()
+    return updated
+
+
+def delete_goal(db_path: str, goal_id: int) -> None:
+    with get_connection(db_path) as conn:
+        deleted = repo_delete_goal(conn, goal_id)
+    if not deleted:
+        raise FeedingGoalNotFoundError()
