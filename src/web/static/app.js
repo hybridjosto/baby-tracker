@@ -5871,6 +5871,7 @@ function renderGoalHistory(goals) {
   goals.forEach((goal, index) => {
     const item = document.createElement("div");
     item.className = "goal-item";
+    const metaWrap = document.createElement("div");
     const label = document.createElement("div");
     label.className = "goal-meta";
     const badge = activeFeedingGoal && goal.id === activeFeedingGoal.id
@@ -5880,8 +5881,58 @@ function renderGoalHistory(goals) {
     const amount = document.createElement("div");
     amount.className = "goal-amount";
     amount.textContent = formatMl(Number.parseFloat(goal.goal_ml));
-    item.appendChild(label);
-    item.appendChild(amount);
+    metaWrap.appendChild(label);
+    metaWrap.appendChild(amount);
+
+    const actions = document.createElement("div");
+    actions.className = "goal-actions";
+    const editBtn = document.createElement("button");
+    editBtn.type = "button";
+    editBtn.className = "goal-action-btn";
+    editBtn.textContent = "Edit";
+    editBtn.addEventListener("click", async () => {
+      const nextAmount = window.prompt("24h goal (ml)", String(goal.goal_ml ?? ""));
+      if (nextAmount === null) {
+        return;
+      }
+      const parsedAmount = Number.parseFloat(nextAmount);
+      if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+        setStatus("Goal must be a positive number");
+        return;
+      }
+      const nextDate = window.prompt("Start date (YYYY-MM-DD)", goal.start_date || "");
+      if (nextDate === null) {
+        return;
+      }
+      try {
+        await updateFeedingGoal(goal.id, {
+          goal_ml: parsedAmount,
+          start_date: nextDate.trim() || null,
+        });
+        await loadGoalHistory();
+      } catch (err) {
+        setStatus(`Error: ${err.message || "unable to update goal"}`);
+      }
+    });
+    const deleteBtn = document.createElement("button");
+    deleteBtn.type = "button";
+    deleteBtn.className = "goal-action-btn";
+    deleteBtn.textContent = "Delete";
+    deleteBtn.addEventListener("click", async () => {
+      if (!window.confirm("Delete this goal?")) {
+        return;
+      }
+      try {
+        await deleteFeedingGoal(goal.id);
+        await loadGoalHistory();
+      } catch (err) {
+        setStatus(`Error: ${err.message || "unable to delete goal"}`);
+      }
+    });
+    actions.appendChild(editBtn);
+    actions.appendChild(deleteBtn);
+    item.appendChild(metaWrap);
+    item.appendChild(actions);
     goalHistoryEl.appendChild(item);
   });
 }
@@ -6801,6 +6852,45 @@ async function saveFeedingGoal(payload) {
   } catch (err) {
     setStatus("Error: network issue saving goal");
   }
+}
+
+async function updateFeedingGoal(goalId, payload) {
+  setStatus("Updating goal...");
+  const response = await fetch(buildUrl(`/api/feeding-goals/${goalId}`), {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    let detail = "";
+    try {
+      const err = await response.json();
+      detail = err.error || JSON.stringify(err);
+    } catch (parseError) {
+      detail = await response.text();
+    }
+    throw new Error(detail || `HTTP ${response.status}`);
+  }
+  setStatus("Goal updated");
+  return response.json();
+}
+
+async function deleteFeedingGoal(goalId) {
+  setStatus("Deleting goal...");
+  const response = await fetch(buildUrl(`/api/feeding-goals/${goalId}`), {
+    method: "DELETE",
+  });
+  if (!response.ok) {
+    let detail = "";
+    try {
+      const err = await response.json();
+      detail = err.error || JSON.stringify(err);
+    } catch (parseError) {
+      detail = await response.text();
+    }
+    throw new Error(detail || `HTTP ${response.status}`);
+  }
+  setStatus("Goal deleted");
 }
 
 async function loadBottles() {

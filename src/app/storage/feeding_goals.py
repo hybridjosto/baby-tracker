@@ -49,3 +49,33 @@ def get_goal(conn: sqlite3.Connection, goal_id: int) -> dict | None:
     )
     row = cursor.fetchone()
     return dict(row) if row else None
+
+
+def update_goal(conn: sqlite3.Connection, goal_id: int, fields: dict) -> dict | None:
+    assignments: list[str] = []
+    values: list[object] = []
+    for key in ("goal_ml", "start_date"):
+        if key in fields:
+            assignments.append(f"{key} = ?")
+            values.append(fields[key])
+    if not assignments:
+        return get_goal(conn, goal_id)
+    values.append(goal_id)
+    conn.execute(
+        f"UPDATE feeding_goals SET {', '.join(assignments)} WHERE id = ?",
+        values,
+    )
+    conn.commit()
+    return get_goal(conn, goal_id)
+
+
+def delete_goal(conn: sqlite3.Connection, goal_id: int) -> bool:
+    cursor = conn.execute(
+        """
+        DELETE FROM feeding_goals
+        WHERE id = ?
+        """,
+        (goal_id,),
+    )
+    conn.commit()
+    return cursor.rowcount > 0
