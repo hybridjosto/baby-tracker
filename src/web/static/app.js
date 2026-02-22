@@ -216,6 +216,7 @@ const nextFeedCloseEl = document.getElementById("next-feed-close");
 const nextFeedListEl = document.getElementById("next-feed-list");
 const nextFeedSubEl = document.getElementById("next-feed-sub");
 const nextFeedEmptyEl = document.getElementById("next-feed-empty");
+const nextFeedShowPreviousEl = document.getElementById("next-feed-show-previous");
 
 const timelineLinkEl = document.getElementById("timeline-link");
 
@@ -359,6 +360,102 @@ function normalizeUserSlug(value) {
 
 function getFeedIntervalMinutes() {
   return feedIntervalMinutes;
+}
+
+function getFeedEntryTotalMl(entry) {
+  if (!entry || !isFeedType(entry.type) || isBreastfeedInProgress(entry)) {
+    return 0;
+  }
+  let total = 0;
+  if (typeof entry.amount_ml === "number" && Number.isFinite(entry.amount_ml)) {
+    total += entry.amount_ml;
+  }
+  if (typeof entry.expressed_ml === "number" && Number.isFinite(entry.expressed_ml)) {
+    total += entry.expressed_ml;
+  }
+  if (typeof entry.formula_ml === "number" && Number.isFinite(entry.formula_ml)) {
+    total += entry.formula_ml;
+  }
+  return total;
+}
+
+function getProjectedFeedAmountMl() {
+  if (!recentFeedVolumeEntries.length) {
+    return null;
+  }
+  const recent = recentFeedVolumeEntries.slice(-8);
+  if (!recent.length) {
+    return null;
+  }
+  const total = recent.reduce((sum, entry) => sum + entry.ml, 0);
+  return total / recent.length;
+}
+
+function computeProjectedRolling24hTotal(anchorTs, projectedFeedTimes, projectedFeedAmountMl) {
+  const startTs = anchorTs - RULER_WINDOW_MS;
+  let total = 0;
+  recentFeedVolumeEntries.forEach((entry) => {
+    if (entry.ts >= startTs && entry.ts <= anchorTs) {
+      total += entry.ml;
+    }
+  });
+  if (Number.isFinite(projectedFeedAmountMl) && projectedFeedAmountMl > 0) {
+    projectedFeedTimes.forEach((projectedTs) => {
+      if (projectedTs >= startTs && projectedTs < anchorTs) {
+        total += projectedFeedAmountMl;
+      }
+    });
+  }
+  return total;
+}
+
+function formatSafeFeedEstimate(anchorTs, projectedFeedTimes, projectedFeedAmountMl) {
+  const goalMl = activeFeedingGoal ? Number.parseFloat(activeFeedingGoal.goal_ml) : NaN;
+  if (!Number.isFinite(goalMl) || goalMl <= 0) {
+    return "Safe estimate needs a 24h goal";
+  }
+  const projected24h = computeProjectedRolling24hTotal(anchorTs, projectedFeedTimes, projectedFeedAmountMl);
+  const safeMl = Math.max(0, goalMl - projected24h);
+  return `Safe up to ${formatMl(safeMl)} · 24h ${formatMl(projected24h)} / ${formatMl(goalMl)}`;
+}
+
+function getPrevious24hFeedEntries(anchorTs) {
+  const startTs = anchorTs - RULER_WINDOW_MS;
+  return recentFeedVolumeEntries.filter((entry) => entry.ts >= startTs && entry.ts <= anchorTs);
+}
+
+function buildNextFeedRow({
+  date,
+  detail,
+  meta,
+  itemClass = "next-feed-item",
+  dotClass = "next-feed-dot",
+}) {
+  const item = document.createElement("div");
+  item.className = itemClass;
+
+  const dot = document.createElement("span");
+  dot.className = dotClass;
+  dot.setAttribute("aria-hidden", "true");
+
+  const timeWrap = document.createElement("div");
+  timeWrap.className = "next-feed-time-wrap";
+
+  const timeEl = document.createElement("div");
+  timeEl.className = "next-feed-time";
+  timeEl.textContent = formatFeedTime(date);
+
+  const detailEl = document.createElement("div");
+  detailEl.className = "next-feed-safe";
+  detailEl.textContent = detail;
+
+  const metaEl = document.createElement("div");
+  metaEl.className = "next-feed-eta";
+  metaEl.textContent = meta;
+
+  timeWrap.append(timeEl, detailEl);
+  item.append(dot, timeWrap, metaEl);
+  return item;
 }
 
 function getBreastfeedStorageKey() {
@@ -1095,6 +1192,7 @@ let calendarWeekStart = null;
 let calendarLoading = false;
 let activeFeedingGoal = null;
 let latestFeedTotalMl = 0;
+let recentFeedVolumeEntries = [];
 let hasLoadedTimelineEntries = false;
 let timelineEntryCount = 0;
 let timelineOldestTimestamp = null;
@@ -2687,18 +2785,30 @@ function bindNextFeedPopup(element) {
   if (!element) {
     return;
   }
+  if (nextFeedShowPreviousEl) {
+    nextFeedShowPreviousEl.addEventListener("click", () => {
+      if (!nextFeedListEl) {
+        return;
+      }
+      nextFeedListEl.scrollTo({ top: 0, behavior: "smooth" });
+    });
+  }
   element.addEventListener("click", () => {
     const intervalMinutes = getFeedIntervalMinutes();
     const lastTimestamp = lastFeedEl ? lastFeedEl.dataset.timestamp : null;
     const showEmpty = () => {
       if (nextFeedListEl) {
         nextFeedListEl.innerHTML = "";
+        nextFeedListEl.scrollTop = 0;
       }
       if (nextFeedSubEl) {
         nextFeedSubEl.textContent = "Every -- minutes";
       }
       if (nextFeedEmptyEl) {
         nextFeedEmptyEl.hidden = false;
+      }
+      if (nextFeedShowPreviousEl) {
+        nextFeedShowPreviousEl.hidden = true;
       }
       openNextFeedModal();
     };
@@ -2713,6 +2823,7 @@ function bindNextFeedPopup(element) {
     }
     if (nextFeedListEl) {
       nextFeedListEl.innerHTML = "";
+      nextFeedListEl.scrollTop = 0;
     }
     if (nextFeedEmptyEl) {
       nextFeedEmptyEl.hidden = true;
@@ -2720,20 +2831,64 @@ function bindNextFeedPopup(element) {
     if (nextFeedSubEl) {
       nextFeedSubEl.textContent = `Every ${intervalMinutes} minutes`;
     }
+    if (nextFeedShowPreviousEl) {
+      nextFeedShowPreviousEl.hidden = false;
+    }
+
+    const nowTs = Date.now();
+    const previousEntries = getPrevious24hFeedEntries(nowTs);
+    if (nextFeedListEl && previousEntries.length) {
+      const previousLabel = document.createElement("div");
+      previousLabel.className = "next-feed-section-label";
+      previousLabel.textContent = "Previous 24h feeds";
+      nextFeedListEl.appendChild(previousLabel);
+
+      previousEntries.forEach((entry) => {
+        const row = buildNextFeedRow({
+          date: new Date(entry.ts),
+          detail: `Fed ${formatMl(entry.ml)}`,
+          meta: `${formatRelativeTime(new Date(entry.ts))} ago`,
+          itemClass: "next-feed-item next-feed-item--previous",
+          dotClass: "next-feed-dot next-feed-dot--previous",
+        });
+        nextFeedListEl.appendChild(row);
+      });
+    }
+
+    let nextAnchorEl = null;
+    if (nextFeedListEl) {
+      const upcomingLabel = document.createElement("div");
+      upcomingLabel.className = "next-feed-section-label";
+      upcomingLabel.textContent = "Next 6 feeds";
+      nextFeedListEl.appendChild(upcomingLabel);
+      nextAnchorEl = upcomingLabel;
+    }
+
+    const projectedFeedAmountMl = getProjectedFeedAmountMl();
+    const projectedFeedTimes = [];
     for (let i = 1; i <= 6; i += 1) {
       const nextDate = new Date(lastDate.getTime() + intervalMinutes * 60000 * i);
-      const item = document.createElement("div");
-      item.className = "next-feed-item";
-      item.innerHTML = `
-        <span class="next-feed-dot" aria-hidden="true"></span>
-        <div class="next-feed-time">${formatFeedTime(nextDate)}</div>
-        <div class="next-feed-eta">${formatTimeUntil(nextDate)}</div>
-      `;
+      const item = buildNextFeedRow({
+        date: nextDate,
+        detail: formatSafeFeedEstimate(
+          nextDate.getTime(),
+          projectedFeedTimes,
+          projectedFeedAmountMl,
+        ),
+        meta: formatTimeUntil(nextDate),
+      });
+      projectedFeedTimes.push(nextDate.getTime());
       if (nextFeedListEl) {
         nextFeedListEl.appendChild(item);
       }
     }
     openNextFeedModal();
+    if (nextFeedListEl && nextAnchorEl) {
+      window.requestAnimationFrame(() => {
+        const offset = Math.max(0, nextAnchorEl.offsetTop - 8);
+        nextFeedListEl.scrollTo({ top: offset, behavior: "auto" });
+      });
+    }
   });
 }
 
@@ -5787,25 +5942,24 @@ function renderStats(entries) {
   let feedTotalMl = 0;
   let expressedTotalMl = 0;
   let formulaTotalMl = 0;
-  const addMl = (value) => {
-    if (typeof value === "number" && Number.isFinite(value)) {
-      feedTotalMl += value;
-    }
-  };
+  const feedVolumeEntries = [];
   entries.forEach((entry) => {
     if (isFeedType(entry.type)) {
       if (isBreastfeedInProgress(entry)) {
         return;
       }
       feedCount += 1;
-      addMl(entry.amount_ml);
+      const feedMl = getFeedEntryTotalMl(entry);
+      feedTotalMl += feedMl;
+      const timestamp = new Date(entry.timestamp_utc);
+      if (feedMl > 0 && !Number.isNaN(timestamp.getTime())) {
+        feedVolumeEntries.push({ ts: timestamp.getTime(), ml: feedMl });
+      }
       if (typeof entry.expressed_ml === "number" && Number.isFinite(entry.expressed_ml)) {
         expressedTotalMl += entry.expressed_ml;
-        feedTotalMl += entry.expressed_ml;
       }
       if (typeof entry.formula_ml === "number" && Number.isFinite(entry.formula_ml)) {
         formulaTotalMl += entry.formula_ml;
-        feedTotalMl += entry.formula_ml;
       }
     } else if (entry.type === "wee") {
       weeCount += 1;
@@ -5816,6 +5970,7 @@ function renderStats(entries) {
   statFeedEl.textContent = String(feedCount);
   statWeeEl.textContent = String(weeCount);
   statPooEl.textContent = String(pooCount);
+  recentFeedVolumeEntries = feedVolumeEntries.sort((a, b) => a.ts - b.ts);
   latestFeedTotalMl = feedTotalMl;
   if (statFeedMlEl) {
     statFeedMlEl.textContent = formatMl(feedTotalMl);
