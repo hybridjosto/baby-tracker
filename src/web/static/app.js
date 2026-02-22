@@ -379,46 +379,6 @@ function getFeedEntryTotalMl(entry) {
   return total;
 }
 
-function getProjectedFeedAmountMl() {
-  if (!recentFeedVolumeEntries.length) {
-    return null;
-  }
-  const recent = recentFeedVolumeEntries.slice(-8);
-  if (!recent.length) {
-    return null;
-  }
-  const total = recent.reduce((sum, entry) => sum + entry.ml, 0);
-  return total / recent.length;
-}
-
-function computeProjectedRolling24hTotal(anchorTs, projectedFeedTimes, projectedFeedAmountMl) {
-  const startTs = anchorTs - RULER_WINDOW_MS;
-  let total = 0;
-  recentFeedVolumeEntries.forEach((entry) => {
-    if (entry.ts >= startTs && entry.ts <= anchorTs) {
-      total += entry.ml;
-    }
-  });
-  if (Number.isFinite(projectedFeedAmountMl) && projectedFeedAmountMl > 0) {
-    projectedFeedTimes.forEach((projectedTs) => {
-      if (projectedTs >= startTs && projectedTs < anchorTs) {
-        total += projectedFeedAmountMl;
-      }
-    });
-  }
-  return total;
-}
-
-function formatSafeFeedEstimate(anchorTs, projectedFeedTimes, projectedFeedAmountMl) {
-  const goalMl = activeFeedingGoal ? Number.parseFloat(activeFeedingGoal.goal_ml) : NaN;
-  if (!Number.isFinite(goalMl) || goalMl <= 0) {
-    return "Safe estimate needs a 24h goal";
-  }
-  const projected24h = computeProjectedRolling24hTotal(anchorTs, projectedFeedTimes, projectedFeedAmountMl);
-  const safeMl = Math.max(0, goalMl - projected24h);
-  return `Safe up to ${formatMl(safeMl)} · 24h ${formatMl(projected24h)} / ${formatMl(goalMl)}`;
-}
-
 function getPrevious24hFeedEntries(anchorTs) {
   const startTs = anchorTs - RULER_WINDOW_MS;
   return recentFeedVolumeEntries.filter((entry) => entry.ts >= startTs && entry.ts <= anchorTs);
@@ -445,15 +405,17 @@ function buildNextFeedRow({
   timeEl.className = "next-feed-time";
   timeEl.textContent = formatFeedTime(date);
 
-  const detailEl = document.createElement("div");
-  detailEl.className = "next-feed-safe";
-  detailEl.textContent = detail;
-
   const metaEl = document.createElement("div");
   metaEl.className = "next-feed-eta";
   metaEl.textContent = meta;
 
-  timeWrap.append(timeEl, detailEl);
+  timeWrap.appendChild(timeEl);
+  if (detail) {
+    const detailEl = document.createElement("div");
+    detailEl.className = "next-feed-safe";
+    detailEl.textContent = detail;
+    timeWrap.appendChild(detailEl);
+  }
   item.append(dot, timeWrap, metaEl);
   return item;
 }
@@ -2864,20 +2826,13 @@ function bindNextFeedPopup(element) {
       nextAnchorEl = upcomingLabel;
     }
 
-    const projectedFeedAmountMl = getProjectedFeedAmountMl();
-    const projectedFeedTimes = [];
     for (let i = 1; i <= 6; i += 1) {
       const nextDate = new Date(lastDate.getTime() + intervalMinutes * 60000 * i);
       const item = buildNextFeedRow({
         date: nextDate,
-        detail: formatSafeFeedEstimate(
-          nextDate.getTime(),
-          projectedFeedTimes,
-          projectedFeedAmountMl,
-        ),
+        detail: "",
         meta: formatTimeUntil(nextDate),
       });
-      projectedFeedTimes.push(nextDate.getTime());
       if (nextFeedListEl) {
         nextFeedListEl.appendChild(item);
       }
