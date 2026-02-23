@@ -15,6 +15,7 @@ class AppConfig:
     tls_key_path: Path | None
     feed_due_poll_seconds: int
     home_kpis_poll_seconds: int
+    enable_schedulers: bool
 
 
 def load_config() -> AppConfig:
@@ -40,6 +41,10 @@ def load_config() -> AppConfig:
         raise ValueError(
             "BABY_TRACKER_HOME_KPIS_POLL_SECONDS must be an integer"
         ) from exc
+    enable_schedulers = _parse_bool_env(
+        "BABY_TRACKER_ENABLE_SCHEDULERS",
+        default=False,
+    )
 
     if (tls_cert_path is None) != (tls_key_path is None):
         raise ValueError(
@@ -60,6 +65,7 @@ def load_config() -> AppConfig:
         tls_key_path=tls_key_path,
         feed_due_poll_seconds=feed_due_poll_seconds,
         home_kpis_poll_seconds=home_kpis_poll_seconds,
+        enable_schedulers=enable_schedulers,
     )
 
 
@@ -70,3 +76,15 @@ def _normalize_base_path(raw: str) -> str:
     if not raw.startswith("/"):
         raw = f"/{raw}"
     return raw.rstrip("/")
+
+
+def _parse_bool_env(name: str, default: bool) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    normalized = raw.strip().lower()
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "off"}:
+        return False
+    raise ValueError(f"{name} must be a boolean (1/0, true/false)")

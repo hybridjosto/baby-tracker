@@ -1,0 +1,16 @@
+[Unit]
+Description=Baby Tracker Scheduler
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/josh/baby-tracker
+Environment=PYTHONUNBUFFERED=1
+Environment=BABY_TRACKER_ENABLE_SCHEDULERS=1
+ExecStart=/home/josh/.local/bin/uv run python -m src.app.scheduler
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
