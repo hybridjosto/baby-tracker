@@ -17,6 +17,8 @@ uv run ruff check .
 
 ## Running Locally (HTTP)
 
+Run from the repository root (`baby-tracker/`):
+
 ```sh
 uv run gunicorn "src.app.main:application" --bind 0.0.0.0:8000 --workers 1 --threads 1 \
   --access-logfile - --error-logfile -
@@ -24,6 +26,13 @@ uv run gunicorn "src.app.main:application" --bind 0.0.0.0:8000 --workers 1 --thr
 
 Open `http://localhost:8000/` (or `http://localhost:8000/<base-path>/` if you set
 `BABY_TRACKER_BASE_PATH`).
+
+If you are already in `src/`, use:
+
+```sh
+uv run gunicorn "app.main:application" --bind 0.0.0.0:8000 --workers 1 --threads 1 \
+  --access-logfile - --error-logfile -
+```
 
 ## Configuration
 
@@ -51,6 +60,23 @@ docker compose up --build
 
 By default it serves on `http://localhost:8000/baby/` with the database stored in `./data`.
 Edit `docker-compose.yml` to change ports, base path, or DB location.
+
+## Podman (persistent)
+
+For a persistent rootless Podman + user-systemd deployment, see
+`docs/podman.md` or run:
+
+```sh
+./scripts/podman-install.sh
+```
+
+## Apple Container (macOS)
+
+If you prefer Apple's `container` CLI, see `docs/apple-container.md` or run:
+
+```sh
+./scripts/apple-container-run.sh
+```
 
 ## Systemd (example)
 

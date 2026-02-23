@@ -29,4 +29,6 @@ Python 3.11: Follow standard conventions
 - 001-two-click-log: Added Python 3.11 + Flask (web), SQLite (embedded DB)
 
 <!-- MANUAL ADDITIONS START -->
+- Run app commands from repo root when using module path `src.app.main`.
+- If your shell is in `src/`, use module path `app.main` instead.
 <!-- MANUAL ADDITIONS END -->
