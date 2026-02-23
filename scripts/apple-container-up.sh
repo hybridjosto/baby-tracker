@@ -11,7 +11,7 @@ container rm --force baby-tracker baby-tracker-scheduler >/dev/null 2>&1 || true
 
 container run --detach \
   --name baby-tracker \
-  --publish 127.0.0.1:8000:8000 \
+  --publish 0.0.0.0:8000:8000 \
   --volume "${DATA_DIR}:/data" \
   --env BABY_TRACKER_DB_PATH=/data/baby-tracker.sqlite \
   --env BABY_TRACKER_ENABLE_SCHEDULERS=0 \
