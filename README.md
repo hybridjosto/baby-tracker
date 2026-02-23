@@ -48,6 +48,8 @@ Environment variables:
   server entrypoint, not gunicorn)
 - `BABY_TRACKER_DISCORD_WEBHOOK_URL`: webhook for reminders (see reminders API)
 
+SQLite server migration runbook: `docs/sqlite-migration.md`
+
 ## Docker / docker-compose
 
 ```sh
