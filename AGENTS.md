@@ -29,4 +29,8 @@ Python 3.11: Follow standard conventions
 - 001-two-click-log: Added Python 3.11 + Flask (web), SQLite (embedded DB)
 
 <!-- MANUAL ADDITIONS START -->
+
+## Ways of Working
+Always update LEDGER.md after development. Mark completed items, add anything you discover (warnings, bugs, incomplete work), and let me know when you edit it. We will use this file to keep track of the project status.
+
 <!-- MANUAL ADDITIONS END -->
