@@ -1099,7 +1099,7 @@ function updateUserDisplay() {
     } else if (pageType === "goals") {
       userMessageEl.textContent = "Goals stay active until a later-dated entry is logged.";
     } else if (pageType === "timeline") {
-      userMessageEl.textContent = "All events";
+      userMessageEl.textContent = "Event timeline";
     } else if (pageType === "calendar" || pageType === "calendar-form") {
       userMessageEl.textContent = "Shared calendar";
     } else if (pageType === "bottles") {
@@ -1108,8 +1108,8 @@ function updateUserDisplay() {
       userMessageEl.textContent = "Last 48 hours • All milk express";
     } else {
       userMessageEl.textContent = userValid
-        ? "All events"
-        : "All events. Choose a user to log.";
+        ? `Logging as ${activeUser}`
+        : "Choose a user to log.";
     }
   }
   if (userChipEl) {
@@ -5945,7 +5945,7 @@ function renderStats(entries) {
     statDailyFeedTotalEl.textContent = formatMl(todayFeedTotalMl);
   }
   if (statDailyFeedSubEl) {
-    statDailyFeedSubEl.textContent = `Avg / feed: ${formatAverageMl(todayFeedTotalMl, todayFeedCount)}`;
+    statDailyFeedSubEl.textContent = `Midnight-midnight · Avg / feed: ${formatAverageMl(todayFeedTotalMl, todayFeedCount)}`;
   }
   recentFeedVolumeEntries = feedVolumeEntries.sort((a, b) => a.ts - b.ts);
   latestFeedTotalMl = feedTotalMl;
