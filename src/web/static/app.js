@@ -187,8 +187,10 @@ const editEntryNotesEl = document.getElementById("edit-entry-notes");
 const editEntryCancelEl = document.getElementById("edit-entry-cancel");
 const editEntryCloseEl = document.getElementById("edit-entry-close");
 const statFeedEl = document.getElementById("stat-feed");
-const statWeeEl = document.getElementById("stat-wee");
-const statPooEl = document.getElementById("stat-poo");
+const statNappyEl = document.getElementById("stat-nappy");
+const statNappyBreakdownEl = document.getElementById("stat-nappy-breakdown");
+const statDailyFeedTotalEl = document.getElementById("stat-daily-feed-total");
+const statDailyFeedSubEl = document.getElementById("stat-daily-feed-sub");
 const statFeedMlEl = document.getElementById("stat-feed-ml");
 const statFeedBreakdownEl = document.getElementById("stat-feed-breakdown");
 const statGoalProgressEl = document.getElementById("stat-goal-progress");
@@ -5888,16 +5890,21 @@ function initMilkExpressLedgerHandlers() {
 }
 
 function renderStats(entries) {
-  if (!statFeedEl || !statWeeEl || !statPooEl) {
+  if (!statFeedEl) {
     return;
   }
   let feedCount = 0;
   let weeCount = 0;
   let pooCount = 0;
   let feedTotalMl = 0;
+  let todayFeedTotalMl = 0;
+  let todayFeedCount = 0;
   let expressedTotalMl = 0;
   let formulaTotalMl = 0;
   const feedVolumeEntries = [];
+  const now = new Date();
+  const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const dayStartTs = dayStart.getTime();
   entries.forEach((entry) => {
     if (isFeedType(entry.type)) {
       if (isBreastfeedInProgress(entry)) {
@@ -5908,7 +5915,12 @@ function renderStats(entries) {
       feedTotalMl += feedMl;
       const timestamp = new Date(entry.timestamp_utc);
       if (feedMl > 0 && !Number.isNaN(timestamp.getTime())) {
-        feedVolumeEntries.push({ ts: timestamp.getTime(), ml: feedMl });
+        const ts = timestamp.getTime();
+        feedVolumeEntries.push({ ts, ml: feedMl });
+        if (ts >= dayStartTs) {
+          todayFeedTotalMl += feedMl;
+          todayFeedCount += 1;
+        }
       }
       if (typeof entry.expressed_ml === "number" && Number.isFinite(entry.expressed_ml)) {
         expressedTotalMl += entry.expressed_ml;
@@ -5923,8 +5935,18 @@ function renderStats(entries) {
     }
   });
   statFeedEl.textContent = String(feedCount);
-  statWeeEl.textContent = String(weeCount);
-  statPooEl.textContent = String(pooCount);
+  if (statNappyEl) {
+    statNappyEl.textContent = String(weeCount + pooCount);
+  }
+  if (statNappyBreakdownEl) {
+    statNappyBreakdownEl.textContent = `Wet ${weeCount} · Soiled ${pooCount}`;
+  }
+  if (statDailyFeedTotalEl) {
+    statDailyFeedTotalEl.textContent = formatMl(todayFeedTotalMl);
+  }
+  if (statDailyFeedSubEl) {
+    statDailyFeedSubEl.textContent = `Avg / feed: ${formatAverageMl(todayFeedTotalMl, todayFeedCount)}`;
+  }
   recentFeedVolumeEntries = feedVolumeEntries.sort((a, b) => a.ts - b.ts);
   latestFeedTotalMl = feedTotalMl;
   if (statFeedMlEl) {
