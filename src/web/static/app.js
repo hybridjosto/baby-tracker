@@ -6252,19 +6252,18 @@ async function saveEntry(payload) {
 async function addEntry(type) {
   const payload = buildEntryPayload(type);
   if (type === "feed") {
-    const minutesInput = window.prompt("Feed duration (minutes)", "");
+    const minutesInput = window.prompt("Feed duration (minutes or h/m)", "");
     if (minutesInput === null) {
       setStatus("");
       return;
     }
-    const trimmed = minutesInput.trim();
-    if (trimmed !== "") {
-      const minutes = Number.parseFloat(trimmed);
-      if (!Number.isFinite(minutes) || minutes < 0) {
-        setStatus("Duration must be a non-negative number");
-        return;
-      }
-      payload.feed_duration_min = minutes;
+    const parsedDuration = parseDurationMinutesText(minutesInput);
+    if (!parsedDuration.valid) {
+      setStatus("Duration must be minutes or h/m (for example: 90, 1h 30m, or 1:30)");
+      return;
+    }
+    if (parsedDuration.hasValue) {
+      payload.feed_duration_min = parsedDuration.value;
     }
   } else if (isMilkExpressType(type)) {
     const expressedInput = window.prompt("Expressed amount (ml)", "");
@@ -6281,19 +6280,18 @@ async function addEntry(type) {
       }
       payload.expressed_ml = amount;
     }
-    const durationInput = window.prompt("Duration (minutes)", "");
+    const durationInput = window.prompt("Duration (minutes or h/m)", "");
     if (durationInput === null) {
       setStatus("");
       return;
     }
-    const trimmedDuration = durationInput.trim();
-    if (trimmedDuration !== "") {
-      const minutes = Number.parseFloat(trimmedDuration);
-      if (!Number.isFinite(minutes) || minutes < 0) {
-        setStatus("Duration must be a non-negative number");
-        return;
-      }
-      payload.feed_duration_min = minutes;
+    const parsedDuration = parseDurationMinutesText(durationInput);
+    if (!parsedDuration.valid) {
+      setStatus("Duration must be minutes or h/m (for example: 90, 1h 30m, or 1:30)");
+      return;
+    }
+    if (parsedDuration.hasValue) {
+      payload.feed_duration_min = parsedDuration.value;
     }
   }
   if (type !== "wee" && type !== "poo") {
@@ -6361,6 +6359,71 @@ function parseOptionalNumberInput(inputEl, label) {
     return { value: null, hasValue: true, valid: false };
   }
   return { value: amount, hasValue: true, valid: true };
+}
+
+function parseDurationMinutesText(rawValue) {
+  const normalized = String(rawValue || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\band\b/g, " ")
+    .replace(/\s+/g, " ");
+  if (!normalized) {
+    return { valid: true, hasValue: false, value: null };
+  }
+
+  if (/^\d+(?:\.\d+)?$/.test(normalized)) {
+    const minutes = Number.parseFloat(normalized);
+    return { valid: true, hasValue: true, value: minutes };
+  }
+
+  const colonMatch = normalized.match(/^(\d+)\s*:\s*([0-5]?\d)$/);
+  if (colonMatch) {
+    const hours = Number.parseInt(colonMatch[1], 10);
+    const minutes = Number.parseInt(colonMatch[2], 10);
+    return { valid: true, hasValue: true, value: hours * 60 + minutes };
+  }
+
+  const segmentPattern = /(\d+(?:\.\d+)?)\s*(h(?:ours?)?|hr|hrs|m(?:in(?:ute)?s?)?)\b/g;
+  let totalMinutes = 0;
+  let lastIndex = 0;
+  let matchedAny = false;
+  let match = segmentPattern.exec(normalized);
+  while (match) {
+    const between = normalized.slice(lastIndex, match.index).trim();
+    if (between) {
+      return { valid: false, hasValue: true, value: null };
+    }
+    const amount = Number.parseFloat(match[1]);
+    const unit = match[2];
+    if (!Number.isFinite(amount) || amount < 0) {
+      return { valid: false, hasValue: true, value: null };
+    }
+    if (unit.startsWith("h")) {
+      totalMinutes += amount * 60;
+    } else {
+      totalMinutes += amount;
+    }
+    matchedAny = true;
+    lastIndex = segmentPattern.lastIndex;
+    match = segmentPattern.exec(normalized);
+  }
+  if (matchedAny && !normalized.slice(lastIndex).trim()) {
+    return { valid: true, hasValue: true, value: totalMinutes };
+  }
+  return { valid: false, hasValue: true, value: null };
+}
+
+function parseOptionalDurationInput(inputEl, label) {
+  if (!inputEl) {
+    return { value: null, hasValue: false, valid: true };
+  }
+  const parsed = parseDurationMinutesText(inputEl.value);
+  if (!parsed.valid) {
+    setStatus(`${label} must be minutes or h/m (for example: 90, 1h 30m, or 1:30)`);
+    inputEl.focus();
+    return { value: null, hasValue: true, valid: false };
+  }
+  return { value: parsed.value, hasValue: parsed.hasValue, valid: true };
 }
 
 async function getBreastfeedEntryForUpdate(startInfo) {
@@ -6631,7 +6694,7 @@ function initEditEntryModalHandlers() {
         return;
       }
       const payload = { type: nextType, timestamp_utc: nextDate.toISOString() };
-      const duration = parseOptionalNumberInput(editEntryDurationEl, "Duration");
+      const duration = parseOptionalDurationInput(editEntryDurationEl, "Duration");
       if (!duration.valid) {
         return;
       }
@@ -6655,7 +6718,7 @@ function initEditEntryModalHandlers() {
         }
         payload.expressed_ml = expressed.hasValue ? expressed.value : null;
 
-        const duration = parseOptionalNumberInput(editEntryDurationEl, "Duration");
+        const duration = parseOptionalDurationInput(editEntryDurationEl, "Duration");
         if (!duration.valid) {
           return;
         }
@@ -6722,7 +6785,7 @@ function openEditEntryModal(entry, mode = "full") {
   }
   if (editEntryDurationEl) {
     editEntryDurationEl.value = entry.feed_duration_min !== null && entry.feed_duration_min !== undefined
-      ? String(entry.feed_duration_min)
+      ? formatDurationMinutes(entry.feed_duration_min)
       : "";
   }
   if (editEntryExpressedEl) {
@@ -6800,20 +6863,19 @@ async function editEntry(entry) {
     entry.feed_duration_min !== null && entry.feed_duration_min !== undefined
       ? String(entry.feed_duration_min)
       : "";
-  const durationInput = window.prompt("Duration (minutes)", currentDuration);
+  const durationInput = window.prompt("Duration (minutes or h/m)", currentDuration);
   if (durationInput === null) {
     return;
   }
-  const trimmedDuration = durationInput.trim();
-  if (trimmedDuration === "") {
+  const parsedDuration = parseDurationMinutesText(durationInput);
+  if (!parsedDuration.valid) {
+    setStatus("Duration must be minutes or h/m (for example: 90, 1h 30m, or 1:30)");
+    return;
+  }
+  if (!parsedDuration.hasValue) {
     payload.feed_duration_min = null;
   } else {
-    const minutes = Number.parseFloat(trimmedDuration);
-    if (!Number.isFinite(minutes) || minutes < 0) {
-      setStatus("Duration must be a non-negative number");
-      return;
-    }
-    payload.feed_duration_min = minutes;
+    payload.feed_duration_min = parsedDuration.value;
   }
   if (nextType === "feed") {
     const currentExpressed =
