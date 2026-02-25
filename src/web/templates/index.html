@@ -1119,6 +1119,15 @@
         background: rgba(32, 46, 36, 0.9);
         color: #d9eee0;
       }
+      .nappy-option:disabled {
+        opacity: 0.72;
+      }
+      html.dark .nappy-option:disabled {
+        background: rgba(48, 68, 54, 0.95);
+        color: #dbeee2;
+        -webkit-text-fill-color: #dbeee2;
+        opacity: 0.95;
+      }
       .nappy-option .material-symbols-outlined {
         font-size: 22px;
       }
@@ -1213,6 +1222,9 @@
       html.dark .breastfeed-banner {
         background: linear-gradient(135deg, rgba(19, 236, 91, 0.16), rgba(16, 185, 129, 0.06));
         border-color: rgba(19, 236, 91, 0.4);
+      }
+      html.dark .breastfeed-banner .banner-title {
+        color: #e5f4e9;
       }
       .breastfeed-banner .banner-left {
         display: flex;
@@ -1544,14 +1556,12 @@
             </div>
             <div class="edit-number-grid edit-field--numbers">
               <div class="edit-field">
-                <label for="edit-entry-duration">Duration (minutes)</label>
+                <label for="edit-entry-duration">Duration (minutes or h/m)</label>
                 <input
                   id="edit-entry-duration"
-                  type="number"
-                  min="0"
-                  step="1"
-                  inputmode="decimal"
-                  pattern="[0-9]*[.,]?[0-9]*"
+                  type="text"
+                  inputmode="text"
+                  placeholder="e.g. 90, 1h 30m, or 1:30"
                 >
               </div>
               <div class="edit-field">
