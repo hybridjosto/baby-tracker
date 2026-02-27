@@ -34,6 +34,7 @@
 - [x] Add static version pass-through to Apple container startup and bump cache version to force new JS in PWA clients.
 - [x] Enable dual-write Firebase env vars in live `systemd` service via drop-in (`30-firebase.conf`) and verify API-created entries land in both SQLite + Firestore.
 - [x] Add Firebase systemd drop-in template: `docs/systemd/baby-tracker.service.d/20-firebase.conf.example`.
+- [x] Reset Firestore to SQLite source of truth on `2026-02-27`: deleted Firestore collections, re-ran `scripts/migrate_sqlite_to_firestore.py`, and re-verified entry parity by `client_event_id` (`missing=0`, `extra=0`).
 
 ## NOTES
 - Warning discovered: `src/app/routes/reminders.py` imports functions (`get_reminders`, `update_reminder`, `dispatch_threshold_reminders`) that do not exist in `src/app/services/reminders.py`. This appears to be pre-existing and is currently not active because reminders routes are not registered in `src/app/main.py`.
