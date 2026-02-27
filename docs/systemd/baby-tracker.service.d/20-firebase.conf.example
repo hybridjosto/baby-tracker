@@ -1,0 +1,7 @@
+[Service]
+Environment=BABY_TRACKER_STORAGE_BACKEND=dual
+Environment=BABY_TRACKER_FIREBASE_PROJECT_ID=baby-tracker-2d288
+# Optional when Application Default Credentials are available:
+# Environment=BABY_TRACKER_FIREBASE_CREDENTIALS_PATH=/home/josh/baby-tracker/firebase-service-account.json
+Environment=BABY_TRACKER_APP_SHARED_SECRET=replace-with-long-random-secret
+Environment=BABY_TRACKER_FIRESTORE_APP_NAMESPACE=
