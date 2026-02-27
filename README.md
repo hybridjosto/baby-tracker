@@ -36,6 +36,12 @@ Open `http://localhost:8000/` (or `http://localhost:8000/<base-path>/` if you se
 
 Environment variables:
 - `BABY_TRACKER_DB_PATH`: SQLite path (default: `./data/baby-tracker.sqlite`)
+- `BABY_TRACKER_STORAGE_BACKEND`: storage backend (`sqlite`, `dual`, `firestore`; default `sqlite`)
+- `BABY_TRACKER_FIREBASE_PROJECT_ID`: Firebase/GCP project id for Firestore backend
+- `BABY_TRACKER_FIREBASE_CREDENTIALS_PATH`: service account JSON path (optional if ADC already configured)
+- `BABY_TRACKER_FIRESTORE_APP_NAMESPACE`: optional Firestore namespace prefix under `app/<namespace>/...`
+- `BABY_TRACKER_APP_SHARED_SECRET`: required in `dual`/`firestore` modes; clients must send it as `X-App-Secret`
+- `BABY_TRACKER_ALLOW_INSECURE_LOCAL`: allow bypassing `X-App-Secret` from localhost only (`0`/`1`, default `0`)
 - `BABY_TRACKER_HOST`: bind host (default: `0.0.0.0`)
 - `BABY_TRACKER_PORT`: bind port (default: `8000`)
 - `BABY_TRACKER_BASE_PATH`: serve under a subpath (default: empty)
@@ -49,6 +55,25 @@ Environment variables:
 - `BABY_TRACKER_DISCORD_WEBHOOK_URL`: webhook for reminders (see reminders API)
 
 SQLite server migration runbook: `docs/sqlite-migration.md`
+
+## Firestore Migration (staged)
+
+1. Configure backend in dual mode and secret:
+```sh
+BABY_TRACKER_STORAGE_BACKEND=dual
+BABY_TRACKER_APP_SHARED_SECRET=replace-me
+BABY_TRACKER_FIREBASE_PROJECT_ID=your-project
+BABY_TRACKER_FIREBASE_CREDENTIALS_PATH=/path/to/service-account.json
+```
+2. Send `X-App-Secret` header on all `/api/*` calls.
+3. Backfill SQLite data into Firestore:
+```sh
+uv run python scripts/migrate_sqlite_to_firestore.py --sqlite-path ./data/baby-tracker.sqlite
+```
+4. Run in `dual` mode until validated, then switch:
+```sh
+BABY_TRACKER_STORAGE_BACKEND=firestore
+```
 
 ## Docker / docker-compose
 
