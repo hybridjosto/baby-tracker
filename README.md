@@ -148,6 +148,10 @@ sudo systemctl daemon-reload
 sudo systemctl restart baby-tracker.service
 ```
 
+To enable Firestore dual-write on an existing systemd install, add the Firebase
+drop-in from `docs/systemd/baby-tracker.service.d/20-firebase.conf.example`
+(set your secret/project values), then reload and restart the service.
+
 ## Offline Mode
 - The PWA caches the app shell for offline access.
 - Entries are stored locally for the last 30 days and sync automatically when online.
