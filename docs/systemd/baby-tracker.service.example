@@ -11,6 +11,11 @@ Environment=BABY_TRACKER_ENABLE_SCHEDULERS=0
 Environment=BABY_TRACKER_HOST=0.0.0.0
 Environment=BABY_TRACKER_PORT=8000
 Environment=BABY_TRACKER_STATIC_VERSION=dev
+Environment=BABY_TRACKER_STORAGE_BACKEND=dual
+Environment=BABY_TRACKER_FIREBASE_PROJECT_ID=baby-tracker-2d288
+Environment=BABY_TRACKER_FIREBASE_CREDENTIALS_PATH=/home/josh/baby-tracker/firebase-service-account.json
+Environment=BABY_TRACKER_APP_SHARED_SECRET=replace-with-long-random-secret
+Environment=BABY_TRACKER_FIRESTORE_APP_NAMESPACE=
 ExecStart=/home/josh/.local/bin/uv run gunicorn "src.app.main:application" --bind ${BABY_TRACKER_HOST}:${BABY_TRACKER_PORT} --workers 2 --threads 2 --access-logfile - --error-logfile -
 Restart=on-failure
 RestartSec=2
