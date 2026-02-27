@@ -9,6 +9,33 @@ services:
       BABY_TRACKER_HOST: 0.0.0.0
       BABY_TRACKER_PORT: 8000
       BABY_TRACKER_STATIC_VERSION: "dev"
+      BABY_TRACKER_ENABLE_SCHEDULERS: "0"
+      BABY_TRACKER_STORAGE_BACKEND: ${BABY_TRACKER_STORAGE_BACKEND:-dual}
+      BABY_TRACKER_FIREBASE_PROJECT_ID: ${BABY_TRACKER_FIREBASE_PROJECT_ID}
+      BABY_TRACKER_FIREBASE_CREDENTIALS_PATH: /run/secrets/firebase-service-account.json
+      BABY_TRACKER_APP_SHARED_SECRET: ${BABY_TRACKER_APP_SHARED_SECRET}
+      BABY_TRACKER_FIRESTORE_APP_NAMESPACE: ${BABY_TRACKER_FIRESTORE_APP_NAMESPACE:-}
+    command: >
+      uv run gunicorn src.app.main:application --bind 0.0.0.0:8000
+      --workers 2 --threads 2 --access-logfile - --error-logfile -
     volumes:
       - ./data:/data
+      - ./firebase-service-account.json:/run/secrets/firebase-service-account.json:ro
+    restart: unless-stopped
+
+  baby-tracker-scheduler:
+    build: .
+    environment:
+      BABY_TRACKER_BASE_PATH: /baby
+      BABY_TRACKER_DB_PATH: /data/baby-tracker.sqlite
+      BABY_TRACKER_ENABLE_SCHEDULERS: "1"
+      BABY_TRACKER_STORAGE_BACKEND: ${BABY_TRACKER_STORAGE_BACKEND:-dual}
+      BABY_TRACKER_FIREBASE_PROJECT_ID: ${BABY_TRACKER_FIREBASE_PROJECT_ID}
+      BABY_TRACKER_FIREBASE_CREDENTIALS_PATH: /run/secrets/firebase-service-account.json
+      BABY_TRACKER_APP_SHARED_SECRET: ${BABY_TRACKER_APP_SHARED_SECRET}
+      BABY_TRACKER_FIRESTORE_APP_NAMESPACE: ${BABY_TRACKER_FIRESTORE_APP_NAMESPACE:-}
+    command: uv run python -m src.app.scheduler
+    volumes:
+      - ./data:/data
+      - ./firebase-service-account.json:/run/secrets/firebase-service-account.json:ro
     restart: unless-stopped

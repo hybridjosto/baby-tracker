@@ -6,7 +6,31 @@ const pageType = bodyEl.dataset.page || "home";
 const logFilterType = bodyEl.dataset.logType || "";
 const logWindowHours = Number.parseInt(bodyEl.dataset.logWindowHours || "", 10);
 const basePath = bodyEl.dataset.basePath || "";
+const apiSharedSecret = bodyEl.dataset.apiSecret || "";
 const buildUrl = (path) => `${basePath}${path}`;
+
+const nativeFetch = window.fetch.bind(window);
+window.fetch = (input, init = {}) => {
+  const requestUrl = typeof input === "string" ? input : input?.url;
+  if (!apiSharedSecret || !requestUrl) {
+    return nativeFetch(input, init);
+  }
+  let pathname = "";
+  try {
+    pathname = new URL(requestUrl, window.location.origin).pathname;
+  } catch (_err) {
+    return nativeFetch(input, init);
+  }
+  const apiPrefix = `${basePath}/api`;
+  if (!pathname.startsWith(apiPrefix)) {
+    return nativeFetch(input, init);
+  }
+  const headers = new Headers(init.headers || (typeof input === "object" ? input.headers : undefined) || {});
+  if (!headers.has("X-App-Secret")) {
+    headers.set("X-App-Secret", apiSharedSecret);
+  }
+  return nativeFetch(input, { ...init, headers });
+};
 
 const THEME_KEY = "baby-tracker-theme";
 const USER_KEY = "baby-tracker-user";
@@ -17,10 +41,14 @@ const TIMED_EVENT_TIMER_KEY = "baby-tracker-timed-event-start";
 const TIMED_EVENT_TYPES = ["sleep", "cry"];
 const OFFLINE_WINDOW_DAYS = 30;
 const DB_NAME = "baby-tracker";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_ENTRIES = "entries";
 const STORE_OUTBOX = "outbox";
 const STORE_META = "meta";
+const INDEX_ENTRIES_TS = "by_timestamp_utc";
+const INDEX_ENTRIES_USER = "by_user_slug";
+const INDEX_ENTRIES_USER_TS = "by_user_slug_timestamp";
+const INDEX_ENTRIES_TYPE_TS = "by_type_timestamp";
 const META_DEVICE_ID = "device_id";
 const META_SYNC_CURSOR = "sync_cursor";
 const USER_RE = /^[a-z0-9-]{1,24}$/;
@@ -279,6 +307,8 @@ let hasLoadedSummaryEntries = false;
 let hasLoadedSummaryInsights = false;
 let syncInFlight = null;
 let syncTimerId = null;
+let pruneScheduled = false;
+let pruneInFlight = false;
 let milkExpressLedgerInitialized = false;
 let milkExpressLedgerEntries = [];
 const milkExpressLedgerSelections = new Set();
@@ -2261,12 +2291,29 @@ function openDb() {
   }
   openDb.cached = new Promise((resolve, reject) => {
     const request = window.indexedDB.open(DB_NAME, DB_VERSION);
+    const openTimeoutId = window.setTimeout(() => {
+      openDb.cached = null;
+      reject(new Error("IndexedDB open timed out"));
+    }, 3000);
     request.onupgradeneeded = () => {
       const db = request.result;
+      let entriesStore;
       if (!db.objectStoreNames.contains(STORE_ENTRIES)) {
-        const store = db.createObjectStore(STORE_ENTRIES, { keyPath: "client_event_id" });
-        store.createIndex("by_timestamp_utc", "timestamp_utc", { unique: false });
-        store.createIndex("by_user_slug", "user_slug", { unique: false });
+        entriesStore = db.createObjectStore(STORE_ENTRIES, { keyPath: "client_event_id" });
+      } else {
+        entriesStore = request.transaction.objectStore(STORE_ENTRIES);
+      }
+      if (!entriesStore.indexNames.contains(INDEX_ENTRIES_TS)) {
+        entriesStore.createIndex(INDEX_ENTRIES_TS, "timestamp_utc", { unique: false });
+      }
+      if (!entriesStore.indexNames.contains(INDEX_ENTRIES_USER)) {
+        entriesStore.createIndex(INDEX_ENTRIES_USER, "user_slug", { unique: false });
+      }
+      if (!entriesStore.indexNames.contains(INDEX_ENTRIES_USER_TS)) {
+        entriesStore.createIndex(INDEX_ENTRIES_USER_TS, ["user_slug", "timestamp_utc"], { unique: false });
+      }
+      if (!entriesStore.indexNames.contains(INDEX_ENTRIES_TYPE_TS)) {
+        entriesStore.createIndex(INDEX_ENTRIES_TYPE_TS, ["type", "timestamp_utc"], { unique: false });
       }
       if (!db.objectStoreNames.contains(STORE_OUTBOX)) {
         db.createObjectStore(STORE_OUTBOX, { autoIncrement: true });
@@ -2275,8 +2322,25 @@ function openDb() {
         db.createObjectStore(STORE_META, { keyPath: "key" });
       }
     };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
+    request.onblocked = () => {
+      window.clearTimeout(openTimeoutId);
+      openDb.cached = null;
+      reject(new Error("IndexedDB upgrade blocked by another tab or worker"));
+    };
+    request.onsuccess = () => {
+      window.clearTimeout(openTimeoutId);
+      const db = request.result;
+      db.onversionchange = () => {
+        db.close();
+        openDb.cached = null;
+      };
+      resolve(db);
+    };
+    request.onerror = () => {
+      window.clearTimeout(openTimeoutId);
+      openDb.cached = null;
+      reject(request.error);
+    };
   });
   return openDb.cached;
 }
@@ -2327,69 +2391,214 @@ async function getEntryLocal(clientEventId) {
   return requestToPromise(store.get(clientEventId));
 }
 
-async function pruneEntriesLocal(entries, cutoffMs) {
-  const staleKeys = entries
-    .filter((entry) => {
-      const timestamp = new Date(entry.timestamp_utc);
-      return !Number.isNaN(timestamp.getTime()) && timestamp.getTime() < cutoffMs;
-    })
-    .map((entry) => entry.client_event_id);
-  if (!staleKeys.length) {
+function toComparableIso(value) {
+  if (typeof value !== "string") {
+    return null;
+  }
+  if (!value.trim()) {
+    return null;
+  }
+  return value;
+}
+
+function createIsoNowMinusDays(days) {
+  return new Date(Date.now() - (days * 24 * 60 * 60 * 1000)).toISOString();
+}
+
+function maxIso(left, right) {
+  if (!left) {
+    return right;
+  }
+  if (!right) {
+    return left;
+  }
+  return left > right ? left : right;
+}
+
+function shouldIncludeLocalEntry(entry, params, lowerBoundIso, upperBoundIso) {
+  if (!entry || entry.deleted_at_utc) {
+    return false;
+  }
+  if (params.user_slug && entry.user_slug !== params.user_slug) {
+    return false;
+  }
+  if (params.type && entry.type !== params.type) {
+    return false;
+  }
+  const timestampIso = toComparableIso(entry.timestamp_utc);
+  if (!timestampIso) {
+    return false;
+  }
+  if (lowerBoundIso && timestampIso < lowerBoundIso) {
+    return false;
+  }
+  if (upperBoundIso && timestampIso > upperBoundIso) {
+    return false;
+  }
+  return true;
+}
+
+function schedulePruneEntriesLocal(cutoffIso) {
+  if (pruneScheduled || pruneInFlight) {
     return;
   }
+  pruneScheduled = true;
+  window.setTimeout(() => {
+    pruneScheduled = false;
+    void pruneEntriesLocal(cutoffIso);
+  }, 0);
+}
+
+async function pruneEntriesLocal(cutoffIso) {
+  if (pruneInFlight) {
+    return;
+  }
+  if (!("indexedDB" in window) || typeof window.IDBKeyRange === "undefined") {
+    return;
+  }
+  pruneInFlight = true;
   const db = await openDb();
-  await new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_ENTRIES, "readwrite");
-    const store = tx.objectStore(STORE_ENTRIES);
-    staleKeys.forEach((key) => store.delete(key));
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-    tx.onabort = () => reject(tx.error);
-  });
+  try {
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_ENTRIES, "readwrite");
+      const store = tx.objectStore(STORE_ENTRIES);
+      const index = store.index(INDEX_ENTRIES_TS);
+      const range = window.IDBKeyRange.upperBound(cutoffIso, true);
+      const request = index.openCursor(range, "next");
+
+      request.onsuccess = (event) => {
+        const cursor = event.target.result;
+        if (!cursor) {
+          resolve();
+          return;
+        }
+        store.delete(cursor.primaryKey);
+        cursor.continue();
+      };
+      request.onerror = () => reject(request.error);
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error);
+    });
+  } finally {
+    pruneInFlight = false;
+  }
 }
 
 async function listEntriesLocal(params = {}) {
+  if (typeof window.IDBKeyRange === "undefined") {
+    return [];
+  }
+  try {
+    return await listEntriesLocalIndexed(params);
+  } catch (err) {
+    return listEntriesLocalLegacy(params);
+  }
+}
+
+async function listEntriesLocalIndexed(params = {}) {
+  const db = await openDb();
+  const tx = db.transaction(STORE_ENTRIES, "readonly");
+  const store = tx.objectStore(STORE_ENTRIES);
+  const cutoffIso = createIsoNowMinusDays(OFFLINE_WINDOW_DAYS);
+  schedulePruneEntriesLocal(cutoffIso);
+
+  const sinceIso = toComparableIso(params.since);
+  const untilIso = toComparableIso(params.until);
+  const lowerBoundIso = maxIso(cutoffIso, sinceIso);
+  const upperBoundIso = untilIso;
+  const limit = Number.isFinite(params.limit)
+    ? Math.max(1, Number.parseInt(String(params.limit), 10))
+    : null;
+
+  return new Promise((resolve, reject) => {
+    const results = [];
+    let finished = false;
+
+    const finish = (value) => {
+      if (finished) {
+        return;
+      }
+      finished = true;
+      resolve(value);
+    };
+
+    const fail = (err) => {
+      if (finished) {
+        return;
+      }
+      finished = true;
+      reject(err);
+    };
+
+    let source = store.index(INDEX_ENTRIES_TS);
+    let range = null;
+
+    if (params.user_slug && store.indexNames.contains(INDEX_ENTRIES_USER_TS)) {
+      source = store.index(INDEX_ENTRIES_USER_TS);
+      const lower = [params.user_slug, lowerBoundIso || ""];
+      const upper = [params.user_slug, upperBoundIso || "\uffff"];
+      range = window.IDBKeyRange.bound(lower, upper);
+    } else if (params.type && store.indexNames.contains(INDEX_ENTRIES_TYPE_TS)) {
+      source = store.index(INDEX_ENTRIES_TYPE_TS);
+      const lower = [params.type, lowerBoundIso || ""];
+      const upper = [params.type, upperBoundIso || "\uffff"];
+      range = window.IDBKeyRange.bound(lower, upper);
+    } else if (lowerBoundIso && upperBoundIso) {
+      range = window.IDBKeyRange.bound(lowerBoundIso, upperBoundIso);
+    } else if (lowerBoundIso) {
+      range = window.IDBKeyRange.lowerBound(lowerBoundIso);
+    } else if (upperBoundIso) {
+      range = window.IDBKeyRange.upperBound(upperBoundIso);
+    }
+
+    const request = source.openCursor(range, "prev");
+    request.onsuccess = (event) => {
+      const cursor = event.target.result;
+      if (!cursor) {
+        finish(results);
+        return;
+      }
+      const entry = cursor.value;
+      if (shouldIncludeLocalEntry(entry, params, lowerBoundIso, upperBoundIso)) {
+        results.push(entry);
+        if (limit && results.length >= limit) {
+          finish(results);
+          return;
+        }
+      }
+      cursor.continue();
+    };
+    request.onerror = () => fail(request.error);
+    tx.onabort = () => fail(tx.error);
+    tx.onerror = () => fail(tx.error);
+  });
+}
+
+async function listEntriesLocalLegacy(params = {}) {
   const db = await openDb();
   const tx = db.transaction(STORE_ENTRIES, "readonly");
   const store = tx.objectStore(STORE_ENTRIES);
   const allEntries = await requestToPromise(store.getAll());
-  const cutoffMs = Date.now() - OFFLINE_WINDOW_DAYS * 24 * 60 * 60 * 1000;
-  void pruneEntriesLocal(allEntries, cutoffMs);
+  const cutoffIso = createIsoNowMinusDays(OFFLINE_WINDOW_DAYS);
+  schedulePruneEntriesLocal(cutoffIso);
+  const sinceIso = toComparableIso(params.since);
+  const untilIso = toComparableIso(params.until);
+  const lowerBoundIso = maxIso(cutoffIso, sinceIso);
+  const upperBoundIso = untilIso;
 
-  const since = params.since ? new Date(params.since) : null;
-  const until = params.until ? new Date(params.until) : null;
-  const filtered = allEntries.filter((entry) => {
-    if (entry.deleted_at_utc) {
-      return false;
-    }
-    if (params.user_slug && entry.user_slug !== params.user_slug) {
-      return false;
-    }
-    if (params.type && entry.type !== params.type) {
-      return false;
-    }
-    const timestamp = new Date(entry.timestamp_utc);
-    if (Number.isNaN(timestamp.getTime())) {
-      return false;
-    }
-    if (timestamp.getTime() < cutoffMs) {
-      return false;
-    }
-    if (since && timestamp < since) {
-      return false;
-    }
-    if (until && timestamp > until) {
-      return false;
-    }
-    return true;
-  });
+  const filtered = allEntries.filter((entry) => (
+    shouldIncludeLocalEntry(entry, params, lowerBoundIso, upperBoundIso)
+  ));
   filtered.sort((a, b) => {
-    const left = new Date(a.timestamp_utc).getTime();
-    const right = new Date(b.timestamp_utc).getTime();
-    return right - left;
+    const left = toComparableIso(a.timestamp_utc) || "";
+    const right = toComparableIso(b.timestamp_utc) || "";
+    if (left === right) {
+      return 0;
+    }
+    return left < right ? 1 : -1;
   });
   if (Number.isFinite(params.limit)) {
-    return filtered.slice(0, params.limit);
+    return filtered.slice(0, Math.max(1, Number.parseInt(String(params.limit), 10)));
   }
   return filtered;
 }
@@ -2472,11 +2681,19 @@ async function syncNow() {
       setStatus("Syncing...");
     }
 
-    const response = await fetch(buildUrl("/api/sync/entries"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ device_id: deviceId, cursor, changes }),
-    });
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 6000);
+    let response;
+    try {
+      response = await fetch(buildUrl("/api/sync/entries"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ device_id: deviceId, cursor, changes }),
+        signal: controller.signal,
+      });
+    } finally {
+      window.clearTimeout(timeoutId);
+    }
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
     }
@@ -4481,7 +4698,7 @@ async function listEntriesLocalSafe(params) {
 }
 
 async function loadEntriesWithFallback(params) {
-  const localEntries = await listEntriesLocalSafe(params);
+  const localEntriesPromise = listEntriesLocalSafe(params);
   try {
     const serverEntries = await fetchEntries(params);
     try {
@@ -4491,6 +4708,7 @@ async function loadEntriesWithFallback(params) {
     }
     return serverEntries;
   } catch (err) {
+    const localEntries = await localEntriesPromise;
     if (localEntries) {
       return localEntries;
     }
@@ -4502,8 +4720,7 @@ async function loadEntriesWithFallback(params) {
 }
 
 async function loadLatestEntryWithFallback() {
-  const localEntries = await listEntriesLocalSafe({ limit: 1 });
-  const localLatest = localEntries && localEntries.length ? localEntries[0] : null;
+  const localEntriesPromise = listEntriesLocalSafe({ limit: 1 });
   try {
     const serverEntries = await fetchEntries({ limit: 1 });
     try {
@@ -4511,8 +4728,12 @@ async function loadLatestEntryWithFallback() {
     } catch (err) {
       // Ignore cache failures and return server data.
     }
+    const localEntries = await localEntriesPromise;
+    const localLatest = localEntries && localEntries.length ? localEntries[0] : null;
     return serverEntries && serverEntries.length ? serverEntries[0] : localLatest;
   } catch (err) {
+    const localEntries = await localEntriesPromise;
+    const localLatest = localEntries && localEntries.length ? localEntries[0] : null;
     return localLatest;
   }
 }
@@ -5258,7 +5479,7 @@ async function loadTimelineEntries(options = {}) {
       }
       return;
     }
-    await syncNow();
+    void syncNow();
     const entries = await loadEntriesWithFallback(params);
     appendTimelineEntries(entries);
     if (entries.length) {
@@ -5835,7 +6056,7 @@ async function loadMilkExpressLedger() {
       ));
       renderMilkExpressLedger(filteredCached);
     }
-    await syncNow();
+    void syncNow();
     const entries = await loadEntriesWithFallback(params);
     const filtered = entries.filter((entry) => isMilkExpressType(entry.type));
     renderMilkExpressLedger(filtered);
@@ -7150,7 +7371,7 @@ async function loadHomeEntries() {
       renderLatestEntry(cachedLatest[0] || null);
     }
 
-    await syncNow();
+    void syncNow();
 
     const [entries, goals, currentGoal, latestEntry] = await Promise.all([
       loadEntriesWithFallback({
@@ -7202,7 +7423,7 @@ async function loadSummaryEntries() {
       renderMilkExpressSummary(cachedEntries);
     }
 
-    await syncNow();
+    void syncNow();
 
     const [entries] = await Promise.all([
       loadEntriesWithFallback({
@@ -7299,7 +7520,7 @@ async function loadLogEntries() {
     if (cachedEntries) {
       renderLogEntries(cachedEntries);
     }
-    await syncNow();
+    void syncNow();
     const entries = await loadEntriesWithFallback(params);
     renderLogEntries(entries);
   } catch (err) {

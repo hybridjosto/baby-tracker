@@ -1293,7 +1293,7 @@
       }
     </style>
   </head>
-  <body data-user="{{ user_slug }}" data-user-valid="{{ 'true' if user_valid else 'false' }}" data-page="{{ page }}" data-base-path="{{ base_path }}">
+  <body data-user="{{ user_slug }}" data-user-valid="{{ 'true' if user_valid else 'false' }}" data-page="{{ page }}" data-base-path="{{ base_path }}" data-api-secret="{{ api_shared_secret }}">
     <div class="app">
       <header>
         <div class="avatar" id="user-chip">{{ user_slug[:2]|upper if user_slug else 'BT' }}</div>

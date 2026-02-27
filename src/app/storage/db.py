@@ -1,6 +1,9 @@
 from datetime import datetime, timedelta, timezone
+from contextlib import contextmanager
 import sqlite3
 from pathlib import Path
+
+from src.app.storage.backend import is_firestore_backend
 
 
 def _connect(db_path: str) -> sqlite3.Connection:
@@ -8,10 +11,13 @@ def _connect(db_path: str) -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON;")
     conn.execute("PRAGMA journal_mode = WAL;")
+    conn.execute("PRAGMA busy_timeout = 3000;")
     return conn
 
 
 def init_db(db_path: str) -> None:
+    if is_firestore_backend():
+        return
     db_file = Path(db_path)
     db_file.parent.mkdir(parents=True, exist_ok=True)
 
@@ -339,5 +345,13 @@ def _ensure_default_reminders(conn: sqlite3.Connection) -> None:
         )
 
 
-def get_connection(db_path: str) -> sqlite3.Connection:
-    return _connect(db_path)
+@contextmanager
+def get_connection(db_path: str):
+    if is_firestore_backend():
+        yield None
+        return
+    conn = _connect(db_path)
+    try:
+        yield conn
+    finally:
+        conn.close()

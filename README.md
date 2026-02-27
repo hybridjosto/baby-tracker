@@ -18,8 +18,15 @@ uv run ruff check .
 ## Running Locally (HTTP)
 
 ```sh
-uv run gunicorn "src.app.main:application" --bind 0.0.0.0:8000 --workers 1 --threads 1 \
+BABY_TRACKER_ENABLE_SCHEDULERS=0 \
+uv run gunicorn "src.app.main:application" --bind 0.0.0.0:8000 --workers 2 --threads 2 \
   --access-logfile - --error-logfile -
+```
+
+Run the background schedulers in a separate process:
+
+```sh
+BABY_TRACKER_ENABLE_SCHEDULERS=1 uv run python -m src.app.scheduler
 ```
 
 Open `http://localhost:8000/` (or `http://localhost:8000/<base-path>/` if you set
@@ -29,6 +36,12 @@ Open `http://localhost:8000/` (or `http://localhost:8000/<base-path>/` if you se
 
 Environment variables:
 - `BABY_TRACKER_DB_PATH`: SQLite path (default: `./data/baby-tracker.sqlite`)
+- `BABY_TRACKER_STORAGE_BACKEND`: storage backend (`sqlite`, `dual`, `firestore`; default `sqlite`)
+- `BABY_TRACKER_FIREBASE_PROJECT_ID`: Firebase/GCP project id for Firestore backend
+- `BABY_TRACKER_FIREBASE_CREDENTIALS_PATH`: service account JSON path (optional if ADC already configured)
+- `BABY_TRACKER_FIRESTORE_APP_NAMESPACE`: optional Firestore namespace prefix under `app/<namespace>/...`
+- `BABY_TRACKER_APP_SHARED_SECRET`: required in `dual`/`firestore` modes; clients must send it as `X-App-Secret`
+- `BABY_TRACKER_ALLOW_INSECURE_LOCAL`: allow bypassing `X-App-Secret` from localhost only (`0`/`1`, default `0`)
 - `BABY_TRACKER_HOST`: bind host (default: `0.0.0.0`)
 - `BABY_TRACKER_PORT`: bind port (default: `8000`)
 - `BABY_TRACKER_BASE_PATH`: serve under a subpath (default: empty)
@@ -36,12 +49,31 @@ Environment variables:
   each deploy so installed PWAs pick up the latest assets.
 - `BABY_TRACKER_FEED_DUE_POLL_SECONDS`: feed-due scheduler interval (default: `60`, set `0` to disable)
 - `BABY_TRACKER_HOME_KPIS_POLL_SECONDS`: home KPI scheduler interval (default: `900`, set `0` to disable)
+- `BABY_TRACKER_ENABLE_SCHEDULERS`: enable in-process schedulers (`0`/`1`, default: `0`)
 - `BABY_TRACKER_TLS_CERT_PATH`, `BABY_TRACKER_TLS_KEY_PATH`: TLS files (only used by the Flask dev
   server entrypoint, not gunicorn)
 - `BABY_TRACKER_DISCORD_WEBHOOK_URL`: webhook for reminders (see reminders API)
 
-Note: the background schedulers run inside the web process. Keep gunicorn workers at `1`
-unless you intentionally want duplicate scheduler threads.
+SQLite server migration runbook: `docs/sqlite-migration.md`
+
+## Firestore Migration (staged)
+
+1. Configure backend in dual mode and secret:
+```sh
+BABY_TRACKER_STORAGE_BACKEND=dual
+BABY_TRACKER_APP_SHARED_SECRET=replace-me
+BABY_TRACKER_FIREBASE_PROJECT_ID=your-project
+BABY_TRACKER_FIREBASE_CREDENTIALS_PATH=/path/to/service-account.json
+```
+2. Send `X-App-Secret` header on all `/api/*` calls.
+3. Backfill SQLite data into Firestore:
+```sh
+uv run python scripts/migrate_sqlite_to_firestore.py --sqlite-path ./data/baby-tracker.sqlite
+```
+4. Run in `dual` mode until validated, then switch:
+```sh
+BABY_TRACKER_STORAGE_BACKEND=firestore
+```
 
 ## Docker / docker-compose
 
@@ -49,8 +81,31 @@ unless you intentionally want duplicate scheduler threads.
 docker compose up --build
 ```
 
-By default it serves on `http://localhost:8000/baby/` with the database stored in `./data`.
+By default compose runs two services:
+- `baby-tracker`: web app on `http://localhost:8000/baby/`
+- `baby-tracker-scheduler`: feed-due and home-kpis background loops
+
+The database is stored in `./data`.
 Edit `docker-compose.yml` to change ports, base path, or DB location.
+
+## Apple Container (`container` CLI)
+
+Build image:
+```sh
+container build -t baby-tracker:apple .
+```
+
+Start web + scheduler with persistent SQLite storage:
+```sh
+./scripts/apple-container-up.sh
+```
+
+Important: when running containers manually, always set both:
+- `--volume "$PWD/data:/data"`
+- `--env BABY_TRACKER_DB_PATH=/data/baby-tracker.sqlite`
+
+If `BABY_TRACKER_DB_PATH` is omitted, the app defaults to `./data` inside the
+container filesystem, which is ephemeral across container replacement.
 
 ## Systemd (example)
 
