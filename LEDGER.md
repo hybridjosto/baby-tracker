@@ -43,3 +43,4 @@
 - Verified running container env includes: `BABY_TRACKER_STORAGE_BACKEND=dual`, Firebase project id, credentials path, and shared secret.
 - Debug note: `/run/secrets/firebase-service-account.json` mount path caused `PermissionError` in Apple container runtime; switched to `/data/firebase-service-account.json`.
 - Root cause for missing Firestore data on `2026-02-27`: active `baby-tracker.service` had no Firebase/dual env vars, so runtime fell back to default `sqlite`.
+- Root cause for intermittent `sync failed` + Summary API errors on `2026-02-27`: clients without `X-App-Secret` hit `/api/*` and received `401`; this was observed with stale cached assets in some PWA sessions. Mitigation applied by bumping `BABY_TRACKER_STATIC_VERSION` to `2026-02-27-authfix-1` and restarting `baby-tracker.service`.
