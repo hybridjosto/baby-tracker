@@ -1,5 +1,5 @@
-from pathlib import Path
 import os
+from pathlib import Path
 
 from flask import Flask, render_template, send_from_directory
 
@@ -17,6 +17,14 @@ from src.app.services.feed_due import start_feed_due_scheduler
 from src.app.services.home_kpis import start_home_kpis_scheduler
 from src.lib.logging import configure_logging
 from src.lib.validation import normalize_user_slug, validate_entry_type
+
+
+def _should_start_schedulers(enable_schedulers: bool) -> bool:
+    if not enable_schedulers:
+        return False
+    if os.getenv("PYTEST_CURRENT_TEST"):
+        return False
+    return True
 
 
 def create_app() -> Flask:
@@ -44,7 +52,7 @@ def create_app() -> Flask:
     app.register_blueprint(pushcut_api, url_prefix=f"{config.base_path}/api")
     app.register_blueprint(feed_api, url_prefix=f"{config.base_path}/api")
     app.register_blueprint(home_kpis_api, url_prefix=f"{config.base_path}/api")
-    if not os.getenv("PYTEST_CURRENT_TEST"):
+    if _should_start_schedulers(config.enable_schedulers):
         start_feed_due_scheduler(app, config.feed_due_poll_seconds)
         start_home_kpis_scheduler(app, config.home_kpis_poll_seconds)
 

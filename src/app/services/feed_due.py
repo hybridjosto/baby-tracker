@@ -98,12 +98,17 @@ def dispatch_feed_due(
         if state.get("feed_due_last_entry_id") == source_entry_id:
             return {"sent": False, "reason": "already_sent"}
 
-        payload = _build_pushcut_payload()
-        sender = send_fn or _send_pushcut
-        if sender(pushcut_url, payload):
-            update_feed_due_state(conn, source_entry_id, now.isoformat())
-            return {"sent": True, "payload": payload}
+    payload = _build_pushcut_payload()
+    sender = send_fn or _send_pushcut
+    if not sender(pushcut_url, payload):
         return {"sent": False, "reason": "push_failed"}
+
+    with get_connection(db_path) as conn:
+        state = get_feed_due_state(conn)
+        if state.get("feed_due_last_entry_id") == source_entry_id:
+            return {"sent": False, "reason": "already_sent"}
+        update_feed_due_state(conn, source_entry_id, now.isoformat())
+    return {"sent": True, "payload": payload}
 
 
 def start_feed_due_scheduler(app: Flask, poll_seconds: int) -> None:
