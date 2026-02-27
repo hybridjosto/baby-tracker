@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 
-from flask import Flask, render_template, send_from_directory
+from flask import Flask, render_template, request, send_from_directory
 
 from src.app.config import load_config
 from src.app.routes.entries import entries_api
@@ -41,7 +41,19 @@ def create_app() -> Flask:
         static_folder=str(static_dir),
         static_url_path=f"{config.base_path}/static",
     )
-    app.config.update(DB_PATH=str(config.db_path))
+    app.config.update(
+        DB_PATH=str(config.db_path),
+        STORAGE_BACKEND=config.storage_backend,
+        FIREBASE_PROJECT_ID=config.firebase_project_id,
+        FIREBASE_CREDENTIALS_PATH=(
+            str(config.firebase_credentials_path)
+            if config.firebase_credentials_path
+            else None
+        ),
+        APP_SHARED_SECRET=config.app_shared_secret,
+        ALLOW_INSECURE_LOCAL=config.allow_insecure_local,
+        BASE_PATH=config.base_path,
+    )
 
     init_db(app.config["DB_PATH"])
     app.register_blueprint(entries_api, url_prefix=f"{config.base_path}/api")
@@ -55,6 +67,26 @@ def create_app() -> Flask:
     if _should_start_schedulers(config.enable_schedulers):
         start_feed_due_scheduler(app, config.feed_due_poll_seconds)
         start_home_kpis_scheduler(app, config.home_kpis_poll_seconds)
+
+    @app.before_request
+    def enforce_api_secret():
+        if app.config.get("STORAGE_BACKEND") not in {"dual", "firestore"}:
+            return None
+        path = request.path or ""
+        base_path = app.config.get("BASE_PATH") or ""
+        api_prefix = f"{base_path}/api"
+        if not path.startswith(api_prefix):
+            return None
+        if app.config.get("ALLOW_INSECURE_LOCAL") and request.remote_addr in {
+            "127.0.0.1",
+            "::1",
+        }:
+            return None
+        expected = app.config.get("APP_SHARED_SECRET")
+        provided = request.headers.get("X-App-Secret")
+        if not expected or provided != expected:
+            return ("", 401)
+        return None
 
     @app.context_processor
     def inject_static_version():
