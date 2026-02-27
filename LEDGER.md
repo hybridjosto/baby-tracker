@@ -20,8 +20,23 @@
 - [x] Add SQLite -> Firestore backfill script: `scripts/migrate_sqlite_to_firestore.py`.
 - [x] Update README with Firebase configuration and staged migration steps.
 - [x] Run test suite after migration changes (`80 passed, 1 skipped`).
+- [x] Wire Firestore env settings into `docker-compose.yml` for web + scheduler (including mounted service account path).
+- [x] Add `.env.firebase.example` template for Firestore runtime variables.
+- [x] Wire Firestore env examples into systemd service example files.
+- [x] Update Apple container startup script to pass Firestore env and mount credentials.
+- [x] Add `firebase-service-account.json` and `.env.firebase` to `.gitignore` to reduce secret-leak risk.
+- [x] Populate real local `.env` with Firestore runtime variables for Apple container deployment.
+- [x] Restart Apple containers (`baby-tracker`, `baby-tracker-scheduler`) with Firestore env loaded from `.env`.
+- [x] Fix Apple container Firestore credential mount path by copying service account JSON into `/data` and using `/data/firebase-service-account.json`.
+- [x] Verify dual-write in live runtime by creating a test entry and confirming presence in both SQLite and Firestore.
+- [x] Fix browser API auth in dual/firestore mode by auto-attaching `X-App-Secret` in frontend fetch calls.
+- [x] Expose `api_shared_secret` to templates and include as `data-api-secret` on page bodies.
+- [x] Add static version pass-through to Apple container startup and bump cache version to force new JS in PWA clients.
 
 ## NOTES
 - Warning discovered: `src/app/routes/reminders.py` imports functions (`get_reminders`, `update_reminder`, `dispatch_threshold_reminders`) that do not exist in `src/app/services/reminders.py`. This appears to be pre-existing and is currently not active because reminders routes are not registered in `src/app/main.py`.
 - In `firestore` mode, collection query indexes may be required in Firebase Console for compound filters/sorts (expected on first production queries).
 - `ruff` command could not be run in this environment because `ruff` is not installed in the current toolchain.
+- Local `.env` now contains a generated `BABY_TRACKER_APP_SHARED_SECRET`; clients must send this value in `X-App-Secret` for `/api/*` in `dual`/`firestore` modes.
+- Verified running container env includes: `BABY_TRACKER_STORAGE_BACKEND=dual`, Firebase project id, credentials path, and shared secret.
+- Debug note: `/run/secrets/firebase-service-account.json` mount path caused `PermissionError` in Apple container runtime; switched to `/data/firebase-service-account.json`.

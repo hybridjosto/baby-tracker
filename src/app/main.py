@@ -90,7 +90,10 @@ def create_app() -> Flask:
 
     @app.context_processor
     def inject_static_version():
-        return {"static_version": config.static_version}
+        return {
+            "static_version": config.static_version,
+            "api_shared_secret": config.app_shared_secret or "",
+        }
 
     def render_log_page(
         user_slug: str,

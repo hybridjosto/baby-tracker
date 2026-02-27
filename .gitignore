@@ -122,6 +122,7 @@ activemq-data/
 *.sage.py
 # Environments
 .env
+.env.firebase
 .envrc
 .venv
 env/
@@ -178,3 +179,4 @@ baby-tracker/
 .worktrees/
 rpi.tail*.ts.net.crt
 rpi.tail*.ts.net.key
+firebase-service-account.json

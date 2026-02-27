@@ -6,7 +6,31 @@ const pageType = bodyEl.dataset.page || "home";
 const logFilterType = bodyEl.dataset.logType || "";
 const logWindowHours = Number.parseInt(bodyEl.dataset.logWindowHours || "", 10);
 const basePath = bodyEl.dataset.basePath || "";
+const apiSharedSecret = bodyEl.dataset.apiSecret || "";
 const buildUrl = (path) => `${basePath}${path}`;
+
+const nativeFetch = window.fetch.bind(window);
+window.fetch = (input, init = {}) => {
+  const requestUrl = typeof input === "string" ? input : input?.url;
+  if (!apiSharedSecret || !requestUrl) {
+    return nativeFetch(input, init);
+  }
+  let pathname = "";
+  try {
+    pathname = new URL(requestUrl, window.location.origin).pathname;
+  } catch (_err) {
+    return nativeFetch(input, init);
+  }
+  const apiPrefix = `${basePath}/api`;
+  if (!pathname.startsWith(apiPrefix)) {
+    return nativeFetch(input, init);
+  }
+  const headers = new Headers(init.headers || (typeof input === "object" ? input.headers : undefined) || {});
+  if (!headers.has("X-App-Secret")) {
+    headers.set("X-App-Secret", apiSharedSecret);
+  }
+  return nativeFetch(input, { ...init, headers });
+};
 
 const THEME_KEY = "baby-tracker-theme";
 const USER_KEY = "baby-tracker-user";
