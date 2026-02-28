@@ -9,6 +9,7 @@
 - align the milk express ledger page format (menu + general look and feel) to the rest of the app.
 
 ## DONE
+- [x] Update Apple container startup script to use firebase service account from `data/` (fallback to legacy root path).
 - [x] Tidy up, remove "All events" in header on all pages.
 - [x] Make it clearer the total intake is midnight - midnight on the home page.
 - [x] make editing the sleep duration easier (hours + minutes) as inputting only minutes is hard to parse.
@@ -35,6 +36,10 @@
 - [x] Enable dual-write Firebase env vars in live `systemd` service via drop-in (`30-firebase.conf`) and verify API-created entries land in both SQLite + Firestore.
 - [x] Add Firebase systemd drop-in template: `docs/systemd/baby-tracker.service.d/20-firebase.conf.example`.
 - [x] Reset Firestore to SQLite source of truth on `2026-02-27`: deleted Firestore collections, re-ran `scripts/migrate_sqlite_to_firestore.py`, and re-verified entry parity by `client_event_id` (`missing=0`, `extra=0`).
+- [x] Keep home page loading scoped to last 24 hours only (including latest-entry display source) to improve perceived responsiveness.
+- [x] Add progressive summary all-time loading: fast initial slice, background history pagination, and visible partial-coverage status text.
+- [x] Re-run tests after progressive loading changes (`80 passed, 1 skipped` via `uv run pytest -q`).
+- [x] Update `scripts/apple-container-up.sh` to auto-load `.env` and fail fast with a clear message if `BABY_TRACKER_APP_SHARED_SECRET` is missing for `dual`/`firestore`.
 
 ## NOTES
 - Warning discovered: `src/app/routes/reminders.py` imports functions (`get_reminders`, `update_reminder`, `dispatch_threshold_reminders`) that do not exist in `src/app/services/reminders.py`. This appears to be pre-existing and is currently not active because reminders routes are not registered in `src/app/main.py`.
