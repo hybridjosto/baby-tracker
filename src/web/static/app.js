@@ -128,6 +128,7 @@ const insightDiaper24SubEl = document.getElementById("insight-diaper-24-sub");
 const insightDiaper7El = document.getElementById("insight-diaper-7");
 const insightDiaper7SubEl = document.getElementById("insight-diaper-7-sub");
 const insightAnchorLabelEl = document.getElementById("insight-anchor-label");
+const insightProgressLabelEl = document.getElementById("insight-progress-label");
 const insightTimeframeBodyEl = document.getElementById("insight-timeframe-body");
 
 const timelineWrapEl = document.getElementById("timeline-wrap");
@@ -1140,6 +1141,8 @@ let summaryEntries = [];
 let summaryInsightsEntries = [];
 let summaryInsightsAnchor = null;
 let summaryInsightsLoading = null;
+let summaryInsightsLoadToken = 0;
+let summaryInsightsComplete = false;
 let summaryType = "feed";
 let milkExpressSparklineMode = "all";
 let milkExpressAllEntries = [];
@@ -1163,6 +1166,9 @@ let timelineLoading = false;
 let timelineObserver = null;
 const timelineDayMap = new Map();
 const timelineHourMap = new Map();
+const SUMMARY_INSIGHTS_PAGE_LIMIT = 250;
+const SUMMARY_INSIGHTS_INITIAL_WINDOW_DAYS = 30;
+const SUMMARY_INSIGHTS_MAX_PAGES = 120;
 const RULER_DAYS_BACK = 7;
 const RULER_WINDOW_MS = 24 * 60 * 60 * 1000;
 const RULER_BUCKET_MS = 30 * 60 * 1000;
@@ -4544,26 +4550,80 @@ async function fetchEntries(params) {
   return normalizeEntriesResponse(data);
 }
 
-async function fetchAllEntriesUntil(untilIso) {
-  const limit = 500;
-  let batchUntil = untilIso;
-  let entries = [];
-  for (let page = 0; page < 20; page += 1) {
-    const batch = await fetchEntries({
-      limit,
-      until: batchUntil,
-    });
-    entries = entries.concat(batch);
-    if (batch.length < limit) {
-      break;
+function sortEntriesByTimestampDesc(entries) {
+  return entries.slice().sort((left, right) => {
+    const leftMs = Date.parse(left.timestamp_utc || "");
+    const rightMs = Date.parse(right.timestamp_utc || "");
+    if (Number.isNaN(leftMs) && Number.isNaN(rightMs)) {
+      return 0;
     }
-    const oldest = batch[batch.length - 1];
-    if (!oldest || !oldest.timestamp_utc) {
-      break;
+    if (Number.isNaN(leftMs)) {
+      return 1;
     }
-    batchUntil = decrementIsoTimestamp(oldest.timestamp_utc);
+    if (Number.isNaN(rightMs)) {
+      return -1;
+    }
+    return rightMs - leftMs;
+  });
+}
+
+function mergeEntriesUnique(existingEntries, incomingEntries) {
+  const deduped = new Map();
+  existingEntries.forEach((entry) => {
+    const key = entry.client_event_id || `id:${entry.id || ""}:${entry.timestamp_utc || ""}`;
+    deduped.set(key, entry);
+  });
+  incomingEntries.forEach((entry) => {
+    const key = entry.client_event_id || `id:${entry.id || ""}:${entry.timestamp_utc || ""}`;
+    deduped.set(key, entry);
+  });
+  return sortEntriesByTimestampDesc(Array.from(deduped.values()));
+}
+
+function formatSummaryCoverageDate(isoValue) {
+  const parsed = new Date(isoValue || "");
+  if (Number.isNaN(parsed.getTime())) {
+    return "unknown date";
   }
-  return entries;
+  return parsed.toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function buildSummaryInsightProgressText(entries, anchorEnd, complete) {
+  if (complete) {
+    return "All-time metrics fully loaded.";
+  }
+  if (!entries.length) {
+    return "Loading all-time metrics...";
+  }
+  const oldest = entries[entries.length - 1];
+  const oldestDateLabel = formatSummaryCoverageDate(oldest.timestamp_utc);
+  const oldestMs = Date.parse(oldest.timestamp_utc || "");
+  const anchorMs = anchorEnd.getTime();
+  const coverageDays = Number.isNaN(oldestMs)
+    ? "--"
+    : String(Math.max(1, Math.ceil((anchorMs - oldestMs) / 86400000)));
+  return `All-time metrics are partial: loaded ${entries.length} entries through ${oldestDateLabel} (${coverageDays}d coverage).`;
+}
+
+function setSummaryInsightProgressText(text) {
+  if (!insightProgressLabelEl) {
+    return;
+  }
+  insightProgressLabelEl.textContent = text || "";
+}
+
+async function yieldForUi() {
+  await new Promise((resolve) => {
+    if (typeof window.requestIdleCallback === "function") {
+      window.requestIdleCallback(() => resolve(), { timeout: 150 });
+      return;
+    }
+    window.setTimeout(resolve, 0);
+  });
 }
 
 async function fetchEntriesInWindow(params) {
@@ -7060,23 +7120,20 @@ async function loadHomeEntries() {
       renderStatsWindow(statsWindow);
       renderLastActivity(cachedEntries);
       renderLastByType(cachedEntries);
-    }
-    const cachedLatest = await listEntriesLocalSafe({ limit: 1 });
-    if (cachedLatest) {
-      renderLatestEntry(cachedLatest[0] || null);
+      renderLatestEntry(cachedEntries[0] || null);
+    } else {
+      renderLatestEntry(null);
     }
 
     await syncNow();
 
-    const [entries, goals, currentGoal, latestEntry] = await Promise.all([
+    const [entries, currentGoal] = await Promise.all([
       loadEntriesWithFallback({
         limit: 200,
         since: statsWindow.sinceIso,
         until: statsWindow.untilIso,
       }),
-      loadFeedingGoals(1).catch(() => []),
       loadCurrentGoal(),
-      loadLatestEntryWithFallback(),
     ]);
     activeFeedingGoal = currentGoal;
     const chartEntries = entries.filter((entry) => entryOverlapsChartWindow(entry, chartWindow));
@@ -7086,7 +7143,7 @@ async function loadHomeEntries() {
     renderStatsWindow(statsWindow);
     renderLastActivity(entries);
     renderLastByType(entries);
-    renderLatestEntry(latestEntry || null);
+    renderLatestEntry(entries[0] || null);
   } catch (err) {
     setStatus(`Failed to load entries: ${err.message || "unknown error"}`);
   } finally {
@@ -7147,26 +7204,114 @@ async function loadSummaryInsights() {
     return;
   }
   const { anchorEnd, anchorIso } = getInsightAnchor(summaryDate || new Date());
-  if (summaryInsightsAnchor === anchorIso && summaryInsightsEntries.length) {
+  const sameAnchor = summaryInsightsAnchor === anchorIso;
+  if (sameAnchor && summaryInsightsEntries.length && summaryInsightsComplete) {
     renderSummaryInsights(summaryInsightsEntries, anchorEnd);
+    setSummaryInsightProgressText("All-time metrics fully loaded.");
     return;
   }
-  if (summaryInsightsLoading) {
+  if (sameAnchor && summaryInsightsLoading) {
     return summaryInsightsLoading;
   }
-  summaryInsightsLoading = fetchAllEntriesUntil(anchorIso)
-    .then((entries) => {
-      summaryInsightsEntries = entries;
-      summaryInsightsAnchor = anchorIso;
-      renderSummaryInsights(entries, anchorEnd);
-      return entries;
-    })
+
+  const loadToken = summaryInsightsLoadToken + 1;
+  summaryInsightsLoadToken = loadToken;
+  summaryInsightsAnchor = anchorIso;
+  summaryInsightsComplete = false;
+
+  const initialSince = new Date(anchorEnd);
+  initialSince.setDate(initialSince.getDate() - SUMMARY_INSIGHTS_INITIAL_WINDOW_DAYS);
+  let mergedEntries = mergeEntriesUnique([], summaryEntries || []);
+  if (mergedEntries.length) {
+    summaryInsightsEntries = mergedEntries;
+    renderSummaryInsights(summaryInsightsEntries, anchorEnd);
+    setSummaryInsightProgressText(buildSummaryInsightProgressText(summaryInsightsEntries, anchorEnd, false));
+  } else {
+    setSummaryInsightProgressText("Loading all-time metrics...");
+  }
+
+  summaryInsightsLoading = (async () => {
+    const initialBatch = await fetchEntries({
+      limit: SUMMARY_INSIGHTS_PAGE_LIMIT,
+      since: initialSince.toISOString(),
+      until: anchorIso,
+    });
+    if (loadToken !== summaryInsightsLoadToken) {
+      return [];
+    }
+    mergedEntries = mergeEntriesUnique(mergedEntries, initialBatch);
+    summaryInsightsEntries = mergedEntries;
+    renderSummaryInsights(summaryInsightsEntries, anchorEnd);
+    setSummaryInsightProgressText(buildSummaryInsightProgressText(summaryInsightsEntries, anchorEnd, false));
+
+    let batchUntil = null;
+    if (mergedEntries.length) {
+      const oldest = mergedEntries[mergedEntries.length - 1];
+      batchUntil = decrementIsoTimestamp(oldest.timestamp_utc);
+    } else {
+      batchUntil = anchorIso;
+    }
+
+    for (let page = 0; page < SUMMARY_INSIGHTS_MAX_PAGES; page += 1) {
+      if (loadToken !== summaryInsightsLoadToken || !batchUntil) {
+        return mergedEntries;
+      }
+      const batch = await fetchEntries({
+        limit: SUMMARY_INSIGHTS_PAGE_LIMIT,
+        until: batchUntil,
+      });
+      if (loadToken !== summaryInsightsLoadToken) {
+        return mergedEntries;
+      }
+      if (!batch.length) {
+        summaryInsightsComplete = true;
+        break;
+      }
+      mergedEntries = mergeEntriesUnique(mergedEntries, batch);
+      summaryInsightsEntries = mergedEntries;
+      renderSummaryInsights(summaryInsightsEntries, anchorEnd);
+      setSummaryInsightProgressText(buildSummaryInsightProgressText(summaryInsightsEntries, anchorEnd, false));
+
+      if (batch.length < SUMMARY_INSIGHTS_PAGE_LIMIT) {
+        summaryInsightsComplete = true;
+        break;
+      }
+      const oldest = batch[batch.length - 1];
+      if (!oldest || !oldest.timestamp_utc) {
+        summaryInsightsComplete = true;
+        break;
+      }
+      const nextBatchUntil = decrementIsoTimestamp(oldest.timestamp_utc);
+      if (!nextBatchUntil || nextBatchUntil === batchUntil) {
+        summaryInsightsComplete = true;
+        break;
+      }
+      batchUntil = nextBatchUntil;
+      await yieldForUi();
+    }
+
+    if (loadToken !== summaryInsightsLoadToken) {
+      return mergedEntries;
+    }
+    setSummaryInsightProgressText(
+      buildSummaryInsightProgressText(summaryInsightsEntries, anchorEnd, summaryInsightsComplete),
+    );
+    return mergedEntries;
+  })()
     .catch((err) => {
+      if (loadToken !== summaryInsightsLoadToken) {
+        return [];
+      }
       setStatus(`Failed to load insights: ${err.message || "unknown error"}`);
-      summaryInsightsEntries = [];
+      setSummaryInsightProgressText(
+        buildSummaryInsightProgressText(summaryInsightsEntries, anchorEnd, false),
+      );
+      return [];
     })
     .finally(() => {
-      summaryInsightsLoading = null;
+      if (loadToken === summaryInsightsLoadToken) {
+        summaryInsightsLoading = null;
+      }
       hasLoadedSummaryInsights = true;
     });
   return summaryInsightsLoading;
