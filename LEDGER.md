@@ -7,8 +7,14 @@
 - add a baby weight (kg) to goal ml function. *needs planning
 - add a more in depth feeding plan. *needs planning
 - align the milk express ledger page format (menu + general look and feel) to the rest of the app.
+- migrate server
 
 ## DONE
+- [x] Exempt `GET /api/home-kpis` from API shared-secret enforcement while keeping write APIs protected in `dual`/`firestore`.
+- [x] Add integration test coverage for API secret behavior (`home-kpis` read exemption + write-route `401` without secret).
+- [x] Verify `home-kpis` API auth behavior and document required header/troubleshooting in README (`X-App-Secret`; not `x-aop-secret`).
+- [x] Make `scripts/apple-container-up.sh` interactive in terminal sessions: prompt to pull prod data when `BABY_TRACKER_PULL_PROD_DATA` is unset.
+- [x] Add env-controlled prod data pull to `scripts/apple-container-up.sh` using remote SQLite `.backup` + `scp` (default target `josh@homelab.tail458584.ts.net`) with fail-fast behavior on sync errors.
 - [x] Update Apple container startup script to use firebase service account from `data/` (fallback to legacy root path).
 - [x] Tidy up, remove "All events" in header on all pages.
 - [x] Make it clearer the total intake is midnight - midnight on the home page.
@@ -42,6 +48,9 @@
 - [x] Update `scripts/apple-container-up.sh` to auto-load `.env` and fail fast with a clear message if `BABY_TRACKER_APP_SHARED_SECRET` is missing for `dual`/`firestore`.
 
 ## NOTES
+- `GET /api/home-kpis` is now intentionally unauthenticated in `dual`/`firestore`; write APIs remain protected by `X-App-Secret`.
+- Auth behavior changed: `GET /api/home-kpis` is exempt; other protected `/api/*` routes still return `401` when `X-App-Secret` is missing/wrong in `dual`/`firestore`.
+- Prod pull in `scripts/apple-container-up.sh` refreshes local SQLite + Firebase credentials only; it intentionally does not auto-run SQLite -> Firestore backfill.
 - Warning discovered: `src/app/routes/reminders.py` imports functions (`get_reminders`, `update_reminder`, `dispatch_threshold_reminders`) that do not exist in `src/app/services/reminders.py`. This appears to be pre-existing and is currently not active because reminders routes are not registered in `src/app/main.py`.
 - In `firestore` mode, collection query indexes may be required in Firebase Console for compound filters/sorts (expected on first production queries).
 - `ruff` command could not be run in this environment because `ruff` is not installed in the current toolchain.
