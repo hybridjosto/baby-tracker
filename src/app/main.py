@@ -77,6 +77,9 @@ def create_app() -> Flask:
         api_prefix = f"{base_path}/api"
         if not path.startswith(api_prefix):
             return None
+        # Allow unauthenticated read-only Home KPIs fetches.
+        if request.method in {"GET", "HEAD"} and path == f"{api_prefix}/home-kpis":
+            return None
         if app.config.get("ALLOW_INSECURE_LOCAL") and request.remote_addr in {
             "127.0.0.1",
             "::1",
