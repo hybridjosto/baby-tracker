@@ -11,12 +11,17 @@ def _build_client(tmp_path, monkeypatch):
     return app.test_client()
 
 
-def test_home_kpis_get_does_not_require_secret(tmp_path, monkeypatch):
+def test_read_only_apis_do_not_require_secret(tmp_path, monkeypatch):
     client = _build_client(tmp_path, monkeypatch)
 
-    response = client.get("/api/home-kpis")
-
-    assert response.status_code == 200
+    for route in (
+        "/api/home-kpis",
+        "/api/entries",
+        "/api/settings",
+        "/api/feeding-goals/current",
+    ):
+        response = client.get(route)
+        assert response.status_code == 200, route
 
 
 def test_write_api_still_requires_secret(tmp_path, monkeypatch):
