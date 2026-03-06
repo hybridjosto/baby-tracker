@@ -36,12 +36,7 @@ Open `http://localhost:8000/` (or `http://localhost:8000/<base-path>/` if you se
 
 Environment variables:
 - `BABY_TRACKER_DB_PATH`: SQLite path (default: `./data/baby-tracker.sqlite`)
-- `BABY_TRACKER_STORAGE_BACKEND`: storage backend (`sqlite`, `dual`, `firestore`; default `sqlite`)
-- `BABY_TRACKER_FIREBASE_PROJECT_ID`: Firebase/GCP project id for Firestore backend
-- `BABY_TRACKER_FIREBASE_CREDENTIALS_PATH`: service account JSON path (optional if ADC already configured)
-- `BABY_TRACKER_FIRESTORE_APP_NAMESPACE`: optional Firestore namespace prefix under `app/<namespace>/...`
-- `BABY_TRACKER_APP_SHARED_SECRET`: required in `dual`/`firestore` modes; clients must send it as `X-App-Secret` for protected `/api/*` routes (write APIs and most reads)
-- `BABY_TRACKER_ALLOW_INSECURE_LOCAL`: allow bypassing `X-App-Secret` from localhost only (`0`/`1`, default `0`)
+- `BABY_TRACKER_STORAGE_BACKEND`: optional legacy setting; must be `sqlite` if set
 - `BABY_TRACKER_HOST`: bind host (default: `0.0.0.0`)
 - `BABY_TRACKER_PORT`: bind port (default: `8000`)
 - `BABY_TRACKER_BASE_PATH`: serve under a subpath (default: empty)
@@ -55,26 +50,6 @@ Environment variables:
 - `BABY_TRACKER_DISCORD_WEBHOOK_URL`: webhook for reminders (see reminders API)
 
 SQLite server migration runbook: `docs/sqlite-migration.md`
-
-## Firestore Migration (staged)
-
-1. Configure backend in dual mode and secret:
-```sh
-BABY_TRACKER_STORAGE_BACKEND=dual
-BABY_TRACKER_APP_SHARED_SECRET=replace-me
-BABY_TRACKER_FIREBASE_PROJECT_ID=your-project
-BABY_TRACKER_FIREBASE_CREDENTIALS_PATH=/path/to/service-account.json
-```
-2. Send `X-App-Secret` header on protected `/api/*` calls (all write APIs and most read APIs).
-   `GET /api/home-kpis` is exempt.
-3. Backfill SQLite data into Firestore:
-```sh
-uv run python scripts/migrate_sqlite_to_firestore.py --sqlite-path ./data/baby-tracker.sqlite
-```
-4. Run in `dual` mode until validated, then switch:
-```sh
-BABY_TRACKER_STORAGE_BACKEND=firestore
-```
 
 ## Docker / docker-compose
 
@@ -114,16 +89,11 @@ Prod pull env vars (all optional):
 - `BABY_TRACKER_PROD_SSH_TARGET` (default `josh@homelab.tail458584.ts.net`)
 - `BABY_TRACKER_PROD_DATA_DIR` (default `/home/josh/baby-tracker/data`)
 - `BABY_TRACKER_PROD_DB_FILE` (default `baby-tracker.sqlite`)
-- `BABY_TRACKER_PROD_FIREBASE_FILE` (default `firebase-service-account.json`)
 - `BABY_TRACKER_PROD_REMOTE_SNAPSHOT` (default `/tmp/baby-tracker-prod-sync.sqlite`)
 
 When enabled, the script creates a remote SQLite `.backup` snapshot and copies it
 locally before starting containers. This avoids unsafe live file copies with WAL mode.
 If sync fails, startup aborts so tests do not run against stale data.
-
-Firestore note: in `dual` mode this pull refreshes local SQLite and credentials only.
-It does not migrate/refresh Firestore. Run `scripts/migrate_sqlite_to_firestore.py`
-manually if you explicitly want local SQLite mirrored into Firestore.
 
 Important: when running containers manually, always set both:
 - `--volume "$PWD/data:/data"`
@@ -172,10 +142,6 @@ sudo cp /home/josh/baby-tracker/docs/systemd/baby-tracker.service.d/10-tls.conf 
 sudo systemctl daemon-reload
 sudo systemctl restart baby-tracker.service
 ```
-
-To enable Firestore dual-write on an existing systemd install, add the Firebase
-drop-in from `docs/systemd/baby-tracker.service.d/20-firebase.conf.example`
-(set your secret/project values), then reload and restart the service.
 
 ## Offline Mode
 - The PWA caches the app shell for offline access.
@@ -263,20 +229,9 @@ Controls:
 
 Home KPIs API:
 - `GET /api/home-kpis` returns the current KPI payload.
-- In `dual`/`firestore` mode, this endpoint is exempt from API secret auth.
-- Other protected APIs still require `X-App-Secret: <BABY_TRACKER_APP_SHARED_SECRET>`.
-- Header name is `X-App-Secret` (not `x-aop-secret`).
-
-Example:
-```sh
-curl -sS \
-  -H "X-App-Secret: $BABY_TRACKER_APP_SHARED_SECRET" \
-  "http://localhost:8000/api/home-kpis"
-```
+- No API shared-secret header is required.
 
 Troubleshooting:
-- If `/api/home-kpis` returns `401`, verify you deployed a version that includes the exemption and that no proxy is overriding auth behavior.
-- If other `/api/*` routes return `401`, confirm request sends `X-App-Secret` with the exact `BABY_TRACKER_APP_SHARED_SECRET` value.
 - If you recently deployed frontend auth changes, bump `BABY_TRACKER_STATIC_VERSION` and hard-refresh/clear PWA cache to avoid stale assets.
 
 ## Backfill expressed/formula amounts

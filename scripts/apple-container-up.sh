@@ -4,8 +4,6 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DATA_DIR="${ROOT_DIR}/data"
 IMAGE="${1:-baby-tracker:apple}"
-FIREBASE_JSON_IN_DATA="${DATA_DIR}/firebase-service-account.json"
-FIREBASE_JSON_LEGACY="${ROOT_DIR}/firebase-service-account.json"
 ENV_FILE="${ROOT_DIR}/.env"
 
 if [[ -f "${ENV_FILE}" ]]; then
@@ -21,7 +19,6 @@ PULL_PROD_DATA="${BABY_TRACKER_PULL_PROD_DATA:-0}"
 PROD_SSH_TARGET="${BABY_TRACKER_PROD_SSH_TARGET:-josh@homelab.tail458584.ts.net}"
 PROD_DATA_DIR="${BABY_TRACKER_PROD_DATA_DIR:-/home/josh/baby-tracker/data}"
 PROD_DB_FILE="${BABY_TRACKER_PROD_DB_FILE:-baby-tracker.sqlite}"
-PROD_FIREBASE_FILE="${BABY_TRACKER_PROD_FIREBASE_FILE:-firebase-service-account.json}"
 PROD_REMOTE_SNAPSHOT="${BABY_TRACKER_PROD_REMOTE_SNAPSHOT:-/tmp/baby-tracker-prod-sync.sqlite}"
 
 resolve_pull_prod_data_mode() {
@@ -51,9 +48,7 @@ pull_prod_data_if_enabled() {
   fi
 
   local remote_db_path="${PROD_DATA_DIR%/}/${PROD_DB_FILE}"
-  local remote_firebase_path="${PROD_DATA_DIR%/}/${PROD_FIREBASE_FILE}"
   local local_db_tmp="${DATA_DIR}/.baby-tracker.sqlite.tmp"
-  local local_firebase_tmp="${DATA_DIR}/.firebase-service-account.json.tmp"
 
   command -v ssh >/dev/null 2>&1 || {
     echo "Missing required command: ssh"
@@ -82,34 +77,17 @@ pull_prod_data_if_enabled() {
   }
   mv "${local_db_tmp}" "${DATA_DIR}/baby-tracker.sqlite"
 
-  scp "${PROD_SSH_TARGET}:${remote_firebase_path}" "${local_firebase_tmp}" || {
-    echo "Failed to copy remote Firebase credentials ${remote_firebase_path}"
-    exit 1
-  }
-  mv "${local_firebase_tmp}" "${FIREBASE_JSON_IN_DATA}"
-
   ssh "${PROD_SSH_TARGET}" "rm -f '${PROD_REMOTE_SNAPSHOT}'" >/dev/null 2>&1 || true
-  echo "Prod data pull complete: ${DATA_DIR}/baby-tracker.sqlite and ${FIREBASE_JSON_IN_DATA}"
+  echo "Prod data pull complete: ${DATA_DIR}/baby-tracker.sqlite"
 }
 
 resolve_pull_prod_data_mode
 pull_prod_data_if_enabled
 
-if [[ -f "${FIREBASE_JSON_IN_DATA}" ]]; then
-  : # Already in the expected location.
-elif [[ -f "${FIREBASE_JSON_LEGACY}" ]]; then
-  cp "${FIREBASE_JSON_LEGACY}" "${FIREBASE_JSON_IN_DATA}"
-else
-  echo "Missing firebase-service-account.json in ${DATA_DIR}"
-  echo "Place it at ${FIREBASE_JSON_IN_DATA} and retry."
-  exit 1
-fi
-
-STORAGE_BACKEND="${BABY_TRACKER_STORAGE_BACKEND:-dual}"
-APP_SHARED_SECRET="${BABY_TRACKER_APP_SHARED_SECRET:-}"
-if [[ "${STORAGE_BACKEND}" != "sqlite" && -z "${APP_SHARED_SECRET}" ]]; then
-  echo "BABY_TRACKER_APP_SHARED_SECRET is required when BABY_TRACKER_STORAGE_BACKEND=${STORAGE_BACKEND}"
-  echo "Set it in ${ENV_FILE} or export it in your shell."
+STORAGE_BACKEND="${BABY_TRACKER_STORAGE_BACKEND:-sqlite}"
+BASE_PATH="${BABY_TRACKER_BASE_PATH:-}"
+if [[ "${STORAGE_BACKEND}" != "sqlite" ]]; then
+  echo "BABY_TRACKER_STORAGE_BACKEND must be sqlite"
   exit 1
 fi
 
@@ -123,10 +101,7 @@ container run --detach \
   --env BABY_TRACKER_ENABLE_SCHEDULERS=0 \
   --env BABY_TRACKER_STATIC_VERSION="${BABY_TRACKER_STATIC_VERSION:-dev}" \
   --env BABY_TRACKER_STORAGE_BACKEND="${STORAGE_BACKEND}" \
-  --env BABY_TRACKER_FIREBASE_PROJECT_ID="${BABY_TRACKER_FIREBASE_PROJECT_ID:-baby-tracker-2d288}" \
-  --env BABY_TRACKER_FIREBASE_CREDENTIALS_PATH=/data/firebase-service-account.json \
-  --env BABY_TRACKER_APP_SHARED_SECRET="${APP_SHARED_SECRET}" \
-  --env BABY_TRACKER_FIRESTORE_APP_NAMESPACE="${BABY_TRACKER_FIRESTORE_APP_NAMESPACE:-}" \
+  --env BABY_TRACKER_BASE_PATH="${BASE_PATH}" \
   "${IMAGE}" >/dev/null
 
 container run --detach \
@@ -135,10 +110,7 @@ container run --detach \
   --env BABY_TRACKER_DB_PATH=/data/baby-tracker.sqlite \
   --env BABY_TRACKER_ENABLE_SCHEDULERS=1 \
   --env BABY_TRACKER_STORAGE_BACKEND="${STORAGE_BACKEND}" \
-  --env BABY_TRACKER_FIREBASE_PROJECT_ID="${BABY_TRACKER_FIREBASE_PROJECT_ID:-baby-tracker-2d288}" \
-  --env BABY_TRACKER_FIREBASE_CREDENTIALS_PATH=/data/firebase-service-account.json \
-  --env BABY_TRACKER_APP_SHARED_SECRET="${APP_SHARED_SECRET}" \
-  --env BABY_TRACKER_FIRESTORE_APP_NAMESPACE="${BABY_TRACKER_FIRESTORE_APP_NAMESPACE:-}" \
+  --env BABY_TRACKER_BASE_PATH="${BASE_PATH}" \
   "${IMAGE}" \
   uv run python -m src.app.scheduler >/dev/null
 

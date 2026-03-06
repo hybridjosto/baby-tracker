@@ -180,3 +180,4 @@ baby-tracker/
 rpi.tail*.ts.net.crt
 rpi.tail*.ts.net.key
 firebase-service-account.json
+.DS_Store
