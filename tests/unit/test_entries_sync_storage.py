@@ -13,6 +13,7 @@ def test_list_entries_updated_since_includes_deleted(tmp_path):
     init_db(str(db_path))
 
     now = datetime.now(timezone.utc).isoformat()
+    cursor_before = "1970-01-01T00:00:00+00:00"
     with get_connection(str(db_path)) as conn:
         entry, _ = create_entry(
             conn,
@@ -27,7 +28,7 @@ def test_list_entries_updated_since_includes_deleted(tmp_path):
         )
         delete_entry(conn, entry["id"], now, now)
 
-        results = list_entries_updated_since(conn, now, limit=10)
+        results = list_entries_updated_since(conn, cursor_before, limit=10)
 
     assert len(results) == 1
     assert results[0]["client_event_id"] == "evt-sync-1"

@@ -24,6 +24,20 @@ def test_create_user_entry_rejects_invalid_type(client):
     assert payload["error"] == "type must use letters, numbers, spaces, / or -"
 
 
+def test_create_user_entry_rejects_invalid_timestamp(client):
+    response = client.post(
+        "/api/users/suz/entries",
+        json={
+            "type": "feed",
+            "client_event_id": "evt-invalid-ts-create",
+            "timestamp_utc": "not-a-timestamp",
+        },
+    )
+    assert response.status_code == 400
+    payload = response.get_json()
+    assert payload["error"] == "timestamp_utc must be ISO-8601"
+
+
 def test_create_milk_express_entry_accepts_metrics(client):
     response = client.post(
         "/api/users/suz/entries",
@@ -424,6 +438,21 @@ def test_update_entry_success(client):
 def test_update_entry_missing_returns_404(client):
     response = client.patch("/api/entries/9999", json={"type": "poo"})
     assert response.status_code == 404
+
+
+def test_update_entry_rejects_invalid_timestamp(client):
+    created = client.post(
+        "/api/users/suz/entries",
+        json={"type": "feed", "client_event_id": "evt-invalid-ts-update"},
+    ).get_json()
+
+    response = client.patch(
+        f"/api/entries/{created['id']}",
+        json={"timestamp_utc": "still-not-a-timestamp"},
+    )
+    assert response.status_code == 400
+    payload = response.get_json()
+    assert payload["error"] == "timestamp_utc must be ISO-8601"
 
 
 def test_delete_entry_success(client):

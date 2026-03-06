@@ -22,6 +22,12 @@ def test_enable_schedulers_invalid_value(monkeypatch):
         load_config()
 
 
+def test_storage_backend_must_be_sqlite(monkeypatch):
+    monkeypatch.setenv("BABY_TRACKER_STORAGE_BACKEND", "firestore")
+    with pytest.raises(ValueError, match="BABY_TRACKER_STORAGE_BACKEND must be sqlite"):
+        load_config()
+
+
 def test_should_start_schedulers_checks_enable_flag(monkeypatch):
     monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
     assert _should_start_schedulers(True) is True
