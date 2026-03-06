@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "skills": {
+    "proompteng-tailscale": {
+      "source": "smithery.ai",
+      "sourceType": "well-known",
+      "computedHash": "5f6ba8a42f336bf0d2e050f7e43a6d81097b7e41af04acd3ba29fd1e449f2992"
+    }
+  }
+}
