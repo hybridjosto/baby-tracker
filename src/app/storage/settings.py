@@ -2,9 +2,6 @@ import json
 import sqlite3
 from datetime import datetime, timezone
 
-from src.app.storage.backend import is_dual_backend, is_firestore_backend
-from src.app.storage.firestore_client import collection
-
 
 SETTINGS_KEYS = (
     "dob",
@@ -47,54 +44,6 @@ def _normalize_settings_payload(data: dict | None) -> dict:
     return settings
 
 
-def _firestore_settings_ref():
-    return collection("settings").document("main")
-
-
-def _firestore_get_settings() -> dict:
-    snap = _firestore_settings_ref().get()
-    if not snap.exists:
-        return _normalize_settings_payload({})
-    data = snap.to_dict() or {}
-    return _normalize_settings_payload(data)
-
-
-def _firestore_update_settings(fields: dict) -> dict:
-    if fields:
-        doc = dict(fields)
-        if "custom_event_types" in doc:
-            doc["custom_event_types"] = _parse_custom_event_types(doc["custom_event_types"])
-        _firestore_settings_ref().set(doc, merge=True)
-    return _firestore_get_settings()
-
-
-def _firestore_get_feed_due_state() -> dict:
-    snap = _firestore_settings_ref().get()
-    if not snap.exists:
-        return {"feed_due_last_entry_id": None, "feed_due_last_sent_at_utc": None}
-    data = snap.to_dict() or {}
-    return {
-        "feed_due_last_entry_id": data.get("feed_due_last_entry_id"),
-        "feed_due_last_sent_at_utc": data.get("feed_due_last_sent_at_utc"),
-    }
-
-
-def _firestore_update_feed_due_state(
-    last_entry_id: int | None,
-    sent_at_utc: str | None,
-) -> dict:
-    stamp = sent_at_utc or datetime.now(timezone.utc).isoformat()
-    _firestore_settings_ref().set(
-        {
-            "feed_due_last_entry_id": last_entry_id,
-            "feed_due_last_sent_at_utc": sent_at_utc,
-            "updated_at_utc": stamp,
-        },
-        merge=True,
-    )
-    return _firestore_get_feed_due_state()
-
-
 def _ensure_settings_row(conn: sqlite3.Connection) -> None:
     row = conn.execute("SELECT id FROM baby_settings WHERE id = 1").fetchone()
     if not row:
@@ -108,9 +57,6 @@ def _ensure_settings_row(conn: sqlite3.Connection) -> None:
 
 
 def get_settings(conn: sqlite3.Connection | None) -> dict:
-    if is_firestore_backend():
-        return _firestore_get_settings()
-
     assert conn is not None
     _ensure_settings_row(conn)
     row = conn.execute(
@@ -130,9 +76,6 @@ def get_settings(conn: sqlite3.Connection | None) -> dict:
 
 
 def update_settings(conn: sqlite3.Connection | None, fields: dict) -> dict:
-    if is_firestore_backend():
-        return _firestore_update_settings(fields)
-
     assert conn is not None
     _ensure_settings_row(conn)
     assignments: list[str] = []
@@ -162,15 +105,10 @@ def update_settings(conn: sqlite3.Connection | None, fields: dict) -> dict:
             values,
         )
         conn.commit()
-        if is_dual_backend():
-            _firestore_update_settings(fields)
     return get_settings(conn)
 
 
 def get_feed_due_state(conn: sqlite3.Connection | None) -> dict:
-    if is_firestore_backend():
-        return _firestore_get_feed_due_state()
-
     assert conn is not None
     _ensure_settings_row(conn)
     row = conn.execute(
@@ -190,9 +128,6 @@ def update_feed_due_state(
     last_entry_id: int | None,
     sent_at_utc: str | None,
 ) -> dict:
-    if is_firestore_backend():
-        return _firestore_update_feed_due_state(last_entry_id, sent_at_utc)
-
     assert conn is not None
     _ensure_settings_row(conn)
     stamp = sent_at_utc or datetime.now(timezone.utc).isoformat()
@@ -207,6 +142,4 @@ def update_feed_due_state(
         (last_entry_id, sent_at_utc, stamp),
     )
     conn.commit()
-    if is_dual_backend():
-        _firestore_update_feed_due_state(last_entry_id, sent_at_utc)
     return get_feed_due_state(conn)

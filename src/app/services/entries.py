@@ -54,10 +54,29 @@ def _parse_csv_timestamp(value: str) -> str:
     return parsed.astimezone(timezone.utc).isoformat()
 
 
+def _normalize_timestamp_utc(value: str | None, *, field_name: str = "timestamp_utc") -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError(f"{field_name} must be ISO-8601")
+    cleaned = value.strip()
+    if not cleaned:
+        raise ValueError(f"{field_name} must be ISO-8601")
+    if cleaned.endswith("Z"):
+        cleaned = cleaned[:-1] + "+00:00"
+    try:
+        parsed = datetime.fromisoformat(cleaned)
+    except ValueError as exc:
+        raise ValueError(f"{field_name} must be ISO-8601") from exc
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc).isoformat()
+
+
 def create_entry(db_path: str, payload: dict) -> dict:
     validated = validate_entry_payload(payload, require_client_event=True)
     validated["user_slug"] = normalize_user_slug(payload.get("user_slug"))
-    timestamp = validated.get("timestamp_utc") or _now_utc_iso()
+    timestamp = _normalize_timestamp_utc(validated.get("timestamp_utc")) or _now_utc_iso()
     validated["timestamp_utc"] = timestamp
     validated["created_at_utc"] = _now_utc_iso()
     validated["updated_at_utc"] = validated["created_at_utc"]
@@ -377,7 +396,7 @@ def update_entry(db_path: str, entry_id: int, payload: dict) -> dict:
         validate_entry_type(payload["type"])
         fields["type"] = payload["type"]
     if "timestamp_utc" in payload:
-        fields["timestamp_utc"] = payload["timestamp_utc"]
+        fields["timestamp_utc"] = _normalize_timestamp_utc(payload["timestamp_utc"])
     if "notes" in payload:
         fields["notes"] = payload["notes"]
     if "amount_ml" in payload:
@@ -465,6 +484,9 @@ def sync_entries(db_path: str, payload: dict) -> dict:
                 validated["user_slug"] = normalize_user_slug(entry.get("user_slug"))
                 if not validated.get("timestamp_utc"):
                     validated["timestamp_utc"] = now
+                validated["timestamp_utc"] = _normalize_timestamp_utc(
+                    validated.get("timestamp_utc")
+                )
                 validated["created_at_utc"] = now
                 validated["updated_at_utc"] = now
                 validated["deleted_at_utc"] = entry.get("deleted_at_utc")

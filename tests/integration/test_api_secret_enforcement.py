@@ -4,24 +4,14 @@ from src.app.main import create_app
 def _build_client(tmp_path, monkeypatch):
     db_path = tmp_path / "test.sqlite"
     monkeypatch.setenv("BABY_TRACKER_DB_PATH", str(db_path))
-    monkeypatch.setenv("BABY_TRACKER_STORAGE_BACKEND", "dual")
-    monkeypatch.setenv("BABY_TRACKER_APP_SHARED_SECRET", "test-secret")
+    monkeypatch.setenv("BABY_TRACKER_STORAGE_BACKEND", "sqlite")
     app = create_app()
     app.config.update(TESTING=True)
     return app.test_client()
 
 
-def test_home_kpis_get_does_not_require_secret(tmp_path, monkeypatch):
+def test_write_api_works_without_secret_header(tmp_path, monkeypatch):
     client = _build_client(tmp_path, monkeypatch)
-
-    response = client.get("/api/home-kpis")
-
-    assert response.status_code == 200
-
-
-def test_write_api_still_requires_secret(tmp_path, monkeypatch):
-    client = _build_client(tmp_path, monkeypatch)
-
     response = client.post(
         "/api/users/suz/entries",
         json={
@@ -32,4 +22,13 @@ def test_write_api_still_requires_secret(tmp_path, monkeypatch):
         },
     )
 
-    assert response.status_code == 401
+    assert response.status_code == 201
+
+
+def test_index_does_not_include_api_secret_dataset(tmp_path, monkeypatch):
+    client = _build_client(tmp_path, monkeypatch)
+    response = client.get("/")
+
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert "data-api-secret" not in html
