@@ -1293,7 +1293,7 @@
       }
     </style>
   </head>
-  <body data-user="{{ user_slug }}" data-user-valid="{{ 'true' if user_valid else 'false' }}" data-page="{{ page }}" data-base-path="{{ base_path }}" data-api-secret="{{ api_shared_secret }}">
+  <body data-user="{{ user_slug }}" data-user-valid="{{ 'true' if user_valid else 'false' }}" data-page="{{ page }}" data-base-path="{{ base_path }}">
     <div class="app">
       <header>
         <div class="avatar" id="user-chip">{{ user_slug[:2]|upper if user_slug else 'BT' }}</div>
@@ -1482,10 +1482,7 @@
           <div class="chart-header">
             <h3>Last 6 Hours</h3>
             <div class="chart-links">
-              <a class="log-link" id="log-link" href="#">Event log</a>
               <a class="timeline-link" id="timeline-link" href="#">Timeline</a>
-              <a class="timeline-link" href="{{ base_path }}/calendar">Calendar</a>
-              <a class="timeline-link" id="milk-express-link" href="#">Milk express ledger</a>
             </div>
           </div>
           <div class="legend">
@@ -1671,14 +1668,14 @@
             <button class="feed-toggle-btn" id="feed-toggle-expressed" type="button" data-kind="expressed">Expressed</button>
           </div>
           <div class="feed-quick-row" role="group" aria-label="Quick log volume">
-            <button class="feed-quick-btn" type="button" data-quick-ml="30">30</button>
             <button class="feed-quick-btn" type="button" data-quick-ml="60">60</button>
             <button class="feed-quick-btn" type="button" data-quick-ml="90">90</button>
             <button class="feed-quick-btn" type="button" data-quick-ml="120">120</button>
+            <button class="feed-quick-btn" type="button" data-quick-ml="150">150</button>
             <button class="feed-quick-btn" id="feed-manual-toggle" type="button">Manual</button>
           </div>
         </div>
-        <button class="feed-option" id="log-breastfeed" type="button">Start breastfed</button>
+        <button class="feed-option" id="log-breastfeed" type="button">Start breastfeed</button>
         <div class="feed-manual" id="feed-manual" hidden>
           <button class="feed-option" id="log-feed-manual" type="button">Log feed</button>
           <div class="feed-input">
