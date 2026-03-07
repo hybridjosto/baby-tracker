@@ -91,9 +91,10 @@ const summaryDateInputEl = document.getElementById("summary-date");
 const summaryDateLabelEl = document.getElementById("summary-date-label");
 const summaryPrevBtn = document.getElementById("summary-prev");
 const summaryNextBtn = document.getElementById("summary-next");
-const summaryTypeSelectEl = document.getElementById("summary-type");
-const summaryChartEl = document.getElementById("summary-chart");
-const summaryChartEmptyEl = document.getElementById("summary-chart-empty");
+const sleepGanttTypeOptionsEl = document.getElementById("sleep-gantt-type-options");
+const sleepGanttChartEl = document.getElementById("sleep-gantt-chart");
+const sleepGanttReadoutEl = document.getElementById("sleep-gantt-readout");
+const sleepGanttEmptyEl = document.getElementById("sleep-gantt-empty");
 const summaryFeedDurationEl = document.getElementById("summary-feed-duration");
 const summaryFeedDurationAvgEl = document.getElementById("summary-feed-duration-avg");
 const summaryExpressedEl = document.getElementById("summary-expressed-amount");
@@ -299,6 +300,14 @@ let quickFeedKind = "formula";
 
 const CUSTOM_TYPE_RE = /^[A-Za-z0-9][A-Za-z0-9 /-]{0,31}$/;
 const MILK_EXPRESS_TYPE = "milk express";
+const SLEEP_GANTT_DEFAULT_OVERLAYS = new Set(["feed", "cry", "wee", "poo"]);
+const SLEEP_GANTT_TYPE_COLORS = {
+  sleep: "#7c83ff",
+  feed: "#13ec5b",
+  cry: "#fb7185",
+  wee: "#7dd3fc",
+  poo: "#fbbf24",
+};
 
 const CHART_CONFIG = {
   width: 360,
@@ -1091,7 +1100,8 @@ function renderMiscMenu() {
 function applyCustomEventTypes() {
   renderCustomTypeList();
   renderMiscMenu();
-  renderSummaryTypeOptions();
+  renderSleepGanttTypeOptions(summaryEntries);
+  renderSleepGantt(summaryGanttEntries.length ? summaryGanttEntries : summaryEntries);
   if (miscBtn) {
     toggleDisabled(miscBtn, !userValid);
   }
@@ -1146,12 +1156,13 @@ let nextFeedTimer = null;
 let refreshTimer = null;
 let summaryDate = null;
 let summaryEntries = [];
+let summaryGanttEntries = [];
 let summaryInsightsEntries = [];
 let summaryInsightsAnchor = null;
 let summaryInsightsLoading = null;
 let summaryInsightsLoadToken = 0;
 let summaryInsightsComplete = false;
-let summaryType = "feed";
+let sleepGanttOverlayTypes = new Set(SLEEP_GANTT_DEFAULT_OVERLAYS);
 let milkExpressSparklineMode = "all";
 let milkExpressAllEntries = [];
 let milkExpressAllLoading = null;
@@ -1177,6 +1188,7 @@ const timelineHourMap = new Map();
 const SUMMARY_INSIGHTS_PAGE_LIMIT = 250;
 const SUMMARY_INSIGHTS_INITIAL_WINDOW_DAYS = 30;
 const SUMMARY_INSIGHTS_MAX_PAGES = 120;
+const SUMMARY_GANTT_LOOKBACK_HOURS = 24;
 const RULER_DAYS_BACK = 7;
 const RULER_WINDOW_MS = 24 * 60 * 60 * 1000;
 const RULER_BUCKET_MS = 30 * 60 * 1000;
@@ -1399,7 +1411,7 @@ function initSummaryHandlers() {
     return;
   }
   summaryInitialized = true;
-  renderSummaryTypeOptions();
+  renderSleepGanttTypeOptions(summaryEntries);
   if (!summaryDate) {
     setSummaryDate(new Date());
   }
@@ -1434,10 +1446,25 @@ function initSummaryHandlers() {
       }
     });
   }
-  if (summaryTypeSelectEl) {
-    summaryTypeSelectEl.addEventListener("change", () => {
-      summaryType = summaryTypeSelectEl.value;
-      renderSummaryChart(summaryEntries, summaryType);
+  if (sleepGanttTypeOptionsEl) {
+    sleepGanttTypeOptionsEl.addEventListener("click", (event) => {
+      const target = event.target instanceof HTMLElement
+        ? event.target.closest("[data-sleep-gantt-type]")
+        : null;
+      if (!target) {
+        return;
+      }
+      const type = normalizeEntryType(target.dataset.sleepGanttType || "");
+      if (!type) {
+        return;
+      }
+      if (sleepGanttOverlayTypes.has(type)) {
+        sleepGanttOverlayTypes.delete(type);
+      } else {
+        sleepGanttOverlayTypes.add(type);
+      }
+      renderSleepGanttTypeOptions(summaryEntries);
+      renderSleepGantt(summaryGanttEntries.length ? summaryGanttEntries : summaryEntries);
     });
   }
   if (refreshBtn) {
@@ -3607,6 +3634,17 @@ function getSummaryDayWindow(date) {
   };
 }
 
+function getSummaryGanttWindow(date) {
+  const dayWindow = getSummaryDayWindow(date);
+  const lookbackSince = new Date(dayWindow.since);
+  lookbackSince.setHours(lookbackSince.getHours() - SUMMARY_GANTT_LOOKBACK_HOURS);
+  return {
+    ...dayWindow,
+    lookbackSince,
+    lookbackSinceIso: lookbackSince.toISOString(),
+  };
+}
+
 function formatDurationMinutes(totalMinutes) {
   if (!Number.isFinite(totalMinutes) || totalMinutes <= 0) {
     return "0 min";
@@ -4532,109 +4570,260 @@ function renderSummaryInsights(entries, anchorEnd) {
   });
 }
 
-function getSummaryTypeColor(type) {
-  if (type === "feed") {
-    return "#13ec5b";
-  }
-  if (type === "wee") {
-    return "#7dd3fc";
-  }
-  if (type === "poo") {
-    return "#fbbf24";
-  }
-  if (type === "all") {
-    return "#16a34a";
+function getSleepGanttTypeColor(type) {
+  const normalized = normalizeEntryType(type);
+  if (SLEEP_GANTT_TYPE_COLORS[normalized]) {
+    return SLEEP_GANTT_TYPE_COLORS[normalized];
   }
   return "#60a5fa";
 }
 
-function renderSummaryTypeOptions() {
-  if (!summaryTypeSelectEl) {
-    return;
-  }
-  const current = summaryTypeSelectEl.value || summaryType || "all";
-  summaryTypeSelectEl.innerHTML = "";
-  const baseOptions = ["all", "feed", "wee", "poo", ...TIMED_EVENT_TYPES];
-  const options = [...baseOptions, ...customEventTypes];
-  options.forEach((value) => {
-    const option = document.createElement("option");
-    option.value = value;
-    option.textContent = value === "all" ? "All events" : value;
-    summaryTypeSelectEl.appendChild(option);
-  });
-  summaryTypeSelectEl.value = options.includes(current) ? current : "all";
-  summaryType = summaryTypeSelectEl.value;
+function getSleepGanttOverlayTypeOptions(entries) {
+  const options = [];
+  const seen = new Set();
+  const pushType = (type) => {
+    const normalized = normalizeEntryType(type);
+    if (!normalized || normalized === "sleep" || seen.has(normalized)) {
+      return;
+    }
+    seen.add(normalized);
+    options.push(normalized);
+  };
+
+  ["feed", "cry", "wee", "poo"].forEach(pushType);
+  TIMED_EVENT_TYPES.forEach(pushType);
+  customEventTypes.forEach(pushType);
+  (entries || []).forEach((entry) => pushType(entry.type));
+  return options;
 }
 
-function renderSummaryChart(entries, selectedType) {
-  if (!summaryChartEl || !summaryChartEmptyEl) {
+function renderSleepGanttTypeOptions(entries) {
+  if (!sleepGanttTypeOptionsEl) {
     return;
   }
-  summaryChartEl.innerHTML = "";
-  const filtered = selectedType === "all"
-    ? entries
-    : entries.filter((entry) => entry.type === selectedType);
-  if (!filtered.length) {
-    summaryChartEmptyEl.style.display = "flex";
+  const options = getSleepGanttOverlayTypeOptions(entries);
+  sleepGanttTypeOptionsEl.innerHTML = "";
+
+  const allowed = new Set(options);
+  sleepGanttOverlayTypes.forEach((type) => {
+    if (!allowed.has(type)) {
+      sleepGanttOverlayTypes.delete(type);
+    }
+  });
+  if (!sleepGanttOverlayTypes.size) {
+    options.forEach((type) => {
+      if (SLEEP_GANTT_DEFAULT_OVERLAYS.has(type)) {
+        sleepGanttOverlayTypes.add(type);
+      }
+    });
+  }
+
+  options.forEach((type) => {
+    const active = sleepGanttOverlayTypes.has(type);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "sleep-gantt-toggle";
+    button.dataset.sleepGanttType = type;
+    button.textContent = formatEntryTypeLabel(type);
+    button.classList.toggle("active", active);
+    if (active) {
+      button.style.background = getSleepGanttTypeColor(type);
+    }
+    sleepGanttTypeOptionsEl.appendChild(button);
+  });
+}
+
+function formatSleepGanttTime(date) {
+  return date.toLocaleTimeString(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function setSleepGanttReadout(text) {
+  if (!sleepGanttReadoutEl) {
     return;
   }
-  summaryChartEmptyEl.style.display = "none";
+  sleepGanttReadoutEl.textContent = text;
+}
+
+function renderSleepGantt(entries) {
+  if (!sleepGanttChartEl || !sleepGanttEmptyEl) {
+    return;
+  }
+  sleepGanttChartEl.innerHTML = "";
+
+  const dayWindow = getSummaryDayWindow(summaryDate || new Date());
+  const dayStartMs = dayWindow.since.getTime();
+  const dayEndExclusiveMs = dayStartMs + 86400000;
+  const daySpanMs = dayEndExclusiveMs - dayStartMs;
+  const activeEntries = (entries || []).filter((entry) => {
+    if (!entry || entry.deleted_at_utc) {
+      return false;
+    }
+    const ts = Date.parse(entry.timestamp_utc || "");
+    return Number.isFinite(ts);
+  });
+  const sleepBars = [];
+  const overlays = [];
+  activeEntries.forEach((entry) => {
+    const type = normalizeEntryType(entry.type);
+    const startMs = Date.parse(entry.timestamp_utc || "");
+    if (!Number.isFinite(startMs)) {
+      return;
+    }
+    if (type === "sleep") {
+      const durationMin = Number.parseFloat(entry.feed_duration_min);
+      if (!Number.isFinite(durationMin) || durationMin <= 0) {
+        return;
+      }
+      const endMs = startMs + durationMin * 60000;
+      const clippedStartMs = Math.max(dayStartMs, startMs);
+      const clippedEndMs = Math.min(dayEndExclusiveMs, endMs);
+      if (clippedEndMs <= clippedStartMs) {
+        return;
+      }
+      sleepBars.push({
+        entry,
+        startMs,
+        endMs,
+        clippedStartMs,
+        clippedEndMs,
+        durationMin,
+      });
+      return;
+    }
+    if (!sleepGanttOverlayTypes.has(type) || startMs < dayStartMs || startMs >= dayEndExclusiveMs) {
+      return;
+    }
+    overlays.push({ entry, type, startMs });
+  });
+
+  const hasData = sleepBars.length > 0 || overlays.length > 0;
+  sleepGanttEmptyEl.style.display = hasData ? "none" : "block";
+  if (!hasData) {
+    setSleepGanttReadout("No sleep or selected events for this day.");
+    return;
+  }
 
   const svgNS = "http://www.w3.org/2000/svg";
   const width = 360;
-  const height = 180;
-  const paddingX = 20;
-  const paddingTop = 18;
-  const paddingBottom = 28;
-  const axisY = height - paddingBottom;
-  const barSlot = (width - paddingX * 2) / 24;
-  const barWidth = barSlot * 0.7;
+  const height = 168;
+  const paddingLeft = 20;
+  const paddingRight = 14;
+  const plotLeft = paddingLeft;
+  const plotRight = width - paddingRight;
+  const plotWidth = plotRight - plotLeft;
+  const sleepY = 34;
+  const sleepHeight = 28;
+  const markerY = 97;
+  const axisY = 131;
 
-  const counts = new Array(24).fill(0);
-  filtered.forEach((entry) => {
-    const ts = new Date(entry.timestamp_utc);
-    if (Number.isNaN(ts.getTime())) {
-      return;
-    }
-    counts[ts.getHours()] += 1;
-  });
-  const maxCount = Math.max(...counts, 1);
+  const track = document.createElementNS(svgNS, "rect");
+  track.setAttribute("x", String(plotLeft));
+  track.setAttribute("y", String(sleepY));
+  track.setAttribute("width", String(plotWidth));
+  track.setAttribute("height", String(sleepHeight));
+  track.setAttribute("fill", "rgba(124, 131, 255, 0.12)");
+  sleepGanttChartEl.appendChild(track);
 
-  const axis = document.createElementNS(svgNS, "line");
-  axis.setAttribute("x1", paddingX);
-  axis.setAttribute("x2", width - paddingX);
-  axis.setAttribute("y1", axisY);
-  axis.setAttribute("y2", axisY);
-  axis.setAttribute("stroke", "#d6ded8");
-  axis.setAttribute("stroke-width", "2");
-  summaryChartEl.appendChild(axis);
+  const markerTrack = document.createElementNS(svgNS, "line");
+  markerTrack.setAttribute("x1", String(plotLeft));
+  markerTrack.setAttribute("x2", String(plotRight));
+  markerTrack.setAttribute("y1", String(markerY));
+  markerTrack.setAttribute("y2", String(markerY));
+  markerTrack.setAttribute("stroke", "rgba(125, 127, 123, 0.35)");
+  markerTrack.setAttribute("stroke-width", "1.5");
+  sleepGanttChartEl.appendChild(markerTrack);
 
-  counts.forEach((count, hour) => {
-    const ratio = count / maxCount;
-    const barHeight = ratio * (axisY - paddingTop);
-    const x = paddingX + hour * barSlot + (barSlot - barWidth) / 2;
-    const y = axisY - barHeight;
+  for (let hour = 0; hour <= 24; hour += 3) {
+    const x = plotLeft + (hour / 24) * plotWidth;
+    const tick = document.createElementNS(svgNS, "line");
+    tick.setAttribute("x1", String(x));
+    tick.setAttribute("x2", String(x));
+    tick.setAttribute("y1", String(sleepY - 10));
+    tick.setAttribute("y2", String(axisY));
+    tick.setAttribute("stroke", "rgba(125, 127, 123, 0.2)");
+    tick.setAttribute("stroke-width", hour % 6 === 0 ? "1" : "0.7");
+    sleepGanttChartEl.appendChild(tick);
+
+    const label = document.createElementNS(svgNS, "text");
+    label.setAttribute("x", String(x));
+    label.setAttribute("y", String(axisY + 14));
+    label.setAttribute("text-anchor", "middle");
+    label.setAttribute("fill", "#7d7f7b");
+    label.setAttribute("font-size", "10");
+    label.textContent = String(hour).padStart(2, "0");
+    sleepGanttChartEl.appendChild(label);
+  }
+
+  const sleepLabel = document.createElementNS(svgNS, "text");
+  sleepLabel.setAttribute("x", String(plotLeft));
+  sleepLabel.setAttribute("y", String(sleepY - 6));
+  sleepLabel.setAttribute("fill", "#7d7f7b");
+  sleepLabel.setAttribute("font-size", "10");
+  sleepLabel.setAttribute("text-anchor", "start");
+  sleepLabel.textContent = "Sleep";
+  sleepGanttChartEl.appendChild(sleepLabel);
+
+  const eventsLabel = document.createElementNS(svgNS, "text");
+  eventsLabel.setAttribute("x", String(plotLeft));
+  eventsLabel.setAttribute("y", String(markerY - 8));
+  eventsLabel.setAttribute("fill", "#7d7f7b");
+  eventsLabel.setAttribute("font-size", "10");
+  eventsLabel.setAttribute("text-anchor", "start");
+  eventsLabel.textContent = "Events";
+  sleepGanttChartEl.appendChild(eventsLabel);
+
+  sleepBars.forEach((bar) => {
+    const startRatio = (bar.clippedStartMs - dayStartMs) / daySpanMs;
+    const endRatio = (bar.clippedEndMs - dayStartMs) / daySpanMs;
+    const x = plotLeft + startRatio * plotWidth;
+    const widthPx = Math.max(2, (endRatio - startRatio) * plotWidth);
     const rect = document.createElementNS(svgNS, "rect");
-    rect.setAttribute("x", x);
-    rect.setAttribute("y", y);
-    rect.setAttribute("width", barWidth);
-    rect.setAttribute("height", barHeight);
-    rect.setAttribute("rx", "3");
-    rect.setAttribute("fill", getSummaryTypeColor(selectedType));
-    summaryChartEl.appendChild(rect);
+    rect.setAttribute("x", String(x));
+    rect.setAttribute("y", String(sleepY + 3));
+    rect.setAttribute("width", String(widthPx));
+    rect.setAttribute("height", String(sleepHeight - 6));
+    rect.setAttribute("rx", "6");
+    rect.setAttribute("fill", getSleepGanttTypeColor("sleep"));
+    rect.setAttribute("fill-opacity", "0.6");
+    rect.setAttribute("stroke", getSleepGanttTypeColor("sleep"));
+    rect.setAttribute("stroke-width", "1");
+    const startLabel = formatSleepGanttTime(new Date(bar.startMs));
+    const endLabel = formatSleepGanttTime(new Date(bar.endMs));
+    const detail = `Sleep ${startLabel} to ${endLabel} (${formatDurationMinutes(bar.durationMin)})`;
+    rect.addEventListener("mouseenter", () => setSleepGanttReadout(detail));
+    rect.addEventListener("click", () => setSleepGanttReadout(detail));
+    const title = document.createElementNS(svgNS, "title");
+    title.textContent = detail;
+    rect.appendChild(title);
+    sleepGanttChartEl.appendChild(rect);
   });
 
-  [0, 6, 12, 18, 23].forEach((hour) => {
-    const x = paddingX + hour * barSlot + barSlot / 2;
-    const tick = document.createElementNS(svgNS, "text");
-    tick.setAttribute("x", x);
-    tick.setAttribute("y", height - 8);
-    tick.setAttribute("text-anchor", "middle");
-    tick.setAttribute("fill", "#7d7f7b");
-    tick.setAttribute("font-size", "10");
-    tick.textContent = String(hour);
-    summaryChartEl.appendChild(tick);
+  overlays.forEach((overlay, idx) => {
+    const ratio = (overlay.startMs - dayStartMs) / daySpanMs;
+    const x = plotLeft + ratio * plotWidth;
+    const marker = document.createElementNS(svgNS, "circle");
+    marker.setAttribute("cx", String(x));
+    marker.setAttribute("cy", String(markerY - (idx % 3) * 3));
+    marker.setAttribute("r", "4.2");
+    marker.setAttribute("fill", getSleepGanttTypeColor(overlay.type));
+    marker.setAttribute("stroke", "#ffffff");
+    marker.setAttribute("stroke-width", "1");
+    const detail = `${formatEntryTypeLabel(overlay.type)} at ${formatSleepGanttTime(new Date(overlay.startMs))}`;
+    marker.addEventListener("mouseenter", () => setSleepGanttReadout(detail));
+    marker.addEventListener("click", () => setSleepGanttReadout(detail));
+    const title = document.createElementNS(svgNS, "title");
+    title.textContent = detail;
+    marker.appendChild(title);
+    sleepGanttChartEl.appendChild(marker);
   });
+
+  const sleepMinutes = sleepBars.reduce((total, bar) => total + bar.durationMin, 0);
+  setSleepGanttReadout(
+    `${formatDurationMinutes(sleepMinutes)} sleep across ${sleepBars.length} session${sleepBars.length === 1 ? "" : "s"} • ${overlays.length} selected event${overlays.length === 1 ? "" : "s"}.`,
+  );
 }
 
 function updateLogEmptyMessage() {
@@ -7118,7 +7307,7 @@ async function editEntry(entry) {
   const payload = { type: nextType, timestamp_utc: nextTime };
   const currentDuration =
     entry.feed_duration_min !== null && entry.feed_duration_min !== undefined
-      ? String(entry.feed_duration_min)
+      ? formatDurationMinutes(entry.feed_duration_min)
       : "";
   const durationInput = window.prompt("Duration (minutes or h/m)", currentDuration);
   if (durationInput === null) {
@@ -7444,30 +7633,50 @@ async function loadSummaryEntries() {
     if (!summaryDate) {
       setSummaryDate(new Date());
     }
-    const dayWindow = getSummaryDayWindow(summaryDate);
+    const ganttWindow = getSummaryGanttWindow(summaryDate);
+    const dayWindow = {
+      sinceIso: ganttWindow.sinceIso,
+      untilIso: ganttWindow.untilIso,
+    };
     const cachedEntries = await listEntriesLocalSafe({
       limit: 200,
       since: dayWindow.sinceIso,
       until: dayWindow.untilIso,
     });
+    const cachedGanttEntries = await listEntriesLocalSafe({
+      limit: 400,
+      since: ganttWindow.lookbackSinceIso,
+      until: ganttWindow.untilIso,
+    });
     if (cachedEntries) {
       summaryEntries = cachedEntries;
+      summaryGanttEntries = cachedGanttEntries || cachedEntries;
       renderSummaryStats(cachedEntries);
+      renderSleepGanttTypeOptions(cachedEntries);
+      renderSleepGantt(summaryGanttEntries.length ? summaryGanttEntries : cachedEntries);
       renderMilkExpressSummary(cachedEntries);
     }
 
     void syncNow();
 
-    const [entries] = await Promise.all([
+    const [entries, ganttEntries] = await Promise.all([
       loadEntriesWithFallback({
         limit: 200,
         since: dayWindow.sinceIso,
         until: dayWindow.untilIso,
       }),
+      loadEntriesWithFallback({
+        limit: 400,
+        since: ganttWindow.lookbackSinceIso,
+        until: ganttWindow.untilIso,
+      }),
       ensureMilkExpressAllEntries(),
     ]);
     summaryEntries = entries;
+    summaryGanttEntries = ganttEntries;
     renderSummaryStats(entries);
+    renderSleepGanttTypeOptions(entries);
+    renderSleepGantt(ganttEntries.length ? ganttEntries : entries);
     renderMilkExpressSummary(entries);
     await loadSummaryInsights();
   } catch (err) {

@@ -7,7 +7,6 @@
 - add a baby weight (kg) to goal ml function. *needs planning
 - add a more in depth feeding plan. *needs planning
 - align the milk express ledger page format (menu + general look and feel) to the rest of the app.
-- editing duration shows as minutes but should show as hr/min. should show the recorded value when editing an entry 
 
 ## DONE
 - created GitButler branch `security/sqlite-only-hardening` and attached existing unassigned local files (`.gitignore`, `scripts/apple-container-restart.sh`, `skills-lock.json`) before code edits.
@@ -26,6 +25,10 @@
   - default app base path in restart script is now `BABY_TRACKER_BASE_PATH=/baby`
   - tailscale serve target now forwards to `http://127.0.0.1:8000/baby` for the `/baby` path
   - verified rendered HTML now uses `/baby/static/...` and `data-base-path="/baby"`
+- fixed edit-entry duration prefill to show formatted `h/m` value instead of raw minutes in prompt fallback (`src/web/static/app.js`) on 2026-03-07.
+- fixed timeline/log edit modal duration field to accept/display `minutes or h/m` (label + text input + example placeholder) in `src/web/templates/timeline.html` and `src/web/templates/log.html` on 2026-03-07.
+- added a Summary-page sleep-focused 24h Gantt timeline with sleep duration bars and optional overlay markers for other event types (`feed`, `cry`, `wee`, `poo`, timed/custom events) in `src/web/templates/summary.html` and `src/web/static/app.js` on 2026-03-07.
+- fixed Summary sleep Gantt overlap handling so sleep entries that start on the previous day still render on the selected day when they overlap past midnight (24h lookback window for chart data) in `src/web/static/app.js` on 2026-03-07.
 
 
 ## NOTES

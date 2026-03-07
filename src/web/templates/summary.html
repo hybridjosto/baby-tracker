@@ -328,6 +328,83 @@
         color: var(--text-secondary);
         text-align: right;
       }
+      .sleep-gantt-controls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 6px;
+      }
+      .sleep-gantt-toggle {
+        border: 1px solid var(--border-light);
+        border-radius: 999px;
+        padding: 4px 10px;
+        background: var(--surface-soft);
+        color: var(--text-primary);
+        font-size: 10px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        cursor: pointer;
+      }
+      .sleep-gantt-toggle.active {
+        color: #0f1a12;
+        border-color: transparent;
+      }
+      .sleep-gantt-board {
+        margin-top: 12px;
+        border: 1px dashed var(--border-light);
+        border-radius: 12px;
+        background: var(--surface-soft);
+        overflow: hidden;
+      }
+      html.dark .sleep-gantt-toggle {
+        border-color: var(--border-dark);
+        background: rgba(255, 255, 255, 0.08);
+        color: #e6f2ea;
+      }
+      html.dark .sleep-gantt-board {
+        border-color: var(--border-dark);
+        background: rgba(26, 44, 32, 0.75);
+      }
+      #sleep-gantt-chart {
+        width: 100%;
+        height: 168px;
+        display: block;
+      }
+      .sleep-gantt-readout {
+        font-size: 12px;
+        color: var(--text-secondary);
+        border-top: 1px solid var(--border-light);
+        padding: 8px 10px;
+      }
+      html.dark .sleep-gantt-readout {
+        border-top-color: var(--border-dark);
+      }
+      .sleep-gantt-empty {
+        display: none;
+        padding: 14px;
+        text-align: center;
+        font-size: 13px;
+        color: var(--text-secondary);
+      }
+      .sleep-gantt-legend {
+        margin-top: 10px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        font-size: 11px;
+        color: var(--text-secondary);
+      }
+      .sleep-gantt-legend-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .sleep-gantt-legend-dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 999px;
+        display: inline-block;
+      }
       .skeleton-text {
         position: relative;
         display: inline-block;
@@ -813,6 +890,26 @@
             <div class="summary-label">Total sleep time</div>
             <div class="summary-value skeleton-text skeleton-mid" id="summary-sleep-duration">0 min</div>
             <div class="summary-sub skeleton-text skeleton-wide" id="summary-sleep-duration-avg">Avg / sleep: --</div>
+          </div>
+        </section>
+
+        <section class="summary-panel">
+          <div class="summary-panel-header">
+            <h2>Sleep timeline</h2>
+            <div class="summary-panel-meta">Selected day (24h)</div>
+          </div>
+          <div class="sleep-gantt-controls" id="sleep-gantt-type-options"></div>
+          <div class="sleep-gantt-board">
+            <svg id="sleep-gantt-chart" viewBox="0 0 360 168" role="img" aria-label="Sleep timeline and event markers"></svg>
+            <div class="sleep-gantt-readout" id="sleep-gantt-readout">Tap or hover an event for details.</div>
+            <div class="sleep-gantt-empty" id="sleep-gantt-empty">No sleep or selected events for this day.</div>
+          </div>
+          <div class="sleep-gantt-legend">
+            <span class="sleep-gantt-legend-item"><i class="sleep-gantt-legend-dot" style="background:#7c83ff"></i>Sleep</span>
+            <span class="sleep-gantt-legend-item"><i class="sleep-gantt-legend-dot" style="background:#13ec5b"></i>Feed</span>
+            <span class="sleep-gantt-legend-item"><i class="sleep-gantt-legend-dot" style="background:#fb7185"></i>Cry</span>
+            <span class="sleep-gantt-legend-item"><i class="sleep-gantt-legend-dot" style="background:#7dd3fc"></i>Wee</span>
+            <span class="sleep-gantt-legend-item"><i class="sleep-gantt-legend-dot" style="background:#fbbf24"></i>Poo</span>
           </div>
         </section>
 

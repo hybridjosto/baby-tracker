@@ -634,14 +634,12 @@
           </div>
           <div class="edit-number-grid edit-field--numbers">
             <div class="edit-field">
-              <label for="edit-entry-duration">Duration (minutes)</label>
+              <label for="edit-entry-duration">Duration (minutes or h/m)</label>
               <input
                 id="edit-entry-duration"
-                type="number"
-                min="0"
-                step="1"
-                inputmode="decimal"
-                pattern="[0-9]*[.,]?[0-9]*"
+                type="text"
+                inputmode="text"
+                placeholder="e.g. 90, 1h 30m, or 1:30"
               >
             </div>
             <div class="edit-field">
