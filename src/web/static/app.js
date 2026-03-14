@@ -1147,6 +1147,7 @@ function toggleDisabled(element, disabled) {
 }
 
 let homeInitialized = false;
+let quickLogInitialized = false;
 let logInitialized = false;
 let settingsInitialized = false;
 let summaryInitialized = false;
@@ -1234,6 +1235,18 @@ function initHomeHandlers() {
       closeNextFeedModal();
     }
   });
+  if (!nextFeedTimer) {
+    nextFeedTimer = window.setInterval(updateNextFeed, 60000);
+  }
+  bindStatCardNavigation();
+  startAutoRefresh(loadHomeEntries);
+}
+
+function initQuickLogHandlers() {
+  if (quickLogInitialized) {
+    return;
+  }
+  quickLogInitialized = true;
   if (feedBtn) {
     feedBtn.addEventListener("click", toggleFeedMenu);
   }
@@ -1379,11 +1392,6 @@ function initHomeHandlers() {
     }
   });
   setQuickFeedKind(quickFeedKind);
-  if (!nextFeedTimer) {
-    nextFeedTimer = window.setInterval(updateNextFeed, 60000);
-  }
-  bindStatCardNavigation();
-  startAutoRefresh(loadHomeEntries);
 }
 
 function initLogHandlers() {
@@ -1856,6 +1864,13 @@ function initBottlesHandlers() {
 }
 
 function applyUserState() {
+  initQuickLogHandlers();
+  toggleDisabled(feedBtn, !userValid);
+  toggleDisabled(nappyBtn, !userValid);
+  toggleDisabled(miscBtn, !userValid);
+  toggleDisabled(pooBtn, !userValid);
+  toggleDisabled(weeBtn, !userValid);
+
   if (pageType === "settings") {
     initSettingsHandlers();
     updateUserDisplay();
@@ -1880,11 +1895,6 @@ function applyUserState() {
   }
   const allowTimeline = pageType === "timeline";
   const allowSharedPage = allowTimeline || pageType === "calendar" || pageType === "calendar-form";
-  toggleDisabled(feedBtn, !userValid);
-  toggleDisabled(nappyBtn, !userValid);
-  toggleDisabled(miscBtn, !userValid);
-  toggleDisabled(pooBtn, !userValid);
-  toggleDisabled(weeBtn, !userValid);
   toggleDisabled(refreshBtn, false);
   if (csvFileEl) {
     csvFileEl.disabled = !userValid;
