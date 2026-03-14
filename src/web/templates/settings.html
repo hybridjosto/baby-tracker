@@ -203,6 +203,30 @@
             <div class="hint">Used to estimate time to next feed.</div>
           </div>
           <div class="field">
+            <label for="feed-size-small-input">Small feed amount (ml)</label>
+            <input
+              id="feed-size-small-input"
+              type="number"
+              name="feed_size_small_ml"
+              min="1"
+              step="1"
+              inputmode="decimal"
+            >
+            <div class="hint">Default suggestion bucket for smaller future feeds.</div>
+          </div>
+          <div class="field">
+            <label for="feed-size-big-input">Big feed amount (ml)</label>
+            <input
+              id="feed-size-big-input"
+              type="number"
+              name="feed_size_big_ml"
+              min="1"
+              step="1"
+              inputmode="decimal"
+            >
+            <div class="hint">Used when a small feed would leave the day short of target.</div>
+          </div>
+          <div class="field">
             <label for="custom-type-input">Custom event types</label>
             <div class="inline-row">
               <input

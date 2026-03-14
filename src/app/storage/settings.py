@@ -2,6 +2,9 @@ import json
 import sqlite3
 from datetime import datetime, timezone
 
+DEFAULT_FEED_SIZE_SMALL_ML = 120.0
+DEFAULT_FEED_SIZE_BIG_ML = 150.0
+
 
 SETTINGS_KEYS = (
     "dob",
@@ -16,6 +19,8 @@ SETTINGS_KEYS = (
     "default_user_slug",
     "pushcut_feed_due_url",
     "home_kpis_webhook_url",
+    "feed_size_small_ml",
+    "feed_size_big_ml",
 )
 
 
@@ -40,6 +45,18 @@ def _normalize_settings_payload(data: dict | None) -> dict:
     settings = {key: raw.get(key) for key in SETTINGS_KEYS}
     settings["custom_event_types"] = _parse_custom_event_types(
         raw.get("custom_event_types")
+    )
+    small_value = raw.get("feed_size_small_ml")
+    big_value = raw.get("feed_size_big_ml")
+    settings["feed_size_small_ml"] = (
+        float(small_value)
+        if isinstance(small_value, (int, float))
+        else DEFAULT_FEED_SIZE_SMALL_ML
+    )
+    settings["feed_size_big_ml"] = (
+        float(big_value)
+        if isinstance(big_value, (int, float))
+        else DEFAULT_FEED_SIZE_BIG_ML
     )
     return settings
 
@@ -66,7 +83,7 @@ def get_settings(conn: sqlite3.Connection | None) -> dict:
                overnight_gap_min_hours, overnight_gap_max_hours,
                behind_target_mode, entry_webhook_url,
                default_user_slug, pushcut_feed_due_url,
-               home_kpis_webhook_url
+               home_kpis_webhook_url, feed_size_small_ml, feed_size_big_ml
         FROM baby_settings
         WHERE id = 1
         """
@@ -93,6 +110,8 @@ def update_settings(conn: sqlite3.Connection | None, fields: dict) -> dict:
         "default_user_slug",
         "pushcut_feed_due_url",
         "home_kpis_webhook_url",
+        "feed_size_small_ml",
+        "feed_size_big_ml",
         "updated_at_utc",
     ):
         if key in fields:

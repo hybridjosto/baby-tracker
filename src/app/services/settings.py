@@ -7,6 +7,7 @@ from src.app.storage.db import get_connection
 from src.lib.validation import normalize_user_slug
 from src.app.storage.settings import get_settings as repo_get_settings
 from src.app.storage.settings import update_settings as repo_update_settings
+from src.app.storage.settings import DEFAULT_FEED_SIZE_BIG_ML, DEFAULT_FEED_SIZE_SMALL_ML
 
 
 def _now_utc_iso() -> str:
@@ -149,6 +150,14 @@ def _normalize_pushcut_feed_due_url(value: object) -> str | None:
     return trimmed
 
 
+def _normalize_feed_size_ml(value: object, field: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"{field} must be a positive number")
+    if not float(value) > 0:
+        raise ValueError(f"{field} must be a positive number")
+    return float(value)
+
+
 def get_settings(db_path: str) -> dict:
     with get_connection(db_path) as conn:
         return repo_get_settings(conn)
@@ -181,6 +190,14 @@ def update_settings(db_path: str, payload: dict) -> dict:
     if "pushcut_feed_due_url" in payload:
         fields["pushcut_feed_due_url"] = _normalize_pushcut_feed_due_url(
             payload["pushcut_feed_due_url"]
+        )
+    if "feed_size_small_ml" in payload:
+        fields["feed_size_small_ml"] = _normalize_feed_size_ml(
+            payload["feed_size_small_ml"], "feed_size_small_ml"
+        )
+    if "feed_size_big_ml" in payload:
+        fields["feed_size_big_ml"] = _normalize_feed_size_ml(
+            payload["feed_size_big_ml"], "feed_size_big_ml"
         )
     with get_connection(db_path) as conn:
         current = repo_get_settings(conn)
@@ -218,6 +235,15 @@ def update_settings(db_path: str, payload: dict) -> dict:
         )
         if gap_min is not None and gap_max is not None and gap_min > gap_max:
             raise ValueError("overnight_gap_min_hours must be <= overnight_gap_max_hours")
+
+        next_small = fields.get("feed_size_small_ml", current.get("feed_size_small_ml"))
+        next_big = fields.get("feed_size_big_ml", current.get("feed_size_big_ml"))
+        if next_small is None:
+            next_small = DEFAULT_FEED_SIZE_SMALL_ML
+        if next_big is None:
+            next_big = DEFAULT_FEED_SIZE_BIG_ML
+        if next_small > next_big:
+            raise ValueError("feed_size_small_ml must be <= feed_size_big_ml")
 
         if fields:
             fields["updated_at_utc"] = _now_utc_iso()

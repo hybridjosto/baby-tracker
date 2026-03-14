@@ -170,6 +170,10 @@ def _ensure_settings_table(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE baby_settings ADD COLUMN pushcut_feed_due_url TEXT")
     if "home_kpis_webhook_url" not in columns:
         conn.execute("ALTER TABLE baby_settings ADD COLUMN home_kpis_webhook_url TEXT")
+    if "feed_size_small_ml" not in columns:
+        conn.execute("ALTER TABLE baby_settings ADD COLUMN feed_size_small_ml REAL")
+    if "feed_size_big_ml" not in columns:
+        conn.execute("ALTER TABLE baby_settings ADD COLUMN feed_size_big_ml REAL")
     if "feed_due_last_entry_id" not in columns:
         conn.execute("ALTER TABLE baby_settings ADD COLUMN feed_due_last_entry_id INTEGER")
     if "feed_due_last_sent_at_utc" not in columns:
@@ -185,9 +189,10 @@ def _ensure_settings_table(conn: sqlite3.Connection) -> None:
                  overnight_gap_min_hours, overnight_gap_max_hours,
                  behind_target_mode, entry_webhook_url, default_user_slug,
                  pushcut_feed_due_url, home_kpis_webhook_url,
+                 feed_size_small_ml, feed_size_big_ml,
                  feed_due_last_entry_id, feed_due_last_sent_at_utc,
                  updated_at_utc)
-            VALUES (1, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, ?)
+            VALUES (1, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, ?)
             """,
             (now,),
         )

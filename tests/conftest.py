@@ -1,7 +1,9 @@
 import sys
+import threading
 from pathlib import Path
 
 import pytest
+from werkzeug.serving import make_server
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -22,3 +24,19 @@ def app(tmp_path, monkeypatch):
 @pytest.fixture()
 def client(app):
     return app.test_client()
+
+
+@pytest.fixture()
+def live_server(app):
+    try:
+        server = make_server("127.0.0.1", 0, app, threaded=True)
+    except (OSError, SystemExit) as exc:
+        pytest.skip(f"Live server unavailable in this environment: {exc}")
+    host, port = server.server_address
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield f"http://{host}:{port}"
+    finally:
+        server.shutdown()
+        thread.join(timeout=5)

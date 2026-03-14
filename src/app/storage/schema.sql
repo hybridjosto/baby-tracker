@@ -32,6 +32,8 @@ CREATE TABLE IF NOT EXISTS baby_settings (
     default_user_slug TEXT,
     pushcut_feed_due_url TEXT,
     home_kpis_webhook_url TEXT,
+    feed_size_small_ml REAL,
+    feed_size_big_ml REAL,
     feed_due_last_entry_id INTEGER,
     feed_due_last_sent_at_utc TEXT,
     updated_at_utc TEXT NOT NULL DEFAULT (datetime('now'))
