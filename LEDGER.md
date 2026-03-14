@@ -9,6 +9,10 @@
 - align the milk express ledger page format (menu + general look and feel) to the rest of the app.
 
 ## DONE
+- fixed homepage next-feed suggestion day bucketing to use the actual next local midnight on DST transition days, preserving the documented local-midnight reset behavior, on 2026-03-14.
+- extended the homepage next-feed modal on 2026-03-14 to show a suggestion-based rolling feed total for each upcoming row, with the running total resetting automatically at each local midnight.
+- added a Playwright-based frontend test harness for the homepage next-feed modal using a live Flask test server fixture and browser-time freezing, with clean skips when Playwright/browser binaries are unavailable, on 2026-03-14.
+- added configurable future-feed suggestion sizes (`feed_size_small_ml`, `feed_size_big_ml`) with defaults 120/150 ml in settings storage/API/UI, and used them on the homepage next-feed modal to suggest `Small`/`Big` feeds that keep the remaining pre-midnight schedule on track for the daily goal on 2026-03-14.
 - added `last_feed_time_utc` to `GET /api/entries/summary` as a backward-compatible top-level field while keeping existing `items` and `summary` unchanged on 2026-03-14.
 - created GitButler branch `security/sqlite-only-hardening` and attached existing unassigned local files (`.gitignore`, `scripts/apple-container-restart.sh`, `skills-lock.json`) before code edits.
 - removed Firebase/Firestore runtime paths and secret-based API gating from the app.
@@ -35,6 +39,13 @@
 - added integration coverage for timed-event start APIs in `tests/integration/test_feed_log_api.py` (default user slug, user override, and payload fields) on 2026-03-08.
 
 ## NOTES
+- review follow-up on 2026-03-14: the original rolling-total planner used `dayStart + 24h`, which can drift from local midnight on DST transition days; `src/web/static/app.js` now uses `getNextLocalMidnightTs(...)` for day splits.
+- tests run on 2026-03-14 after rolling future-feed totals: `./.venv/bin/pytest tests/integration/test_settings_api.py tests/unit/test_settings_storage.py tests/frontend/test_next_feed_modal.py` -> `7 passed, 3 skipped`.
+- frontend tests added on 2026-03-14 require Python package `playwright` plus an installed Chromium binary; in this environment they currently skip because Playwright is not installed.
+- tests run on 2026-03-14 for frontend harness: `./.venv/bin/pytest tests/frontend/test_next_feed_modal.py` -> `3 skipped` (sandbox cannot bind a localhost test server here).
+- tests run on 2026-03-14 for combined coverage: `./.venv/bin/pytest tests/integration/test_settings_api.py tests/unit/test_settings_storage.py tests/frontend/test_next_feed_modal.py` -> `7 passed, 3 skipped`.
+- tests run on 2026-03-14 after future-feed suggestion sizing: `./.venv/bin/pytest tests/integration/test_settings_api.py tests/unit/test_settings_storage.py` -> `7 passed`.
+- lint attempted on 2026-03-14 after future-feed suggestion sizing: `./.venv/bin/python -m ruff check src tests/integration/test_settings_api.py tests/unit/test_settings_storage.py` could not run because `ruff` is not installed in `.venv`.
 - tests run on 2026-03-14 after summary API addition: `./.venv/bin/pytest tests/integration/test_entries_api.py` -> `29 passed`.
 - lint attempted on 2026-03-14 after summary API addition: `./.venv/bin/python -m ruff check src` could not run because `ruff` is not installed in `.venv`.
 - tests after SQLite-only security refactor: `87 passed, 1 skipped` on 2026-03-05.

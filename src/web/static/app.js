@@ -243,6 +243,8 @@ const settingsFormEl = document.getElementById("settings-form");
 const dobInputEl = document.getElementById("dob-input");
 const ageOutputEl = document.getElementById("age-output");
 const intervalInputEl = document.getElementById("interval-input");
+const feedSizeSmallInputEl = document.getElementById("feed-size-small-input");
+const feedSizeBigInputEl = document.getElementById("feed-size-big-input");
 const customTypeInputEl = document.getElementById("custom-type-input");
 const entryWebhookInputEl = document.getElementById("entry-webhook-input");
 const homeKpisWebhookInputEl = document.getElementById("home-kpis-webhook-input");
@@ -274,6 +276,8 @@ const bottleLogMilkBtnEl = document.getElementById("bottle-log-milk");
 
 let babyDob = null;
 let feedIntervalMinutes = null;
+let feedSizeSmallMl = 120;
+let feedSizeBigMl = 150;
 let customEventTypes = [];
 let breastfeedTickerId = null;
 let miscTimedEventTickerId = null;
@@ -400,6 +404,95 @@ function getFeedEntryTotalMl(entry) {
 function getPrevious24hFeedEntries(anchorTs) {
   const startTs = anchorTs - RULER_WINDOW_MS;
   return recentFeedVolumeEntries.filter((entry) => entry.ts >= startTs && entry.ts <= anchorTs);
+}
+
+function getLocalMidnightTs(anchorTs = Date.now()) {
+  const date = new Date(anchorTs);
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+}
+
+function getNextLocalMidnightTs(anchorTs = Date.now()) {
+  const date = new Date(anchorTs);
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1).getTime();
+}
+
+function getTodayFeedTotalMl(anchorTs = Date.now()) {
+  const dayStartTs = getLocalMidnightTs(anchorTs);
+  return recentFeedVolumeEntries.reduce((total, entry) => {
+    if (entry.ts < dayStartTs || entry.ts > anchorTs) {
+      return total;
+    }
+    return total + entry.ml;
+  }, 0);
+}
+
+function getFeedTotalForDay(dayStartTs, dayEndTs, anchorTs = Date.now()) {
+  return recentFeedVolumeEntries.reduce((total, entry) => {
+    if (entry.ts < dayStartTs || entry.ts >= dayEndTs || entry.ts > anchorTs) {
+      return total;
+    }
+    return total + entry.ml;
+  }, 0);
+}
+
+function getUpcomingFeedSuggestionPlan({ nowTs, firstFeedTs, intervalMinutes, feedCount }) {
+  const goalValue = Number.parseFloat(activeFeedingGoal && activeFeedingGoal.goal_ml);
+  if (!Number.isFinite(goalValue) || goalValue <= 0) {
+    return [];
+  }
+  if (!Number.isFinite(firstFeedTs) || !Number.isFinite(intervalMinutes) || intervalMinutes <= 0 || !Number.isInteger(feedCount) || feedCount <= 0) {
+    return [];
+  }
+
+  const schedule = [];
+  for (let i = 0; i < feedCount; i += 1) {
+    const ts = firstFeedTs + (intervalMinutes * 60000 * i);
+    schedule.push(ts);
+  }
+  if (!schedule.length) {
+    return [];
+  }
+
+  const suggestions = [];
+  let index = 0;
+  while (index < schedule.length) {
+    const dayStartTs = getLocalMidnightTs(schedule[index]);
+    const dayEndTs = getNextLocalMidnightTs(schedule[index]);
+    const daySchedule = [];
+    while (index < schedule.length && schedule[index] < dayEndTs) {
+      daySchedule.push(schedule[index]);
+      index += 1;
+    }
+
+    const consumedDayMl = dayStartTs <= nowTs
+      ? getFeedTotalForDay(dayStartTs, dayEndTs, nowTs)
+      : 0;
+    if (consumedDayMl >= goalValue) {
+      continue;
+    }
+
+    let plannedTotalMl = consumedDayMl;
+    daySchedule.forEach((ts, dayIndex) => {
+      const remainingFeeds = daySchedule.length - dayIndex;
+      const remainingMl = Math.max(0, goalValue - plannedTotalMl);
+      if (remainingMl <= 0) {
+        return;
+      }
+      const maxLaterWithBig = (remainingFeeds - 1) * feedSizeBigMl;
+      const suggestedCategory = plannedTotalMl + feedSizeSmallMl + maxLaterWithBig >= goalValue
+        ? "small"
+        : "big";
+      const suggestedMl = suggestedCategory === "small" ? feedSizeSmallMl : feedSizeBigMl;
+      plannedTotalMl += suggestedMl;
+      suggestions.push({
+        ts,
+        category: suggestedCategory,
+        ml: suggestedMl,
+        rollingTotalMl: plannedTotalMl,
+      });
+    });
+  }
+  return suggestions;
 }
 
 function buildNextFeedRow({
@@ -1527,6 +1620,26 @@ function initSettingsHandlers() {
         const minutes = Math.round(nextValue * 60);
         void saveBabySettings({ feed_interval_min: minutes });
       }
+    });
+  }
+  if (feedSizeSmallInputEl) {
+    feedSizeSmallInputEl.addEventListener("change", () => {
+      const nextValue = Number.parseFloat(feedSizeSmallInputEl.value);
+      if (Number.isNaN(nextValue) || nextValue <= 0) {
+        feedSizeSmallInputEl.value = String(feedSizeSmallMl);
+        return;
+      }
+      void saveBabySettings({ feed_size_small_ml: nextValue });
+    });
+  }
+  if (feedSizeBigInputEl) {
+    feedSizeBigInputEl.addEventListener("change", () => {
+      const nextValue = Number.parseFloat(feedSizeBigInputEl.value);
+      if (Number.isNaN(nextValue) || nextValue <= 0) {
+        feedSizeBigInputEl.value = String(feedSizeBigMl);
+        return;
+      }
+      void saveBabySettings({ feed_size_big_ml: nextValue });
     });
   }
   if (customTypeAddBtn && customTypeInputEl) {
@@ -3056,6 +3169,15 @@ function bindNextFeedPopup(element) {
     }
 
     let nextAnchorEl = null;
+    const suggestionPlan = getUpcomingFeedSuggestionPlan({
+      nowTs,
+      firstFeedTs: lastDate.getTime() + intervalMinutes * 60000,
+      intervalMinutes,
+      feedCount: 6,
+    });
+    const suggestionByTs = new Map(
+      suggestionPlan.map((entry) => [entry.ts, entry]),
+    );
     if (nextFeedListEl) {
       const upcomingLabel = document.createElement("div");
       upcomingLabel.className = "next-feed-section-label";
@@ -3066,9 +3188,16 @@ function bindNextFeedPopup(element) {
 
     for (let i = 1; i <= 6; i += 1) {
       const nextDate = new Date(lastDate.getTime() + intervalMinutes * 60000 * i);
+      const suggestion = suggestionByTs.get(nextDate.getTime());
+      const detail = suggestion
+        ? [
+          `Suggested: ${suggestion.category === "small" ? "Small" : "Big"} (${formatMl(suggestion.ml)})`,
+          `Rolling total: ${formatMl(suggestion.rollingTotalMl)}`,
+        ].join(" · ")
+        : "";
       const item = buildNextFeedRow({
         date: nextDate,
-        detail: "",
+        detail,
         meta: formatTimeUntil(nextDate),
       });
       if (nextFeedListEl) {
@@ -7963,6 +8092,12 @@ async function loadBabySettings() {
     customEventTypes = Array.isArray(data.custom_event_types)
       ? data.custom_event_types
       : [];
+    feedSizeSmallMl = Number.isFinite(Number.parseFloat(data.feed_size_small_ml))
+      ? Number.parseFloat(data.feed_size_small_ml)
+      : 120;
+    feedSizeBigMl = Number.isFinite(Number.parseFloat(data.feed_size_big_ml))
+      ? Number.parseFloat(data.feed_size_big_ml)
+      : 150;
     if (dobInputEl) {
       dobInputEl.value = babyDob || "";
     }
@@ -7982,6 +8117,12 @@ async function loadBabySettings() {
     }
     if (pushcutFeedDueInputEl) {
       pushcutFeedDueInputEl.value = data.pushcut_feed_due_url || "";
+    }
+    if (feedSizeSmallInputEl) {
+      feedSizeSmallInputEl.value = String(feedSizeSmallMl);
+    }
+    if (feedSizeBigInputEl) {
+      feedSizeBigInputEl.value = String(feedSizeBigMl);
     }
     applyCustomEventTypes();
     updateAgeDisplay();
@@ -8009,6 +8150,12 @@ async function saveBabySettings(patch) {
     customEventTypes = Array.isArray(data.custom_event_types)
       ? data.custom_event_types
       : [];
+    feedSizeSmallMl = Number.isFinite(Number.parseFloat(data.feed_size_small_ml))
+      ? Number.parseFloat(data.feed_size_small_ml)
+      : 120;
+    feedSizeBigMl = Number.isFinite(Number.parseFloat(data.feed_size_big_ml))
+      ? Number.parseFloat(data.feed_size_big_ml)
+      : 150;
     if (entryWebhookInputEl) {
       entryWebhookInputEl.value = data.entry_webhook_url || "";
     }
@@ -8020,6 +8167,12 @@ async function saveBabySettings(patch) {
     }
     if (pushcutFeedDueInputEl) {
       pushcutFeedDueInputEl.value = data.pushcut_feed_due_url || "";
+    }
+    if (feedSizeSmallInputEl) {
+      feedSizeSmallInputEl.value = String(feedSizeSmallMl);
+    }
+    if (feedSizeBigInputEl) {
+      feedSizeBigInputEl.value = String(feedSizeBigMl);
     }
     applyCustomEventTypes();
     updateAgeDisplay();
