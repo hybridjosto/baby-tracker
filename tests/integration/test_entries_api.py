@@ -228,6 +228,7 @@ def test_entries_summary_returns_null_when_missing(client):
             {"title": "Last poo", "date_time": None},
             {"title": "Next feed", "date_time": None},
         ],
+        "last_feed_time_utc": None,
         "summary": "Last feed: -- · Last wee: -- · Last poo: -- · Next feed: --",
     }
 
@@ -277,6 +278,7 @@ def test_entries_summary_returns_latest_entries(client):
             {"title": "Last poo", "date_time": "2024-01-04 00:00"},
             {"title": "Next feed", "date_time": "2024-01-02 03:00"},
         ],
+        "last_feed_time_utc": "2024-01-02T00:00:00+00:00",
         "summary": (
             "Last feed: 2024-01-02 00:00 · Last wee: 2024-01-03 00:00 · "
             "Last poo: 2024-01-04 00:00 · Next feed: 2024-01-02 03:00"

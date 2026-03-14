@@ -9,6 +9,7 @@
 - align the milk express ledger page format (menu + general look and feel) to the rest of the app.
 
 ## DONE
+- added `last_feed_time_utc` to `GET /api/entries/summary` as a backward-compatible top-level field while keeping existing `items` and `summary` unchanged on 2026-03-14.
 - created GitButler branch `security/sqlite-only-hardening` and attached existing unassigned local files (`.gitignore`, `scripts/apple-container-restart.sh`, `skills-lock.json`) before code edits.
 - removed Firebase/Firestore runtime paths and secret-based API gating from the app.
 - removed frontend secret exposure path (`data-api-secret` + JS `X-App-Secret` header injection).
@@ -34,6 +35,8 @@
 - added integration coverage for timed-event start APIs in `tests/integration/test_feed_log_api.py` (default user slug, user override, and payload fields) on 2026-03-08.
 
 ## NOTES
+- tests run on 2026-03-14 after summary API addition: `./.venv/bin/pytest tests/integration/test_entries_api.py` -> `29 passed`.
+- lint attempted on 2026-03-14 after summary API addition: `./.venv/bin/python -m ruff check src` could not run because `ruff` is not installed in `.venv`.
 - tests after SQLite-only security refactor: `87 passed, 1 skipped` on 2026-03-05.
 - `uv.lock` changed as part of dependency surface changes (Firestore dependency removed from `pyproject.toml`).
 - removed `docs/systemd/baby-tracker.service.d/20-firebase.conf.example`; if needed later, replace with a SQLite-focused drop-in instead of Firebase env vars.

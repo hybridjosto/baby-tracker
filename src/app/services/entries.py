@@ -199,7 +199,7 @@ def get_next_feed_schedule(
     }
 
 
-def get_entry_summary(db_path: str, user_slug: str | None = None) -> list[dict]:
+def get_entry_summary(db_path: str, user_slug: str | None = None) -> dict:
     last_feed = get_latest_entry_by_type(db_path, "feed", user_slug=user_slug)
     last_wee = get_latest_entry_by_type(db_path, "wee", user_slug=user_slug)
     last_poo = get_latest_entry_by_type(db_path, "poo", user_slug=user_slug)
@@ -213,7 +213,11 @@ def get_entry_summary(db_path: str, user_slug: str | None = None) -> list[dict]:
             "date_time": _format_timestamp_value(next_feed.get("timestamp_utc")),
         },
     ]
-    return items
+    return {
+        "items": items,
+        "summary": build_entry_summary_text(items),
+        "last_feed_time_utc": last_feed.get("timestamp_utc") if last_feed else None,
+    }
 
 
 def build_entry_summary_text(items: list[dict]) -> str:
