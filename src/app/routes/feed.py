@@ -88,6 +88,35 @@ def _log_simple_event(event_type: str):
         return jsonify({"error": str(exc)}), 400
 
 
+def _start_timed_event(event_type: str):
+    payload = request.get_json(silent=True) or {}
+    user_slug = _extract_user_slug(payload)
+    notes = payload.get("notes")
+    timestamp_utc = payload.get("timestamp_utc")
+
+    try:
+        resolved_slug = _resolve_user_slug(user_slug)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    entry_payload: dict = {
+        "type": event_type,
+        "client_event_id": f"pushcut-{uuid.uuid4().hex}",
+        "user_slug": resolved_slug,
+        "feed_duration_min": None,
+    }
+    if notes is not None:
+        entry_payload["notes"] = notes
+    if timestamp_utc is not None:
+        entry_payload["timestamp_utc"] = timestamp_utc
+
+    try:
+        entry = create_entry(_db_path(), entry_payload)
+        return jsonify(entry), 201
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+
 @feed_api.post("/poo/log")
 def log_poo_route():
     return _log_simple_event("poo")
@@ -96,3 +125,13 @@ def log_poo_route():
 @feed_api.post("/wee/log")
 def log_wee_route():
     return _log_simple_event("wee")
+
+
+@feed_api.post("/sleep/start")
+def start_sleep_route():
+    return _start_timed_event("sleep")
+
+
+@feed_api.post("/cry/start")
+def start_cry_route():
+    return _start_timed_event("cry")

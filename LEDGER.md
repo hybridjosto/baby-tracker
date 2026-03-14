@@ -30,6 +30,8 @@
 - added a Summary-page sleep-focused 24h Gantt timeline with sleep duration bars and optional overlay markers for other event types (`feed`, `cry`, `wee`, `poo`, timed/custom events) in `src/web/templates/summary.html` and `src/web/static/app.js` on 2026-03-07.
 - fixed Summary sleep Gantt overlap handling so sleep entries that start on the previous day still render on the selected day when they overlap past midnight (24h lookback window for chart data) in `src/web/static/app.js` on 2026-03-07.
 - made the quick logging footer accessible from every page by extracting a shared template partial (`src/web/templates/logging_footer.html`), including it across all page templates, moving shared footer/menu styles into `src/web/static/styles.css`, and initializing quick-log handlers globally in `src/web/static/app.js` on 2026-03-07.
+- added new timed-event start APIs `POST /api/sleep/start` and `POST /api/cry/start` in `src/app/routes/feed.py` (default/override user slug support, optional notes/timestamp passthrough, and `feed_duration_min=null` on creation) on 2026-03-08.
+- added integration coverage for timed-event start APIs in `tests/integration/test_feed_log_api.py` (default user slug, user override, and payload fields) on 2026-03-08.
 
 ## NOTES
 - tests after SQLite-only security refactor: `87 passed, 1 skipped` on 2026-03-05.
@@ -40,3 +42,6 @@
 - debug finding (2026-03-04): `/baby/` currently renders `data-base-path=""` and root asset URLs (`/static/...`), while tailscale only proxies `/baby/*`; result is page HTML loads but JS/CSS/API at root can fail and UI appears unresponsive.
 - debug finding (2026-03-04): if app is configured with `BASE_PATH=/baby`, proxy target must include `/baby` too (e.g. `tailscale serve --set-path /baby http://127.0.0.1:8000/baby`) to avoid 404s.
 - tests run on 2026-03-07 after footer change: `../.venv/bin/pytest ../tests/integration/test_feed_log_api.py ../tests/integration/test_diaper_log_api.py` -> `7 passed`.
+- tests run on 2026-03-08 after timed-event start API addition: `../.venv/bin/pytest ../tests/integration/test_feed_log_api.py ../tests/integration/test_diaper_log_api.py` -> `10 passed`.
+- lint run on 2026-03-08 after timed-event start API addition: `cd src && ruff check .` -> `All checks passed!`.
+- tests attempted on 2026-03-14: `python3 -m pytest tests/integration/test_feed_log_api.py` could not run because `pytest` is not installed and this environment cannot reach PyPI.
