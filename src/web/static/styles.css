@@ -412,27 +412,29 @@ html.dark .feed-menu {
 .feed-toggle-btn {
   height: 36px;
   border-radius: 12px;
-  border: 1px solid #c9d6cd;
-  background: rgba(255, 255, 255, 0.8);
-  color: #1b2b1f;
+  border: 1px solid #a3d9a6;
+  background: var(--primary);
+  color: #0f1a12;
   font-weight: 700;
   cursor: pointer;
 }
 
 .feed-toggle-btn.is-active {
   border-color: rgba(90, 140, 96, 0.9);
-  background: rgba(180, 214, 188, 0.9);
+  background: #0f1a12;
+  color: var(--primary);
 }
 
 html.dark .feed-toggle-btn {
-  border-color: rgba(255, 255, 255, 0.12);
-  background: rgba(16, 26, 20, 0.9);
-  color: #d9eee0;
+  border-color: rgba(19, 236, 91, 0.4);
+  background: var(--primary);
+  color: #0f1a12;
 }
 
 html.dark .feed-toggle-btn.is-active {
   border-color: rgba(130, 200, 150, 0.7);
-  background: rgba(40, 70, 50, 0.9);
+  background: #0f1a12;
+  color: var(--primary);
 }
 
 .feed-quick-row {
@@ -444,16 +446,17 @@ html.dark .feed-toggle-btn.is-active {
 .feed-quick-btn {
   height: 38px;
   border-radius: 12px;
-  border: 1px solid transparent;
-  background: rgba(230, 238, 232, 0.9);
-  color: #1b2b1f;
+  border: 1px solid #a3d9a6;
+  background: var(--primary);
+  color: #0f1a12;
   font-weight: 700;
   cursor: pointer;
 }
 
 html.dark .feed-quick-btn {
-  background: rgba(32, 46, 36, 0.9);
-  color: #d9eee0;
+  border-color: rgba(19, 236, 91, 0.4);
+  background: var(--primary);
+  color: #0f1a12;
 }
 
 .feed-option,
@@ -464,17 +467,18 @@ html.dark .feed-quick-btn {
   gap: 8px;
   height: 44px;
   border-radius: 14px;
-  border: 1px solid transparent;
-  background: rgba(230, 238, 232, 0.9);
-  color: #1b2b1f;
+  border: 1px solid #a3d9a6;
+  background: var(--primary);
+  color: #0f1a12;
   font-weight: 700;
   cursor: pointer;
 }
 
 html.dark .feed-option,
 html.dark .nappy-option {
-  background: rgba(32, 46, 36, 0.9);
-  color: #d9eee0;
+  border-color: rgba(19, 236, 91, 0.4);
+  background: var(--primary);
+  color: #0f1a12;
 }
 
 .feed-input {

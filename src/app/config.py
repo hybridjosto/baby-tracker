@@ -21,13 +21,15 @@ class AppConfig:
 
 def load_config() -> AppConfig:
     db_path = Path(os.getenv("BABY_TRACKER_DB_PATH", "./data/baby-tracker.sqlite"))
-    storage_backend = os.getenv("BABY_TRACKER_STORAGE_BACKEND", "sqlite").strip().lower()
+    storage_backend = (
+        os.getenv("BABY_TRACKER_STORAGE_BACKEND", "sqlite").strip().lower()
+    )
     if storage_backend != "sqlite":
         raise ValueError("BABY_TRACKER_STORAGE_BACKEND must be sqlite")
     host = os.getenv("BABY_TRACKER_HOST", "0.0.0.0")
     port = int(os.getenv("BABY_TRACKER_PORT", "8000"))
     base_path = _normalize_base_path(os.getenv("BABY_TRACKER_BASE_PATH", ""))
-    static_version = os.getenv("BABY_TRACKER_STATIC_VERSION", "dev")
+    static_version = os.getenv("BABY_TRACKER_STATIC_VERSION", "v2")
     discord_webhook_url = os.getenv("BABY_TRACKER_DISCORD_WEBHOOK_URL")
     tls_cert_path_raw = os.getenv("BABY_TRACKER_TLS_CERT_PATH")
     tls_key_path_raw = os.getenv("BABY_TRACKER_TLS_KEY_PATH")
@@ -37,7 +39,9 @@ def load_config() -> AppConfig:
     try:
         feed_due_poll_seconds = int(poll_raw)
     except ValueError as exc:
-        raise ValueError("BABY_TRACKER_FEED_DUE_POLL_SECONDS must be an integer") from exc
+        raise ValueError(
+            "BABY_TRACKER_FEED_DUE_POLL_SECONDS must be an integer"
+        ) from exc
     kpis_raw = os.getenv("BABY_TRACKER_HOME_KPIS_POLL_SECONDS", "900")
     try:
         home_kpis_poll_seconds = int(kpis_raw)

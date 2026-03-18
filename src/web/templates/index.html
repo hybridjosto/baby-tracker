@@ -109,6 +109,26 @@
         box-shadow: 0 6px 14px rgba(0, 0, 0, 0.06);
         min-width: 0;
       }
+      .stat-card[data-home-stat-key] {
+        cursor: pointer;
+        perspective: 1200px;
+        transition: transform 0.18s ease, box-shadow 0.18s ease;
+      }
+      .stat-card[data-home-stat-key]:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 10px 18px rgba(0, 0, 0, 0.08);
+      }
+      .stat-card[data-home-stat-key]:focus {
+        outline: 2px solid var(--primary);
+        outline-offset: 2px;
+      }
+      .stat-card[data-home-stat-key].disabled {
+        cursor: default;
+      }
+      .stat-card[data-home-stat-key].disabled:hover {
+        transform: none;
+        box-shadow: 0 6px 14px rgba(0, 0, 0, 0.06);
+      }
       .stat-card.is-clickable {
         cursor: pointer;
         transition: transform 0.15s ease, box-shadow 0.15s ease;
@@ -164,6 +184,34 @@
         text-decoration: none;
         font-weight: 600;
         gap: 4px;
+      }
+      .stat-flip-scene {
+        position: relative;
+        min-height: 92px;
+        transform-style: preserve-3d;
+        transition: transform 0.42s ease;
+      }
+      .stat-card.is-flipped .stat-flip-scene {
+        transform: rotateY(180deg);
+      }
+      .stat-face {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        align-content: start;
+        gap: 0;
+        backface-visibility: hidden;
+        -webkit-backface-visibility: hidden;
+      }
+      .stat-face--back {
+        transform: rotateY(180deg);
+      }
+      .stat-flip-hint {
+        margin-top: 8px;
+        font-size: 10px;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
       }
       .stats-range {
         margin-top: 10px;
@@ -1403,40 +1451,90 @@
               <span class="material-symbols-outlined" style="font-size: 14px;">arrow_forward</span>
             </a>
           </div>
-          <div class="stat-card" aria-label="Total feed amount in last 24 hours">
-            <div class="stat-label">
-              <span class="material-symbols-outlined" style="font-size: 18px; color: var(--primary);">local_drink</span>
-              Feed total (24h)
+          <div class="stat-card" data-home-stat-key="feed-total" data-home-stat-default-view="today" role="button" tabindex="0" aria-label="Show last 24 hours for feed total">
+            <div class="stat-flip-scene">
+              <div class="stat-face stat-face--front">
+                <div class="stat-label">
+                  <span class="material-symbols-outlined" style="font-size: 18px; color: var(--primary);">local_drink</span>
+                  Feed total (today)
+                </div>
+                <div class="stat-value skeleton-text skeleton-mid" id="stat-feed-ml-today">0 ml</div>
+                <div class="stat-sub skeleton-text skeleton-wide" id="stat-feed-breakdown-today">Expressed 0 ml · Formula 0 ml</div>
+              </div>
+              <div class="stat-face stat-face--back" aria-hidden="true">
+                <div class="stat-label">
+                  <span class="material-symbols-outlined" style="font-size: 18px; color: var(--primary);">local_drink</span>
+                  Feed total (24h)
+                </div>
+                <div class="stat-value skeleton-text skeleton-mid" id="stat-feed-ml-24h">0 ml</div>
+                <div class="stat-sub skeleton-text skeleton-wide" id="stat-feed-breakdown-24h">Expressed 0 ml · Formula 0 ml</div>
+              </div>
             </div>
-            <div class="stat-value skeleton-text skeleton-mid" id="stat-feed-ml">0 ml</div>
-            <div class="stat-sub skeleton-text skeleton-wide" id="stat-feed-breakdown">Expressed 0 ml · Formula 0 ml</div>
+            <div class="stat-flip-hint">Tap to flip 24h</div>
           </div>
-          <div class="stat-card" aria-label="24 hour feeding goal progress">
-            <div class="stat-label">
-              <span class="material-symbols-outlined" style="font-size: 18px; color: #38bdf8;">track_changes</span>
-              Goal (24h)
+          <div class="stat-card" data-home-stat-key="goal" data-home-stat-default-view="today" role="button" tabindex="0" aria-label="Show last 24 hours for feeding goal progress">
+            <div class="stat-flip-scene">
+              <div class="stat-face stat-face--front">
+                <div class="stat-label">
+                  <span class="material-symbols-outlined" style="font-size: 18px; color: #38bdf8;">track_changes</span>
+                  Goal (today)
+                </div>
+                <div class="stat-value skeleton-text skeleton-mid" id="stat-goal-progress-today">--</div>
+                <div class="stat-sub skeleton-text skeleton-wide" id="stat-goal-detail-today">Set a 24h goal</div>
+              </div>
+              <div class="stat-face stat-face--back" aria-hidden="true">
+                <div class="stat-label">
+                  <span class="material-symbols-outlined" style="font-size: 18px; color: #38bdf8;">track_changes</span>
+                  Goal (24h)
+                </div>
+                <div class="stat-value skeleton-text skeleton-mid" id="stat-goal-progress-24h">--</div>
+                <div class="stat-sub skeleton-text skeleton-wide" id="stat-goal-detail-24h">Set a 24h goal</div>
+              </div>
             </div>
-            <div class="stat-value skeleton-text skeleton-mid" id="stat-goal-progress">--</div>
-            <div class="stat-sub skeleton-text skeleton-wide" id="stat-goal-detail">Set a 24h goal</div>
             <a class="stat-link" href="{{ base_path }}/goals" aria-label="Edit feeding goals">
               Edit goals
               <span class="material-symbols-outlined" style="font-size: 14px;">arrow_forward</span>
             </a>
           </div>
-          <div class="stat-card" data-log-type="feed" role="button" tabindex="0" aria-label="View feed events">
-            <div class="stat-label">
-              <span class="material-symbols-outlined" style="font-size: 18px; color: var(--primary);">water_drop</span>
-              Feeds
+          <div class="stat-card" data-home-stat-key="feeds" data-home-stat-default-view="today" role="button" tabindex="0" aria-label="Show last 24 hours for feeds">
+            <div class="stat-flip-scene">
+              <div class="stat-face stat-face--front">
+                <div class="stat-label">
+                  <span class="material-symbols-outlined" style="font-size: 18px; color: var(--primary);">water_drop</span>
+                  Feeds (today)
+                </div>
+                <div class="stat-value skeleton-text" id="stat-feed-today">0</div>
+              </div>
+              <div class="stat-face stat-face--back" aria-hidden="true">
+                <div class="stat-label">
+                  <span class="material-symbols-outlined" style="font-size: 18px; color: var(--primary);">water_drop</span>
+                  Feeds (24h)
+                </div>
+                <div class="stat-value skeleton-text" id="stat-feed-24h">0</div>
+              </div>
             </div>
-            <div class="stat-value skeleton-text" id="stat-feed">0</div>
+            <div class="stat-flip-hint">Tap to flip 24h</div>
           </div>
-          <div class="stat-card" aria-label="Nappy events today">
-            <div class="stat-label">
-              <span class="material-symbols-outlined" style="font-size: 18px; color: #7dd3fc;">baby_changing_station</span>
-              Nappies
+          <div class="stat-card" data-home-stat-key="nappies" data-home-stat-default-view="today" role="button" tabindex="0" aria-label="Show last 24 hours for nappies">
+            <div class="stat-flip-scene">
+              <div class="stat-face stat-face--front">
+                <div class="stat-label">
+                  <span class="material-symbols-outlined" style="font-size: 18px; color: #7dd3fc;">baby_changing_station</span>
+                  Nappies (today)
+                </div>
+                <div class="stat-value skeleton-text" id="stat-nappy-today">0</div>
+                <div class="stat-sub skeleton-text skeleton-wide" id="stat-nappy-breakdown-today">Wet 0 · Soiled 0</div>
+              </div>
+              <div class="stat-face stat-face--back" aria-hidden="true">
+                <div class="stat-label">
+                  <span class="material-symbols-outlined" style="font-size: 18px; color: #7dd3fc;">baby_changing_station</span>
+                  Nappies (24h)
+                </div>
+                <div class="stat-value skeleton-text" id="stat-nappy-24h">0</div>
+                <div class="stat-sub skeleton-text skeleton-wide" id="stat-nappy-breakdown-24h">Wet 0 · Soiled 0</div>
+              </div>
             </div>
-            <div class="stat-value skeleton-text" id="stat-nappy">0</div>
-            <div class="stat-sub skeleton-text skeleton-wide" id="stat-nappy-breakdown">Wet 0 · Soiled 0</div>
+            <div class="stat-flip-hint">Tap to flip 24h</div>
           </div>
           <div class="stat-card" aria-label="Total intake for today">
             <div class="stat-label">
@@ -1447,7 +1545,7 @@
             <div class="stat-sub skeleton-text skeleton-wide" id="stat-daily-feed-sub">Midnight-midnight · Avg / feed: --</div>
           </div>
         </section>
-        <div class="stats-range skeleton-text skeleton-wide" id="stat-window">Rolling 24h: --</div>
+        <div class="stats-range skeleton-text skeleton-wide" id="stat-window">Today so far: -- · Tap a card for 24h</div>
 
         <section class="latest-card" aria-live="polite">
           <div class="latest-header">

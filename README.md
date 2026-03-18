@@ -15,7 +15,13 @@ uv run pytest
 uv run ruff check .
 ```
 
-## Running Locally (HTTP)
+## Running Locally
+
+```sh
+just restart
+```
+
+Or manually:
 
 ```sh
 BABY_TRACKER_ENABLE_SCHEDULERS=0 \
@@ -28,9 +34,6 @@ Run the background schedulers in a separate process:
 ```sh
 BABY_TRACKER_ENABLE_SCHEDULERS=1 uv run python -m src.app.scheduler
 ```
-
-Open `http://localhost:8000/` (or `http://localhost:8000/<base-path>/` if you set
-`BABY_TRACKER_BASE_PATH`).
 
 ## Configuration
 
@@ -51,68 +54,7 @@ Environment variables:
 
 SQLite server migration runbook: `docs/sqlite-migration.md`
 
-## Docker / docker-compose
 
-```sh
-docker compose up --build
-```
-
-By default compose runs two services:
-- `baby-tracker`: web app on `http://localhost:8000/baby/`
-- `baby-tracker-scheduler`: feed-due and home-kpis background loops
-
-The database is stored in `./data`.
-Edit `docker-compose.yml` to change ports, base path, or DB location.
-
-## Apple Container (`container` CLI)
-
-Build image:
-```sh
-container build -t baby-tracker:apple .
-```
-
-Start web + scheduler with persistent SQLite storage:
-```sh
-./scripts/apple-container-up.sh
-```
-
-Interactive behavior: when run in a terminal and `BABY_TRACKER_PULL_PROD_DATA`
-is not set, the script prompts whether to pull prod data before startup.
-
-Optionally pull a fresh prod snapshot before start:
-```sh
-BABY_TRACKER_PULL_PROD_DATA=1 ./scripts/apple-container-up.sh
-```
-
-Prod pull env vars (all optional):
-- `BABY_TRACKER_PULL_PROD_DATA` (`0`/`1`, default `0`)
-- `BABY_TRACKER_PROD_SSH_TARGET` (default `josh@homelab.tail458584.ts.net`)
-- `BABY_TRACKER_PROD_DATA_DIR` (default `/home/josh/baby-tracker/data`)
-- `BABY_TRACKER_PROD_DB_FILE` (default `baby-tracker.sqlite`)
-- `BABY_TRACKER_PROD_REMOTE_SNAPSHOT` (default `/tmp/baby-tracker-prod-sync.sqlite`)
-
-When enabled, the script creates a remote SQLite `.backup` snapshot and copies it
-locally before starting containers. This avoids unsafe live file copies with WAL mode.
-If sync fails, startup aborts so tests do not run against stale data.
-
-Important: when running containers manually, always set both:
-- `--volume "$PWD/data:/data"`
-- `--env BABY_TRACKER_DB_PATH=/data/baby-tracker.sqlite`
-
-If `BABY_TRACKER_DB_PATH` is omitted, the app defaults to `./data` inside the
-container filesystem, which is ephemeral across container replacement.
-
-## Systemd (example)
-
-Copy `docs/systemd/baby-tracker.service.example` to `/etc/systemd/system/baby-tracker.service`,
-adjust paths, then:
-
-```sh
-sudo systemctl daemon-reload
-sudo systemctl enable --now baby-tracker.service
-```
-
-## HTTPS with Tailscale
 
 If you want HTTPS on your Tailscale domain, generate a cert on the host:
 
@@ -131,17 +73,6 @@ uv run python -m src.app.main
 For gunicorn (recommended), terminate TLS with Tailscale serve (or another reverse
 proxy) and forward HTTPS to the HTTP listener
 (`http://127.0.0.1:8000`, or whatever you set for `BABY_TRACKER_PORT`).
-
-If you run via systemd, update the service and restart. A ready-to-use
-drop-in for TLS env vars lives at `docs/systemd/baby-tracker.service.d/10-tls.conf`. Copy it to:
-
-```sh
-sudo mkdir -p /etc/systemd/system/baby-tracker.service.d
-sudo cp /home/josh/baby-tracker/docs/systemd/baby-tracker.service.d/10-tls.conf \\
-  /etc/systemd/system/baby-tracker.service.d/10-tls.conf
-sudo systemctl daemon-reload
-sudo systemctl restart baby-tracker.service
-```
 
 ## Offline Mode
 - The PWA caches the app shell for offline access.

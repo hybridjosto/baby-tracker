@@ -192,15 +192,22 @@ const editEntryFormulaEl = document.getElementById("edit-entry-formula");
 const editEntryNotesEl = document.getElementById("edit-entry-notes");
 const editEntryCancelEl = document.getElementById("edit-entry-cancel");
 const editEntryCloseEl = document.getElementById("edit-entry-close");
-const statFeedEl = document.getElementById("stat-feed");
-const statNappyEl = document.getElementById("stat-nappy");
-const statNappyBreakdownEl = document.getElementById("stat-nappy-breakdown");
+const statFeedTodayEl = document.getElementById("stat-feed-today");
+const statFeed24hEl = document.getElementById("stat-feed-24h");
+const statNappyTodayEl = document.getElementById("stat-nappy-today");
+const statNappy24hEl = document.getElementById("stat-nappy-24h");
+const statNappyBreakdownTodayEl = document.getElementById("stat-nappy-breakdown-today");
+const statNappyBreakdown24hEl = document.getElementById("stat-nappy-breakdown-24h");
 const statDailyFeedTotalEl = document.getElementById("stat-daily-feed-total");
 const statDailyFeedSubEl = document.getElementById("stat-daily-feed-sub");
-const statFeedMlEl = document.getElementById("stat-feed-ml");
-const statFeedBreakdownEl = document.getElementById("stat-feed-breakdown");
-const statGoalProgressEl = document.getElementById("stat-goal-progress");
-const statGoalDetailEl = document.getElementById("stat-goal-detail");
+const statFeedMlTodayEl = document.getElementById("stat-feed-ml-today");
+const statFeedMl24hEl = document.getElementById("stat-feed-ml-24h");
+const statFeedBreakdownTodayEl = document.getElementById("stat-feed-breakdown-today");
+const statFeedBreakdown24hEl = document.getElementById("stat-feed-breakdown-24h");
+const statGoalProgressTodayEl = document.getElementById("stat-goal-progress-today");
+const statGoalProgress24hEl = document.getElementById("stat-goal-progress-24h");
+const statGoalDetailTodayEl = document.getElementById("stat-goal-detail-today");
+const statGoalDetail24hEl = document.getElementById("stat-goal-detail-24h");
 const statWindowEl = document.getElementById("stat-window");
 const lastActivityEl = document.getElementById("last-activity");
 const lastFeedEl = document.getElementById("last-feed");
@@ -218,6 +225,7 @@ const latestNotesEl = document.getElementById("latest-notes");
 const latestEditBtn = document.getElementById("latest-edit");
 const latestDeleteBtn = document.getElementById("latest-delete");
 const statCardEls = document.querySelectorAll(".stat-card[data-log-type]");
+const homeStatFlipCardEls = document.querySelectorAll(".stat-card[data-home-stat-key]");
 const nextFeedModalEl = document.getElementById("next-feed-modal");
 const nextFeedBackdropEl = document.getElementById("next-feed-backdrop");
 const nextFeedCloseEl = document.getElementById("next-feed-close");
@@ -435,6 +443,49 @@ function getFeedTotalForDay(dayStartTs, dayEndTs, anchorTs = Date.now()) {
   }, 0);
 }
 
+function planDayFeedSuggestions(daySchedule, consumedDayMl, goalValue) {
+  if (!Array.isArray(daySchedule) || !daySchedule.length) {
+    return [];
+  }
+
+  let plannedTotalMl = consumedDayMl;
+  const plannedEntries = [];
+  daySchedule.forEach((ts, dayIndex) => {
+    const remainingFeeds = daySchedule.length - dayIndex;
+    const remainingMl = Math.max(0, goalValue - plannedTotalMl);
+    if (remainingFeeds <= 0 || remainingMl <= 0) {
+      plannedEntries.push({ ts, category: null, ml: 0, rollingTotalMl: plannedTotalMl });
+      return;
+    }
+
+    const averageMl = remainingMl / remainingFeeds;
+    const options = [
+      { category: null, ml: 0 },
+      { category: "small", ml: feedSizeSmallMl },
+      { category: "big", ml: feedSizeBigMl },
+    ].filter((option) => option.ml <= remainingMl);
+
+    options.sort((left, right) => {
+      const distanceDiff = Math.abs(left.ml - averageMl) - Math.abs(right.ml - averageMl);
+      if (distanceDiff !== 0) {
+        return distanceDiff;
+      }
+      return right.ml - left.ml;
+    });
+
+    const chosen = options[0] || { category: null, ml: 0 };
+    plannedTotalMl += chosen.ml;
+    plannedEntries.push({
+      ts,
+      category: chosen.category,
+      ml: chosen.ml,
+      rollingTotalMl: plannedTotalMl,
+    });
+  });
+
+  return plannedEntries;
+}
+
 function getUpcomingFeedSuggestionPlan({ nowTs, firstFeedTs, intervalMinutes, feedCount }) {
   const goalValue = Number.parseFloat(activeFeedingGoal && activeFeedingGoal.goal_ml);
   if (!Number.isFinite(goalValue) || goalValue <= 0) {
@@ -444,14 +495,21 @@ function getUpcomingFeedSuggestionPlan({ nowTs, firstFeedTs, intervalMinutes, fe
     return [];
   }
 
-  const schedule = [];
+  const visibleSchedule = [];
   for (let i = 0; i < feedCount; i += 1) {
     const ts = firstFeedTs + (intervalMinutes * 60000 * i);
-    schedule.push(ts);
+    visibleSchedule.push(ts);
   }
-  if (!schedule.length) {
+  if (!visibleSchedule.length) {
     return [];
   }
+
+  const planEndTs = getNextLocalMidnightTs(visibleSchedule[visibleSchedule.length - 1]);
+  const schedule = [];
+  for (let ts = firstFeedTs; ts < planEndTs; ts += intervalMinutes * 60000) {
+    schedule.push(ts);
+  }
+  const visibleTs = new Set(visibleSchedule);
 
   const suggestions = [];
   let index = 0;
@@ -471,24 +529,16 @@ function getUpcomingFeedSuggestionPlan({ nowTs, firstFeedTs, intervalMinutes, fe
       continue;
     }
 
-    let plannedTotalMl = consumedDayMl;
-    daySchedule.forEach((ts, dayIndex) => {
-      const remainingFeeds = daySchedule.length - dayIndex;
-      const remainingMl = Math.max(0, goalValue - plannedTotalMl);
-      if (remainingMl <= 0) {
+    const dayPlan = planDayFeedSuggestions(daySchedule, consumedDayMl, goalValue);
+    dayPlan.forEach((entry) => {
+      if (!entry.category || !visibleTs.has(entry.ts)) {
         return;
       }
-      const maxLaterWithBig = (remainingFeeds - 1) * feedSizeBigMl;
-      const suggestedCategory = plannedTotalMl + feedSizeSmallMl + maxLaterWithBig >= goalValue
-        ? "small"
-        : "big";
-      const suggestedMl = suggestedCategory === "small" ? feedSizeSmallMl : feedSizeBigMl;
-      plannedTotalMl += suggestedMl;
       suggestions.push({
-        ts,
-        category: suggestedCategory,
-        ml: suggestedMl,
-        rollingTotalMl: plannedTotalMl,
+        ts: entry.ts,
+        category: entry.category,
+        ml: entry.ml,
+        rollingTotalMl: entry.rollingTotalMl,
       });
     });
   }
@@ -1269,8 +1319,20 @@ let calendarWeekOffset = 0;
 let calendarWeekStart = null;
 let calendarLoading = false;
 let activeFeedingGoal = null;
-let latestFeedTotalMl = 0;
+let latestFeedTotalsMl = { today: 0, rolling24h: 0 };
 let recentFeedVolumeEntries = [];
+const HOME_STAT_VIEW_TODAY = "today";
+const HOME_STAT_VIEW_24H = "24h";
+const HOME_STAT_LABEL_BY_VIEW = {
+  [HOME_STAT_VIEW_TODAY]: "today",
+  [HOME_STAT_VIEW_24H]: "last 24 hours",
+};
+const homeStatViews = {
+  "feed-total": HOME_STAT_VIEW_TODAY,
+  goal: HOME_STAT_VIEW_TODAY,
+  feeds: HOME_STAT_VIEW_TODAY,
+  nappies: HOME_STAT_VIEW_TODAY,
+};
 let hasLoadedTimelineEntries = false;
 let timelineEntryCount = 0;
 let timelineOldestTimestamp = null;
@@ -1331,8 +1393,62 @@ function initHomeHandlers() {
   if (!nextFeedTimer) {
     nextFeedTimer = window.setInterval(updateNextFeed, 60000);
   }
+  bindHomeStatCardFlips();
   bindStatCardNavigation();
   startAutoRefresh(loadHomeEntries);
+}
+
+function getHomeStatAriaLabel(statKey) {
+  const currentView = homeStatViews[statKey] || HOME_STAT_VIEW_TODAY;
+  const nextView = currentView === HOME_STAT_VIEW_TODAY ? HOME_STAT_VIEW_24H : HOME_STAT_VIEW_TODAY;
+  return `Show ${HOME_STAT_LABEL_BY_VIEW[nextView]} for ${statKey.replace("-", " ")}`;
+}
+
+function syncHomeStatCardState(card) {
+  if (!card) {
+    return;
+  }
+  const statKey = card.dataset.homeStatKey;
+  if (!statKey) {
+    return;
+  }
+  const currentView = homeStatViews[statKey] || HOME_STAT_VIEW_TODAY;
+  const isFlipped = currentView === HOME_STAT_VIEW_24H;
+  card.classList.toggle("is-flipped", isFlipped);
+  card.setAttribute("aria-pressed", isFlipped ? "true" : "false");
+  card.setAttribute("aria-label", getHomeStatAriaLabel(statKey));
+}
+
+function toggleHomeStatCard(card) {
+  if (!card || !userValid || card.classList.contains("disabled")) {
+    return;
+  }
+  const statKey = card.dataset.homeStatKey;
+  if (!statKey) {
+    return;
+  }
+  homeStatViews[statKey] = homeStatViews[statKey] === HOME_STAT_VIEW_24H
+    ? HOME_STAT_VIEW_TODAY
+    : HOME_STAT_VIEW_24H;
+  syncHomeStatCardState(card);
+}
+
+function bindHomeStatCardFlips() {
+  homeStatFlipCardEls.forEach((card) => {
+    syncHomeStatCardState(card);
+    card.addEventListener("click", (event) => {
+      if (event.target && event.target.closest("a, button")) {
+        return;
+      }
+      toggleHomeStatCard(card);
+    });
+    card.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        toggleHomeStatCard(card);
+      }
+    });
+  });
 }
 
 function initQuickLogHandlers() {
@@ -2018,6 +2134,10 @@ function applyUserState() {
   statCardEls.forEach((card) => {
     card.classList.toggle("is-clickable", userValid);
     toggleDisabled(card, !userValid);
+  });
+  homeStatFlipCardEls.forEach((card) => {
+    toggleDisabled(card, !userValid);
+    syncHomeStatCardState(card);
   });
   initLinks();
   updateUserDisplay();
@@ -6475,56 +6595,86 @@ function initMilkExpressLedgerHandlers() {
 }
 
 function renderStats(entries) {
-  if (!statFeedEl) {
+  if (!statFeedTodayEl) {
     return;
   }
-  let feedCount = 0;
-  let weeCount = 0;
-  let pooCount = 0;
-  let feedTotalMl = 0;
+  let feedCount24h = 0;
+  let weeCount24h = 0;
+  let pooCount24h = 0;
+  let feedTotal24hMl = 0;
   let todayFeedTotalMl = 0;
+  let todayFeedEventCount = 0;
   let todayFeedCount = 0;
-  let expressedTotalMl = 0;
-  let formulaTotalMl = 0;
+  let expressedTotal24hMl = 0;
+  let formulaTotal24hMl = 0;
+  let todayExpressedTotalMl = 0;
+  let todayFormulaTotalMl = 0;
+  let todayWeeCount = 0;
+  let todayPooCount = 0;
   const feedVolumeEntries = [];
   const now = new Date();
   const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const dayStartTs = dayStart.getTime();
   entries.forEach((entry) => {
+    const timestamp = new Date(entry.timestamp_utc);
+    const ts = timestamp.getTime();
+    const isToday = !Number.isNaN(ts) && ts >= dayStartTs;
     if (isFeedType(entry.type)) {
       if (isBreastfeedInProgress(entry)) {
         return;
       }
-      feedCount += 1;
+      feedCount24h += 1;
+      if (isToday) {
+        todayFeedEventCount += 1;
+      }
       const feedMl = getFeedEntryTotalMl(entry);
-      feedTotalMl += feedMl;
-      const timestamp = new Date(entry.timestamp_utc);
+      feedTotal24hMl += feedMl;
       if (feedMl > 0 && !Number.isNaN(timestamp.getTime())) {
-        const ts = timestamp.getTime();
         feedVolumeEntries.push({ ts, ml: feedMl });
-        if (ts >= dayStartTs) {
+        if (isToday) {
           todayFeedTotalMl += feedMl;
           todayFeedCount += 1;
         }
       }
       if (typeof entry.expressed_ml === "number" && Number.isFinite(entry.expressed_ml)) {
-        expressedTotalMl += entry.expressed_ml;
+        expressedTotal24hMl += entry.expressed_ml;
+        if (isToday) {
+          todayExpressedTotalMl += entry.expressed_ml;
+        }
       }
       if (typeof entry.formula_ml === "number" && Number.isFinite(entry.formula_ml)) {
-        formulaTotalMl += entry.formula_ml;
+        formulaTotal24hMl += entry.formula_ml;
+        if (isToday) {
+          todayFormulaTotalMl += entry.formula_ml;
+        }
       }
     } else if (entry.type === "wee") {
-      weeCount += 1;
+      weeCount24h += 1;
+      if (isToday) {
+        todayWeeCount += 1;
+      }
     } else if (entry.type === "poo") {
-      pooCount += 1;
+      pooCount24h += 1;
+      if (isToday) {
+        todayPooCount += 1;
+      }
     }
   });
-  statFeedEl.textContent = String(feedCount);
-  if (statNappyEl) {
-    statNappyEl.textContent = String(weeCount + pooCount);
+  statFeedTodayEl.textContent = String(todayFeedEventCount);
+  if (statFeed24hEl) {
+    statFeed24hEl.textContent = String(feedCount24h);
   }
-  if (statNappyBreakdownEl) {
-    statNappyBreakdownEl.textContent = `Wet ${weeCount} · Soiled ${pooCount}`;
+  if (statNappyTodayEl) {
+    statNappyTodayEl.textContent = String(todayWeeCount + todayPooCount);
+  }
+  if (statNappy24hEl) {
+    statNappy24hEl.textContent = String(weeCount24h + pooCount24h);
+  }
+  if (statNappyBreakdownTodayEl) {
+    statNappyBreakdownTodayEl.textContent = `Wet ${todayWeeCount} · Soiled ${todayPooCount}`;
+  }
+  if (statNappyBreakdown24hEl) {
+    statNappyBreakdown24hEl.textContent = `Wet ${weeCount24h} · Soiled ${pooCount24h}`;
   }
   if (statDailyFeedTotalEl) {
     statDailyFeedTotalEl.textContent = formatMl(todayFeedTotalMl);
@@ -6533,12 +6683,21 @@ function renderStats(entries) {
     statDailyFeedSubEl.textContent = `Midnight-midnight · Avg / feed: ${formatAverageMl(todayFeedTotalMl, todayFeedCount)}`;
   }
   recentFeedVolumeEntries = feedVolumeEntries.sort((a, b) => a.ts - b.ts);
-  latestFeedTotalMl = feedTotalMl;
-  if (statFeedMlEl) {
-    statFeedMlEl.textContent = formatMl(feedTotalMl);
+  latestFeedTotalsMl = {
+    today: todayFeedTotalMl,
+    rolling24h: feedTotal24hMl,
+  };
+  if (statFeedMlTodayEl) {
+    statFeedMlTodayEl.textContent = formatMl(todayFeedTotalMl);
   }
-  if (statFeedBreakdownEl) {
-    statFeedBreakdownEl.textContent = `Expressed ${formatMl(expressedTotalMl)} · Formula ${formatMl(formulaTotalMl)}`;
+  if (statFeedMl24hEl) {
+    statFeedMl24hEl.textContent = formatMl(feedTotal24hMl);
+  }
+  if (statFeedBreakdownTodayEl) {
+    statFeedBreakdownTodayEl.textContent = `Expressed ${formatMl(todayExpressedTotalMl)} · Formula ${formatMl(todayFormulaTotalMl)}`;
+  }
+  if (statFeedBreakdown24hEl) {
+    statFeedBreakdown24hEl.textContent = `Expressed ${formatMl(expressedTotal24hMl)} · Formula ${formatMl(formulaTotal24hMl)}`;
   }
 }
 
@@ -6555,23 +6714,42 @@ function formatGoalDateLabel(value) {
 }
 
 function renderGoalComparison() {
-  if (!statGoalProgressEl || !statGoalDetailEl) {
+  if (!statGoalProgressTodayEl || !statGoalDetailTodayEl) {
     return;
   }
   if (!activeFeedingGoal) {
-    statGoalProgressEl.textContent = "--";
-    statGoalDetailEl.textContent = "Set a 24h goal";
+    statGoalProgressTodayEl.textContent = "--";
+    statGoalDetailTodayEl.textContent = "Set a 24h goal";
+    if (statGoalProgress24hEl) {
+      statGoalProgress24hEl.textContent = "--";
+    }
+    if (statGoalDetail24hEl) {
+      statGoalDetail24hEl.textContent = "Set a 24h goal";
+    }
     return;
   }
   const goalValue = Number.parseFloat(activeFeedingGoal.goal_ml);
   if (!Number.isFinite(goalValue) || goalValue <= 0) {
-    statGoalProgressEl.textContent = "--";
-    statGoalDetailEl.textContent = "Set a 24h goal";
+    statGoalProgressTodayEl.textContent = "--";
+    statGoalDetailTodayEl.textContent = "Set a 24h goal";
+    if (statGoalProgress24hEl) {
+      statGoalProgress24hEl.textContent = "--";
+    }
+    if (statGoalDetail24hEl) {
+      statGoalDetail24hEl.textContent = "Set a 24h goal";
+    }
     return;
   }
-  const percent = Math.round((latestFeedTotalMl / goalValue) * 100);
-  statGoalProgressEl.textContent = `${percent}%`;
-  statGoalDetailEl.textContent = `${formatMl(latestFeedTotalMl)} / ${formatMl(goalValue)}`;
+  const todayPercent = Math.round((latestFeedTotalsMl.today / goalValue) * 100);
+  const rollingPercent = Math.round((latestFeedTotalsMl.rolling24h / goalValue) * 100);
+  statGoalProgressTodayEl.textContent = `${todayPercent}%`;
+  statGoalDetailTodayEl.textContent = `${formatMl(latestFeedTotalsMl.today)} / ${formatMl(goalValue)}`;
+  if (statGoalProgress24hEl) {
+    statGoalProgress24hEl.textContent = `${rollingPercent}%`;
+  }
+  if (statGoalDetail24hEl) {
+    statGoalDetail24hEl.textContent = `${formatMl(latestFeedTotalsMl.rolling24h)} / ${formatMl(goalValue)}`;
+  }
 }
 
 function renderGoalHistory(goals) {
@@ -6666,10 +6844,10 @@ function renderStatsWindow(windowBounds) {
   if (!statWindowEl) {
     return;
   }
-  statWindowEl.textContent = `Rolling 24h: ${formatRangeLabel(
+  statWindowEl.textContent = `Today so far: ${formatRangeLabel(
     windowBounds.since,
     windowBounds.until,
-  )}`;
+  )} · Tap a card for 24h`;
 }
 
 function renderLastActivity(entries) {
@@ -7715,6 +7893,11 @@ async function loadHomeEntries() {
   }
   try {
     const statsWindow = computeWindow(24);
+    const now = new Date();
+    const todayWindow = {
+      since: new Date(now.getFullYear(), now.getMonth(), now.getDate()),
+      until: now,
+    };
     const chartWindow = computeWindow(6);
     const cachedEntries = await listEntriesLocalSafe({
       limit: 200,
@@ -7726,7 +7909,7 @@ async function loadHomeEntries() {
       renderChart(cachedChartEntries, chartWindow);
       renderStats(cachedEntries);
       renderGoalComparison();
-      renderStatsWindow(statsWindow);
+      renderStatsWindow(todayWindow);
       renderLastActivity(cachedEntries);
       renderLastByType(cachedEntries);
       renderLatestEntry(cachedEntries[0] || null);
@@ -7749,7 +7932,7 @@ async function loadHomeEntries() {
     renderChart(chartEntries, chartWindow);
     renderStats(entries);
     renderGoalComparison();
-    renderStatsWindow(statsWindow);
+    renderStatsWindow(todayWindow);
     renderLastActivity(entries);
     renderLastByType(entries);
     renderLatestEntry(entries[0] || null);
