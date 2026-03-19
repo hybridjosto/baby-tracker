@@ -32,7 +32,9 @@ def live_server(app):
         server = make_server("127.0.0.1", 0, app, threaded=True)
     except (OSError, SystemExit) as exc:
         pytest.skip(f"Live server unavailable in this environment: {exc}")
-    host, port = server.server_address
+    address = server.server_address
+    host = address[0]
+    port = address[1]
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     try:

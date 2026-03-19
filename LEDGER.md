@@ -7,9 +7,18 @@
 - add a baby weight (kg) to goal ml function. *needs planning
 - add a more in depth feeding plan. *needs planning
 - align the milk express ledger page format (menu + general look and feel) to the rest of the app.
+- remove breastfeed from the feed quick-log popup.
+- reorganise the Summary page layout and information hierarchy.
+- add a sleep tracker line chart showing total hours slept per day.
 - gradual frontend refactor of `src/web/static/app.js` into modules. *plan in `docs/plans/2026-03-18-app-js-refactor-plan.md`
 
 ## DONE
+- updated native push subscription activation on 2026-03-19 so saving a device subscription immediately runs a feed-due check, avoiding the wait for the next scheduler poll when a feed is already overdue at the moment reminders are enabled.
+- simplified service-worker notification options and fixed container asset packaging on 2026-03-19 by removing icon/badge from `showNotification`, copying `apple-touch-icon.png` into the container image, cleaning up the manifest icon list, and bumping `.env` `BABY_TRACKER_STATIC_VERSION` again so iOS PWAs refresh the worker.
+- updated `scripts/apple-container-restart.sh` on 2026-03-19 to load `.env`, pass VAPID vars into the web container, start a separate scheduler container, and bumped `.env` `BABY_TRACKER_STATIC_VERSION` to force the new frontend/service-worker assets to refresh.
+- added placeholder native push VAPID env entries to `.env` on 2026-03-19 for `BABY_TRACKER_VAPID_PUBLIC_KEY`, `BABY_TRACKER_VAPID_PRIVATE_KEY`, and `BABY_TRACKER_VAPID_SUBJECT`.
+- added native browser feed-due push notifications on 2026-03-18 with a one-active-device-per-user subscription model, including VAPID-backed backend delivery, subscription storage/API, service-worker push handling, and Settings-page enable/disable/test controls.
+- added backend coverage on 2026-03-18 for native push subscription APIs, scheduler config validation, per-user feed-due dispatch, invalid-subscription cleanup, and single-device replacement behavior.
 - added a gradual frontend refactor plan for `src/web/static/app.js` on 2026-03-18 in `docs/plans/2026-03-18-app-js-refactor-plan.md`, covering responsibility areas, target module layout, centralized state, extraction order, and coupling hazards.
 - changed homepage next-feed planning on 2026-03-16 to plan against all remaining feed slots in the local day, then show the next 6 rows from that fuller day plan so early suggestions do not consume the whole day before later feeds.
 - added frontend coverage on 2026-03-16 for the case where the next-feed modal only shows 6 rows but the planner must reserve volume for additional later feeds in the same day.
@@ -47,6 +56,10 @@
 - added integration coverage for timed-event start APIs in `tests/integration/test_feed_log_api.py` (default user slug, user override, and payload fields) on 2026-03-08.
 
 ## NOTES
+- `just restart` previously ignored `.env` values for VAPID and did not start the scheduler container, which made native push appear unavailable even after keys were added; the restart script now fixes both for the Apple container workflow.
+- native feed reminders now depend on `BABY_TRACKER_VAPID_PUBLIC_KEY`, `BABY_TRACKER_VAPID_PRIVATE_KEY`, and `BABY_TRACKER_VAPID_SUBJECT`; browsers must access the app over HTTPS outside localhost for push to work.
+- native feed reminders are now per `user_slug` with one active browser/device per user; enabling reminders on a new device replaces the old device for that user.
+- tests run on 2026-03-18 for native push reminder support: `./.venv/bin/pytest tests/unit/test_feed_due_service.py tests/unit/test_push_subscription_storage.py tests/unit/test_scheduler_runtime_config.py tests/integration/test_pushcut_feed_api.py tests/integration/test_settings_api.py` -> `27 passed`.
 - planning note on 2026-03-18: the safest `app.js` refactor path is helpers -> state/config -> data/sync -> shared shell/footer -> shared entry workflows -> page modules, with `home` left for last because it has the heaviest cross-feature coupling.
 - tests run on 2026-03-16 after full-day next-feed planner update: `./.venv/bin/pytest tests/frontend/test_next_feed_modal.py` -> `6 skipped` (Playwright/browser unavailable in this environment).
 - manual review on 2026-03-16: future-feed suggestions now stop once the projected local-day intake would exceed `goal_ml`; planner prefers `big` feeds, then falls back to `small`, and leaves later slots unsuggested if both would overflow.
