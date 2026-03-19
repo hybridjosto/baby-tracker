@@ -16,6 +16,9 @@ from src.app.main import create_app
 def app(tmp_path, monkeypatch):
     db_path = tmp_path / "test.sqlite"
     monkeypatch.setenv("BABY_TRACKER_DB_PATH", str(db_path))
+    monkeypatch.setenv("BABY_TRACKER_VAPID_PUBLIC_KEY", "test-public-key")
+    monkeypatch.setenv("BABY_TRACKER_VAPID_PRIVATE_KEY", "test-private-key")
+    monkeypatch.setenv("BABY_TRACKER_VAPID_SUBJECT", "mailto:test@example.com")
     app = create_app()
     app.config.update(TESTING=True)
     return app

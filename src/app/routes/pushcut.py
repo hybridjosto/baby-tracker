@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from flask import Blueprint, current_app, jsonify, request
 
+from src.app.services.feed_due import dispatch_feed_due
 from src.app.services.push_subscriptions import (
     build_push_payload,
     delete_push_subscription,
@@ -86,6 +87,11 @@ def save_push_subscription_route():
             user_slug=user_slug,
             subscription=subscription_payload,
             user_agent=request.headers.get("User-Agent"),
+        )
+        dispatch_feed_due(
+            _db_path(),
+            vapid_config=config,
+            base_path=_base_path(),
         )
         return jsonify(
             {

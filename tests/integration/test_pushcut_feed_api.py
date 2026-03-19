@@ -107,3 +107,35 @@ def test_push_subscription_requires_user_slug(client):
     )
     assert response.status_code == 400
     assert response.get_json()["error"] == "user_slug is required"
+
+
+def test_push_subscription_triggers_due_check(client, monkeypatch):
+    captured: dict = {}
+
+    def fake_dispatch(
+        db_path, vapid_config=None, base_path="", now_utc=None, send_fn=None
+    ):
+        captured["db_path"] = db_path
+        captured["vapid_config"] = vapid_config
+        captured["base_path"] = base_path
+        return {"sent": False, "reason": "not_due"}
+
+    from src.app.routes import pushcut as push_module
+
+    monkeypatch.setattr(push_module, "dispatch_feed_due", fake_dispatch)
+
+    response = client.post(
+        "/api/push/subscription",
+        json={
+            "user_slug": "suz",
+            "subscription": {
+                "endpoint": "https://push.example.com/device-1",
+                "keys": {"p256dh": "p256dh-1", "auth": "auth-1"},
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    assert captured["db_path"].endswith("test.sqlite")
+    assert captured["base_path"] == ""
+    assert captured["vapid_config"].subject == "mailto:test@example.com"

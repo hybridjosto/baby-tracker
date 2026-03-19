@@ -257,7 +257,10 @@ const customTypeInputEl = document.getElementById("custom-type-input");
 const entryWebhookInputEl = document.getElementById("entry-webhook-input");
 const homeKpisWebhookInputEl = document.getElementById("home-kpis-webhook-input");
 const defaultUserInputEl = document.getElementById("default-user-input");
-const pushcutFeedDueInputEl = document.getElementById("pushcut-feed-due-input");
+const pushReminderUserEl = document.getElementById("push-reminder-user");
+const pushReminderStatusEl = document.getElementById("push-reminder-status");
+const enablePushRemindersBtn = document.getElementById("enable-push-reminders");
+const disablePushRemindersBtn = document.getElementById("disable-push-reminders");
 const testFeedDueNotificationBtn = document.getElementById("test-feed-due-notification");
 const customTypeAddBtn = document.getElementById("custom-type-add");
 const customTypeListEl = document.getElementById("custom-type-list");
@@ -309,6 +312,14 @@ let editEntryModalMode = "full";
 let breastfeedHydrated = false;
 let timedEventHydrated = false;
 let quickFeedKind = "formula";
+let pushReminderState = {
+  enabled: false,
+  endpoint: "",
+  isCurrentDevice: false,
+  permission: typeof Notification === "undefined" ? "default" : Notification.permission,
+  supported: false,
+  configured: false,
+};
 
 const CUSTOM_TYPE_RE = /^[A-Za-z0-9][A-Za-z0-9 /-]{0,31}$/;
 const MILK_EXPRESS_TYPE = "milk express";
@@ -1806,10 +1817,14 @@ function initSettingsHandlers() {
       void saveBabySettings({ default_user_slug: value || null });
     });
   }
-  if (pushcutFeedDueInputEl) {
-    pushcutFeedDueInputEl.addEventListener("change", () => {
-      const value = pushcutFeedDueInputEl.value;
-      void saveBabySettings({ pushcut_feed_due_url: value || null });
+  if (enablePushRemindersBtn) {
+    enablePushRemindersBtn.addEventListener("click", () => {
+      void enablePushReminders();
+    });
+  }
+  if (disablePushRemindersBtn) {
+    disablePushRemindersBtn.addEventListener("click", () => {
+      void disablePushReminders();
     });
   }
   if (settingsFormEl) {
@@ -1828,6 +1843,7 @@ function initSettingsHandlers() {
       void handleTestFeedDueNotification();
     });
   }
+  void refreshPushReminderState();
 }
 
 function initGoalsHandlers() {
@@ -2103,6 +2119,7 @@ function applyUserState() {
   if (pageType === "settings") {
     initSettingsHandlers();
     updateUserDisplay();
+    void refreshPushReminderState();
     if (exportCsvBtn) {
       toggleDisabled(exportCsvBtn, !userValid);
     }
@@ -2488,11 +2505,16 @@ async function handleCsvExport() {
 
 async function handleTestFeedDueNotification() {
   setStatus("Sending test notification...");
+  if (!userValid || !activeUser) {
+    setStatus("Choose a user before testing reminders");
+    return;
+  }
   try {
     const response = await fetch(buildUrl("/api/push/feed-due"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        user_slug: activeUser,
         title: "Feed due (test)",
         body: "This is a test notification from Baby Tracker settings.",
       }),
@@ -2506,6 +2528,197 @@ async function handleTestFeedDueNotification() {
     setStatus("Test feed-due notification sent");
   } catch (error) {
     setStatus("Error: network issue sending test notification");
+  }
+}
+
+function urlBase64ToUint8Array(value) {
+  const base64 = `${value}`.replace(/-/g, "+").replace(/_/g, "/");
+  const padding = "=".repeat((4 - (base64.length % 4)) % 4);
+  const raw = window.atob(`${base64}${padding}`);
+  return Uint8Array.from(raw, (char) => char.charCodeAt(0));
+}
+
+function isPushSupported() {
+  return (
+    "serviceWorker" in navigator
+    && "PushManager" in window
+    && typeof Notification !== "undefined"
+  );
+}
+
+async function getCurrentPushSubscription() {
+  if (!isPushSupported()) {
+    return null;
+  }
+  const registration = await navigator.serviceWorker.ready;
+  return registration.pushManager.getSubscription();
+}
+
+function renderPushReminderState() {
+  if (pushReminderUserEl) {
+    if (userValid && activeUser) {
+      pushReminderUserEl.textContent = `Current user: ${activeUser}`;
+    } else {
+      pushReminderUserEl.textContent = "Choose a user to enable reminders.";
+    }
+  }
+  if (!pushReminderStatusEl) {
+    return;
+  }
+  if (!pushReminderState.supported) {
+    pushReminderStatusEl.textContent = "This browser does not support native push notifications.";
+  } else if (!pushReminderState.configured) {
+    pushReminderStatusEl.textContent = "Push notifications are not configured on the server yet.";
+  } else if (!userValid || !activeUser) {
+    pushReminderStatusEl.textContent = "Choose a user to enable reminders on this device.";
+  } else if (pushReminderState.permission === "denied") {
+    pushReminderStatusEl.textContent = "Notifications are blocked in this browser. Allow them in browser settings to continue.";
+  } else if (pushReminderState.enabled && pushReminderState.isCurrentDevice) {
+    pushReminderStatusEl.textContent = "Active on this device.";
+  } else if (pushReminderState.enabled) {
+    pushReminderStatusEl.textContent = "Active on another device for this user.";
+  } else {
+    pushReminderStatusEl.textContent = "Not enabled on this device.";
+  }
+  if (enablePushRemindersBtn) {
+    enablePushRemindersBtn.disabled = (
+      !pushReminderState.supported
+      || !pushReminderState.configured
+      || !userValid
+      || pushReminderState.permission === "denied"
+    );
+  }
+  if (disablePushRemindersBtn) {
+    disablePushRemindersBtn.disabled = !userValid || !pushReminderState.supported;
+  }
+  if (testFeedDueNotificationBtn) {
+    testFeedDueNotificationBtn.disabled = (
+      !userValid
+      || !pushReminderState.configured
+      || !pushReminderState.enabled
+    );
+  }
+}
+
+async function refreshPushReminderState() {
+  pushReminderState.supported = isPushSupported();
+  pushReminderState.permission = typeof Notification === "undefined"
+    ? "default"
+    : Notification.permission;
+  pushReminderState.configured = false;
+  pushReminderState.enabled = false;
+  pushReminderState.endpoint = "";
+  pushReminderState.isCurrentDevice = false;
+  renderPushReminderState();
+  if (!pushReminderState.supported || !userValid || !activeUser) {
+    return;
+  }
+  try {
+    const [registration, response] = await Promise.all([
+      getCurrentPushSubscription(),
+      fetch(buildUrl(`/api/push/subscription?user_slug=${encodeURIComponent(activeUser)}`)),
+    ]);
+    pushReminderState.configured = response.status !== 404;
+    if (!response.ok) {
+      renderPushReminderState();
+      return;
+    }
+    const payload = await response.json().catch(() => ({}));
+    pushReminderState.configured = Boolean(payload.configured);
+    pushReminderState.enabled = Boolean(payload.enabled);
+    pushReminderState.endpoint = payload.endpoint || "";
+    pushReminderState.isCurrentDevice = Boolean(
+      registration && payload.endpoint && registration.endpoint === payload.endpoint,
+    );
+  } catch (error) {
+    console.error("Failed to refresh push reminders", error);
+  }
+  renderPushReminderState();
+}
+
+async function enablePushReminders() {
+  if (!userValid || !activeUser) {
+    setStatus("Choose a user before enabling reminders");
+    return;
+  }
+  if (!isPushSupported()) {
+    setStatus("This browser does not support push notifications");
+    return;
+  }
+  setStatus("Enabling reminders on this device...");
+  try {
+    const permission = await Notification.requestPermission();
+    pushReminderState.permission = permission;
+    if (permission !== "granted") {
+      renderPushReminderState();
+      setStatus("Notification permission was not granted");
+      return;
+    }
+    const keyResponse = await fetch(buildUrl("/api/push/vapid-public-key"));
+    if (!keyResponse.ok) {
+      pushReminderState.configured = false;
+      renderPushReminderState();
+      setStatus("Error: push notifications are not configured on the server");
+      return;
+    }
+    const keyPayload = await keyResponse.json();
+    const registration = await navigator.serviceWorker.ready;
+    let subscription = await registration.pushManager.getSubscription();
+    if (!subscription) {
+      subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(keyPayload.public_key),
+      });
+    }
+    const response = await fetch(buildUrl("/api/push/subscription"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        user_slug: activeUser,
+        subscription: subscription.toJSON(),
+      }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      setStatus(`Error: ${payload.error || response.status}`);
+      return;
+    }
+    pushReminderState.configured = true;
+    pushReminderState.enabled = true;
+    pushReminderState.endpoint = payload.endpoint || subscription.endpoint || "";
+    pushReminderState.isCurrentDevice = true;
+    renderPushReminderState();
+    setStatus("Feed reminders enabled on this device");
+  } catch (error) {
+    console.error("Failed to enable push reminders", error);
+    setStatus("Error: could not enable push reminders");
+  }
+}
+
+async function disablePushReminders() {
+  if (!userValid || !activeUser) {
+    setStatus("Choose a user before disabling reminders");
+    return;
+  }
+  setStatus("Disabling reminders on this device...");
+  try {
+    const subscription = await getCurrentPushSubscription();
+    await fetch(buildUrl("/api/push/subscription"), {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user_slug: activeUser }),
+    });
+    if (subscription) {
+      await subscription.unsubscribe().catch(() => false);
+    }
+    pushReminderState.enabled = false;
+    pushReminderState.endpoint = "";
+    pushReminderState.isCurrentDevice = false;
+    renderPushReminderState();
+    setStatus("Feed reminders disabled on this device");
+  } catch (error) {
+    console.error("Failed to disable push reminders", error);
+    setStatus("Error: could not disable push reminders");
   }
 }
 
@@ -8298,9 +8511,6 @@ async function loadBabySettings() {
     if (defaultUserInputEl) {
       defaultUserInputEl.value = data.default_user_slug || "";
     }
-    if (pushcutFeedDueInputEl) {
-      pushcutFeedDueInputEl.value = data.pushcut_feed_due_url || "";
-    }
     if (feedSizeSmallInputEl) {
       feedSizeSmallInputEl.value = String(feedSizeSmallMl);
     }
@@ -8310,6 +8520,9 @@ async function loadBabySettings() {
     applyCustomEventTypes();
     updateAgeDisplay();
     updateNextFeed();
+    if (pageType === "settings") {
+      void refreshPushReminderState();
+    }
   } catch (err) {
     console.error("Failed to load settings", err);
   }
@@ -8357,6 +8570,9 @@ async function saveBabySettings(patch) {
     applyCustomEventTypes();
     updateAgeDisplay();
     updateNextFeed();
+    if (pageType === "settings") {
+      void refreshPushReminderState();
+    }
   } catch (err) {
     console.error("Failed to save settings", err);
   }
