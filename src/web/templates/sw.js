@@ -41,6 +41,50 @@ self.addEventListener("message", (event) => {
   self.skipWaiting();
 });
 
+self.addEventListener("push", (event) => {
+  let payload = {};
+  try {
+    payload = event.data ? event.data.json() : {};
+  } catch (error) {
+    payload = {};
+  }
+  const title = typeof payload.title === "string" && payload.title.trim()
+    ? payload.title.trim()
+    : "Feed due";
+  const body = typeof payload.body === "string" && payload.body.trim()
+    ? payload.body.trim()
+    : "Time for a feed.";
+  const url = typeof payload.url === "string" && payload.url.trim() ? payload.url.trim() : "./";
+  const tag = typeof payload.tag === "string" && payload.tag.trim() ? payload.tag.trim() : "feed-due";
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body,
+      tag,
+      data: { url },
+    }),
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const targetUrl = event.notification.data && event.notification.data.url
+    ? new URL(event.notification.data.url, self.location.origin).toString()
+    : new URL("./", self.location.origin).toString();
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
+      for (const client of clients) {
+        if (client.url === targetUrl && "focus" in client) {
+          return client.focus();
+        }
+      }
+      if (self.clients.openWindow) {
+        return self.clients.openWindow(targetUrl);
+      }
+      return null;
+    }),
+  );
+});
+
 self.addEventListener("fetch", (event) => {
   const request = event.request;
   if (request.mode === "navigate") {

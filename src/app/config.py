@@ -17,6 +17,9 @@ class AppConfig:
     feed_due_poll_seconds: int
     home_kpis_poll_seconds: int
     enable_schedulers: bool
+    vapid_public_key: str | None
+    vapid_private_key: str | None
+    vapid_subject: str | None
 
 
 def load_config() -> AppConfig:
@@ -53,10 +56,25 @@ def load_config() -> AppConfig:
         "BABY_TRACKER_ENABLE_SCHEDULERS",
         default=False,
     )
+    vapid_public_key = _normalize_optional_env(
+        os.getenv("BABY_TRACKER_VAPID_PUBLIC_KEY")
+    )
+    vapid_private_key = _normalize_optional_env(
+        os.getenv("BABY_TRACKER_VAPID_PRIVATE_KEY")
+    )
+    vapid_subject = _normalize_optional_env(os.getenv("BABY_TRACKER_VAPID_SUBJECT"))
 
     if (tls_cert_path is None) != (tls_key_path is None):
         raise ValueError(
             "Both BABY_TRACKER_TLS_CERT_PATH and BABY_TRACKER_TLS_KEY_PATH must be set"
+        )
+    if bool(vapid_public_key) != bool(vapid_private_key):
+        raise ValueError(
+            "Both BABY_TRACKER_VAPID_PUBLIC_KEY and BABY_TRACKER_VAPID_PRIVATE_KEY must be set"
+        )
+    if vapid_private_key and not vapid_subject:
+        raise ValueError(
+            "BABY_TRACKER_VAPID_SUBJECT must be set when VAPID keys are configured"
         )
     if tls_cert_path and not tls_cert_path.exists():
         raise FileNotFoundError(f"TLS cert not found: {tls_cert_path}")
@@ -75,6 +93,9 @@ def load_config() -> AppConfig:
         feed_due_poll_seconds=feed_due_poll_seconds,
         home_kpis_poll_seconds=home_kpis_poll_seconds,
         enable_schedulers=enable_schedulers,
+        vapid_public_key=vapid_public_key,
+        vapid_private_key=vapid_private_key,
+        vapid_subject=vapid_subject,
     )
 
 
@@ -97,3 +118,10 @@ def _parse_bool_env(name: str, default: bool) -> bool:
     if normalized in {"0", "false", "no", "off"}:
         return False
     raise ValueError(f"{name} must be a boolean (1/0, true/false)")
+
+
+def _normalize_optional_env(value: str | None) -> str | None:
+    if value is None:
+        return None
+    trimmed = value.strip()
+    return trimmed or None

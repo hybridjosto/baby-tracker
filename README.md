@@ -48,6 +48,7 @@ Environment variables:
 - `BABY_TRACKER_FEED_DUE_POLL_SECONDS`: feed-due scheduler interval (default: `60`, set `0` to disable)
 - `BABY_TRACKER_HOME_KPIS_POLL_SECONDS`: home KPI scheduler interval (default: `900`, set `0` to disable)
 - `BABY_TRACKER_ENABLE_SCHEDULERS`: enable in-process schedulers (`0`/`1`, default: `0`)
+- `BABY_TRACKER_VAPID_PUBLIC_KEY`, `BABY_TRACKER_VAPID_PRIVATE_KEY`, `BABY_TRACKER_VAPID_SUBJECT`: Web Push VAPID settings for native browser feed reminders
 - `BABY_TRACKER_TLS_CERT_PATH`, `BABY_TRACKER_TLS_KEY_PATH`: TLS files (only used by the Flask dev
   server entrypoint, not gunicorn)
 - `BABY_TRACKER_DISCORD_WEBHOOK_URL`: webhook for reminders (see reminders API)
@@ -117,11 +118,10 @@ Example sync response:
 Use Caddy to expose just the `/api` endpoints over your tailnet while keeping the
 Flask app bound to localhost. See `docs/tailscale-caddy.md`.
 
-## Pushcut Feed Logging
+## Feed Logging
 Configure these settings in the UI (Settings page) or via `/api/settings`:
 - `default_user_slug`: used when `user_slug` is not provided to `/api/feed/log`
-- `pushcut_feed_due_url`: Pushcut URL to receive feed-due notifications
- - `feed_interval_min`: minutes between feeds (drives next-feed calculation)
+- `feed_interval_min`: minutes between feeds (drives next-feed calculation)
 
 Endpoints:
 - `POST /api/feed/log` logs a feed with `formula_ml` set to the amount
@@ -131,25 +131,30 @@ Endpoints:
     - `https://<host>:<port>/api/feed/log?amount=70`
     - `https://<host>:<port>/api/feed/log?amount=90`
     - `https://<host>:<port>/api/feed/log?amount=110`
-- `POST /api/push/feed-due` forwards a Pushcut notification payload
-  - JSON body: `{"title":"Feed due","body":"Time for a feed."}`
-  - If empty, defaults to the payload above.
 
 ## Feed-Due Timer
-The server can automatically send a feed-due Pushcut notification when the
-next-feed time is reached. It uses `feed_interval_min`, the latest feed entry,
-and `default_user_slug` (if set).
+The server can automatically send a native browser push notification when the
+next-feed time is reached. Reminders are tied to the subscribed `user_slug`,
+with one active browser/device per user.
 
 Controls:
 - `BABY_TRACKER_FEED_DUE_POLL_SECONDS` (default: 60). Set to `0` to disable.
 
-Manual smoke test:
-Use this to send a one-off Pushcut notification via pytest. It creates a due
-feed entry and calls the feed-due dispatcher.
-```sh
-RUN_PUSHCUT_SMOKE=1 PUSHCUT_URL="https://api.pushcut.io/..." \
-uv run pytest tests/manual/test_feed_due_timer_smoke.py
-```
+Native push setup:
+- Generate VAPID keys and set `BABY_TRACKER_VAPID_PUBLIC_KEY`, `BABY_TRACKER_VAPID_PRIVATE_KEY`, and `BABY_TRACKER_VAPID_SUBJECT`.
+- Open the app over HTTPS, choose a user, then enable `Feed reminders on this device` in Settings.
+- The newest enabled device replaces the previous device for that user.
+
+Push APIs:
+- `GET /api/push/vapid-public-key` returns the browser subscription key.
+- `GET /api/push/subscription?user_slug=suz` returns current subscription status.
+- `POST /api/push/subscription` saves the current browser subscription for a user.
+- `DELETE /api/push/subscription` removes the current user's active subscription.
+- `POST /api/push/feed-due` sends a test notification to the current user's active device.
+
+Notes:
+- Web Push requires HTTPS outside localhost.
+- For production, keep schedulers in the dedicated scheduler process instead of web workers to avoid duplicate sends.
 
 ## Home KPIs Webhook
 Configure `home_kpis_webhook_url` in Settings to POST a KPI payload whenever

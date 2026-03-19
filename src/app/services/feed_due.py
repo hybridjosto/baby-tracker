@@ -1,19 +1,22 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-import json
 import logging
 import time
 import threading
-from urllib import request as urllib_request
 
 from flask import Flask
-from typing import Callable
 
 from src.app.services.entries import get_next_feed_time
-from src.app.services.settings import get_settings
-from src.app.storage.db import get_connection
-from src.app.storage.settings import get_feed_due_state, update_feed_due_state
+from src.app.services.push_subscriptions import (
+    SendPushFn,
+    VapidConfig,
+    build_push_payload,
+    delete_push_subscription,
+    list_push_subscriptions,
+    mark_push_subscription_notified,
+    send_web_push,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -36,79 +39,69 @@ def _parse_utc(value: str | None) -> datetime | None:
     return parsed.astimezone(timezone.utc)
 
 
-def _build_pushcut_payload(payload: dict | None = None) -> dict:
-    if not payload:
-        return {"title": "Feed due", "body": "Time for a feed.", "sound": "default", "badge": 1}
-    title = payload.get("title")
-    body = payload.get("body")
-    if isinstance(title, str) and title.strip():
-        title = title.strip()
-    else:
-        title = "Feed due"
-    if isinstance(body, str) and body.strip():
-        body = body.strip()
-    else:
-        body = "Time for a feed."
-    return {"title": title, "body": body}
-
-
-def _send_pushcut(pushcut_url: str, payload: dict) -> bool:
-    data = json.dumps(payload).encode("utf-8")
-    req = urllib_request.Request(
-        pushcut_url,
-        data=data,
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    try:
-        with urllib_request.urlopen(req, timeout=10):
-            return True
-    except Exception:
-        logger.exception("Pushcut feed-due delivery failed")
-        return False
-
-
 def dispatch_feed_due(
     db_path: str,
+    vapid_config: VapidConfig | None = None,
+    base_path: str = "",
     now_utc: datetime | None = None,
-    send_fn: Callable[[str, dict], bool] | None = None,
+    send_fn: SendPushFn | None = None,
 ) -> dict:
-    settings = get_settings(db_path)
-    pushcut_url = settings.get("pushcut_feed_due_url")
-    if not pushcut_url:
-        return {"sent": False, "reason": "missing_pushcut_url"}
-
-    user_slug = settings.get("default_user_slug")
-    next_feed = get_next_feed_time(db_path, user_slug=user_slug)
-    next_timestamp = next_feed.get("timestamp_utc")
-    source_entry_id = next_feed.get("source_entry_id")
-    if not next_timestamp or not source_entry_id:
-        return {"sent": False, "reason": "no_schedule"}
-
-    due_at = _parse_utc(next_timestamp)
-    if not due_at:
-        return {"sent": False, "reason": "invalid_timestamp"}
-
     now = now_utc or _now_utc()
-    if now < due_at:
-        return {"sent": False, "reason": "not_due", "due_at_utc": due_at.isoformat()}
+    if vapid_config is None:
+        return {"sent": False, "reason": "missing_vapid_config"}
 
-    with get_connection(db_path) as conn:
-        state = get_feed_due_state(conn)
-        if state.get("feed_due_last_entry_id") == source_entry_id:
-            return {"sent": False, "reason": "already_sent"}
+    subscriptions = list_push_subscriptions(db_path)
+    if not subscriptions:
+        return {"sent": False, "reason": "missing_subscription"}
 
-    payload = _build_pushcut_payload()
-    sender = send_fn or _send_pushcut
-    if not sender(pushcut_url, payload):
-        return {"sent": False, "reason": "push_failed"}
+    sender = send_fn or send_web_push
+    sent_users: list[str] = []
+    invalid_users: list[str] = []
+    due_users: list[str] = []
 
-    with get_connection(db_path) as conn:
-        state = get_feed_due_state(conn)
-        if state.get("feed_due_last_entry_id") == source_entry_id:
-            return {"sent": False, "reason": "already_sent"}
-        update_feed_due_state(conn, source_entry_id, now.isoformat())
-    return {"sent": True, "payload": payload}
+    for subscription in subscriptions:
+        user_slug = subscription.get("user_slug")
+        if not user_slug:
+            continue
+        next_feed = get_next_feed_time(db_path, user_slug=user_slug)
+        next_timestamp = next_feed.get("timestamp_utc")
+        source_entry_id = next_feed.get("source_entry_id")
+        if not next_timestamp or not source_entry_id:
+            continue
+        due_at = _parse_utc(next_timestamp)
+        if not due_at or now < due_at:
+            continue
+        due_users.append(user_slug)
+        if subscription.get("last_notified_entry_id") == source_entry_id:
+            continue
+        payload = build_push_payload(
+            title="Feed due",
+            body="Time for a feed.",
+            url=f"{base_path}/{user_slug}" if user_slug else f"{base_path}/",
+            tag=f"feed-due-{user_slug}",
+        )
+        result = sender(subscription, payload, vapid_config)
+        if result.get("sent"):
+            mark_push_subscription_notified(
+                db_path,
+                user_slug=user_slug,
+                last_notified_entry_id=source_entry_id,
+                last_sent_at_utc=now.isoformat(),
+            )
+            sent_users.append(user_slug)
+            continue
+        reason = result.get("reason")
+        if reason == "invalid_subscription":
+            delete_push_subscription(db_path, user_slug)
+            invalid_users.append(user_slug)
+
+    if sent_users:
+        return {"sent": True, "users": sent_users}
+    if invalid_users:
+        return {"sent": False, "reason": "invalid_subscription", "users": invalid_users}
+    if due_users:
+        return {"sent": False, "reason": "already_sent", "users": due_users}
+    return {"sent": False, "reason": "not_due"}
 
 
 def start_feed_due_scheduler(app: Flask, poll_seconds: int) -> None:
@@ -119,7 +112,11 @@ def start_feed_due_scheduler(app: Flask, poll_seconds: int) -> None:
         while True:
             try:
                 with app.app_context():
-                    dispatch_feed_due(app.config["DB_PATH"])
+                    dispatch_feed_due(
+                        app.config["DB_PATH"],
+                        vapid_config=app.config.get("VAPID_CONFIG"),
+                        base_path=app.config.get("BASE_PATH", ""),
+                    )
             except Exception:
                 logger.exception("Feed due scheduler failed")
             time.sleep(poll_seconds)

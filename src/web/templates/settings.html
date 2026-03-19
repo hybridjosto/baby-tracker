@@ -273,19 +273,15 @@
             <div class="hint">Used when logging via Pushcut without a user.</div>
           </div>
           <div class="field">
-            <label for="pushcut-feed-due-input">Pushcut feed-due URL</label>
-            <input
-              id="pushcut-feed-due-input"
-              type="url"
-              name="pushcut_feed_due_url"
-              placeholder="https://api.pushcut.io/..."
-            >
-            <div class="hint">Endpoint to trigger the feed due notification.</div>
+            <label>Feed reminders on this device</label>
+            <div class="hint" id="push-reminder-user">Choose a user to enable reminders.</div>
+            <div class="hint" id="push-reminder-status">Not enabled on this device.</div>
             <div class="inline-row" style="margin-top: 8px;">
-              <button class="add-btn" id="test-feed-due-notification" type="button">
-                Send test feed-due notification
-              </button>
+              <button class="add-btn" id="enable-push-reminders" type="button">Enable</button>
+              <button class="add-btn" id="disable-push-reminders" type="button">Disable</button>
+              <button class="add-btn" id="test-feed-due-notification" type="button">Send test</button>
             </div>
+            <div class="hint">Uses native browser notifications for the current user on this device.</div>
           </div>
           <div class="field">
             <label>Export events</label>
