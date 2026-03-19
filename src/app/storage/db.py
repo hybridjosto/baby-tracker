@@ -3,6 +3,7 @@ from contextlib import contextmanager
 import sqlite3
 from pathlib import Path
 
+
 def _connect(db_path: str) -> sqlite3.Connection:
     conn = sqlite3.connect(db_path, check_same_thread=False)
     conn.row_factory = sqlite3.Row
@@ -33,6 +34,7 @@ def init_db(db_path: str) -> None:
         _ensure_reminders_table(conn)
         _ensure_default_reminders(conn)
         _ensure_calendar_events_table(conn)
+        _ensure_push_subscriptions_table(conn)
         conn.commit()
     finally:
         conn.close()
@@ -72,8 +74,7 @@ def _ensure_entry_type_constraint(conn: sqlite3.Connection) -> None:
         row["name"] for row in conn.execute("PRAGMA table_info(entries)").fetchall()
     ]
     old_cols = {
-        row["name"]
-        for row in conn.execute("PRAGMA table_info(entries_old)").fetchall()
+        row["name"] for row in conn.execute("PRAGMA table_info(entries_old)").fetchall()
     }
     copy_cols = [col for col in new_cols if col in old_cols]
     if copy_cols:
@@ -148,7 +149,8 @@ def _ensure_settings_table(conn: sqlite3.Connection) -> None:
         """
     )
     columns = {
-        row["name"] for row in conn.execute("PRAGMA table_info(baby_settings)").fetchall()
+        row["name"]
+        for row in conn.execute("PRAGMA table_info(baby_settings)").fetchall()
     }
     if "custom_event_types" not in columns:
         conn.execute("ALTER TABLE baby_settings ADD COLUMN custom_event_types TEXT")
@@ -157,9 +159,13 @@ def _ensure_settings_table(conn: sqlite3.Connection) -> None:
     if "feed_goal_max" not in columns:
         conn.execute("ALTER TABLE baby_settings ADD COLUMN feed_goal_max INTEGER")
     if "overnight_gap_min_hours" not in columns:
-        conn.execute("ALTER TABLE baby_settings ADD COLUMN overnight_gap_min_hours REAL")
+        conn.execute(
+            "ALTER TABLE baby_settings ADD COLUMN overnight_gap_min_hours REAL"
+        )
     if "overnight_gap_max_hours" not in columns:
-        conn.execute("ALTER TABLE baby_settings ADD COLUMN overnight_gap_max_hours REAL")
+        conn.execute(
+            "ALTER TABLE baby_settings ADD COLUMN overnight_gap_max_hours REAL"
+        )
     if "behind_target_mode" not in columns:
         conn.execute("ALTER TABLE baby_settings ADD COLUMN behind_target_mode TEXT")
     if "entry_webhook_url" not in columns:
@@ -175,9 +181,13 @@ def _ensure_settings_table(conn: sqlite3.Connection) -> None:
     if "feed_size_big_ml" not in columns:
         conn.execute("ALTER TABLE baby_settings ADD COLUMN feed_size_big_ml REAL")
     if "feed_due_last_entry_id" not in columns:
-        conn.execute("ALTER TABLE baby_settings ADD COLUMN feed_due_last_entry_id INTEGER")
+        conn.execute(
+            "ALTER TABLE baby_settings ADD COLUMN feed_due_last_entry_id INTEGER"
+        )
     if "feed_due_last_sent_at_utc" not in columns:
-        conn.execute("ALTER TABLE baby_settings ADD COLUMN feed_due_last_sent_at_utc TEXT")
+        conn.execute(
+            "ALTER TABLE baby_settings ADD COLUMN feed_due_last_sent_at_utc TEXT"
+        )
     row = conn.execute("SELECT id FROM baby_settings WHERE id = 1").fetchone()
     if not row:
         now = datetime.now(timezone.utc).isoformat()
@@ -217,11 +227,17 @@ def _ensure_bottles_table(conn: sqlite3.Connection) -> None:
     if "name" not in columns:
         conn.execute("ALTER TABLE bottles ADD COLUMN name TEXT NOT NULL DEFAULT ''")
     if "empty_weight_g" not in columns:
-        conn.execute("ALTER TABLE bottles ADD COLUMN empty_weight_g REAL NOT NULL DEFAULT 0")
+        conn.execute(
+            "ALTER TABLE bottles ADD COLUMN empty_weight_g REAL NOT NULL DEFAULT 0"
+        )
     if "created_at_utc" not in columns:
-        conn.execute("ALTER TABLE bottles ADD COLUMN created_at_utc TEXT NOT NULL DEFAULT ''")
+        conn.execute(
+            "ALTER TABLE bottles ADD COLUMN created_at_utc TEXT NOT NULL DEFAULT ''"
+        )
     if "updated_at_utc" not in columns:
-        conn.execute("ALTER TABLE bottles ADD COLUMN updated_at_utc TEXT NOT NULL DEFAULT ''")
+        conn.execute(
+            "ALTER TABLE bottles ADD COLUMN updated_at_utc TEXT NOT NULL DEFAULT ''"
+        )
     if "deleted_at_utc" not in columns:
         conn.execute("ALTER TABLE bottles ADD COLUMN deleted_at_utc TEXT")
     conn.execute(
@@ -276,6 +292,41 @@ def _ensure_calendar_events_table(conn: sqlite3.Connection) -> None:
     )
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_calendar_events_updated_at_utc ON calendar_events (updated_at_utc DESC)"
+    )
+
+
+def _ensure_push_subscriptions_table(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS push_subscriptions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_slug TEXT NOT NULL UNIQUE,
+            endpoint TEXT NOT NULL UNIQUE,
+            p256dh TEXT NOT NULL,
+            auth TEXT NOT NULL,
+            user_agent TEXT,
+            created_at_utc TEXT NOT NULL,
+            updated_at_utc TEXT NOT NULL,
+            last_notified_entry_id INTEGER,
+            last_sent_at_utc TEXT
+        )
+        """
+    )
+    columns = {
+        row["name"]
+        for row in conn.execute("PRAGMA table_info(push_subscriptions)").fetchall()
+    }
+    if "last_notified_entry_id" not in columns:
+        conn.execute(
+            "ALTER TABLE push_subscriptions ADD COLUMN last_notified_entry_id INTEGER"
+        )
+    if "last_sent_at_utc" not in columns:
+        conn.execute("ALTER TABLE push_subscriptions ADD COLUMN last_sent_at_utc TEXT")
+    conn.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_push_subscriptions_user_slug ON push_subscriptions (user_slug)"
+    )
+    conn.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_push_subscriptions_endpoint ON push_subscriptions (endpoint)"
     )
 
 

@@ -13,6 +13,7 @@ COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev
 
 COPY src ./src
+COPY apple-touch-icon.png ./apple-touch-icon.png
 
 EXPOSE 8000
 

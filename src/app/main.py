@@ -12,6 +12,7 @@ from src.app.routes.calendar import calendar_api
 from src.app.routes.feed import feed_api
 from src.app.routes.pushcut import pushcut_api
 from src.app.routes.home_kpis import home_kpis_api
+from src.app.services.push_subscriptions import build_vapid_config
 from src.app.storage.db import init_db
 from src.app.services.feed_due import start_feed_due_scheduler
 from src.app.services.home_kpis import start_home_kpis_scheduler
@@ -45,6 +46,11 @@ def create_app() -> Flask:
         DB_PATH=str(config.db_path),
         STORAGE_BACKEND=config.storage_backend,
         BASE_PATH=config.base_path,
+        VAPID_CONFIG=build_vapid_config(
+            config.vapid_public_key,
+            config.vapid_private_key,
+            config.vapid_subject,
+        ),
     )
 
     init_db(app.config["DB_PATH"])
@@ -136,7 +142,9 @@ def create_app() -> Flask:
 
     @app.get(f"{config.base_path}/settings")
     def settings():
-        return render_template("settings.html", page="settings", base_path=config.base_path)
+        return render_template(
+            "settings.html", page="settings", base_path=config.base_path
+        )
 
     @app.get(f"{config.base_path}/goals")
     def goals():

@@ -1,80 +1,109 @@
-import json
+def test_push_vapid_public_key_route(client):
+    response = client.get("/api/push/vapid-public-key")
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["public_key"] == "test-public-key"
 
 
-def test_pushcut_feed_due_requires_url(client):
-    response = client.post("/api/push/feed-due", json={"title": "Hi", "body": "Now"})
+def test_push_subscription_round_trip(client):
+    response = client.post(
+        "/api/push/subscription",
+        json={
+            "user_slug": "suz",
+            "subscription": {
+                "endpoint": "https://push.example.com/device-1",
+                "keys": {"p256dh": "p256dh-1", "auth": "auth-1"},
+            },
+        },
+    )
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["enabled"] is True
+    assert payload["user_slug"] == "suz"
+
+    follow_up = client.get("/api/push/subscription?user_slug=suz")
+    assert follow_up.status_code == 200
+    follow_payload = follow_up.get_json()
+    assert follow_payload["enabled"] is True
+    assert follow_payload["endpoint"] == "https://push.example.com/device-1"
+
+
+def test_push_subscription_delete_route(client):
+    client.post(
+        "/api/push/subscription",
+        json={
+            "user_slug": "suz",
+            "subscription": {
+                "endpoint": "https://push.example.com/device-1",
+                "keys": {"p256dh": "p256dh-1", "auth": "auth-1"},
+            },
+        },
+    )
+
+    response = client.delete("/api/push/subscription", json={"user_slug": "suz"})
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["enabled"] is False
+    assert payload["deleted"] is True
+
+
+def test_push_feed_due_requires_subscription(client):
+    response = client.post("/api/push/feed-due", json={"user_slug": "suz"})
     assert response.status_code == 400
     payload = response.get_json()
-    assert payload["error"] == "pushcut_feed_due_url not configured"
+    assert payload["error"] == "push_subscription_not_configured"
 
 
-def test_pushcut_feed_due_sends_payload(client, monkeypatch):
+def test_push_feed_due_sends_payload(client, monkeypatch):
     captured: dict = {}
 
-    class DummyResponse:
-        def __enter__(self):
-            return self
+    def fake_send(subscription, payload, vapid_config):
+        captured["subscription"] = subscription
+        captured["payload"] = payload
+        captured["subject"] = vapid_config.subject
+        return {"sent": True}
 
-        def __exit__(self, exc_type, exc_value, traceback):
-            return False
+    from src.app.routes import pushcut as push_module
 
-    def fake_urlopen(req, timeout=0):
-        captured["url"] = req.full_url
-        captured["data"] = req.data
-        captured["headers"] = dict(req.headers)
-        return DummyResponse()
+    monkeypatch.setattr(push_module, "send_web_push", fake_send)
 
-    from src.app.routes import pushcut as pushcut_module
-
-    monkeypatch.setattr(pushcut_module.urllib_request, "urlopen", fake_urlopen)
-
-    settings_response = client.patch(
-        "/api/settings",
-        json={"pushcut_feed_due_url": "https://pushcut.example.com/feed"},
+    client.post(
+        "/api/push/subscription",
+        json={
+            "user_slug": "suz",
+            "subscription": {
+                "endpoint": "https://push.example.com/device-1",
+                "keys": {"p256dh": "p256dh-1", "auth": "auth-1"},
+            },
+        },
     )
-    assert settings_response.status_code == 200
 
     response = client.post(
         "/api/push/feed-due",
-        json={"title": "Feed", "body": "Now"},
+        json={"user_slug": "suz", "title": "Feed", "body": "Now"},
     )
     assert response.status_code == 200
     payload = response.get_json()
     assert payload["sent"] is True
-    assert captured["url"] == "https://pushcut.example.com/feed"
-    assert json.loads(captured["data"].decode("utf-8")) == {
+    assert captured["subscription"]["endpoint"] == "https://push.example.com/device-1"
+    assert captured["payload"] == {
         "title": "Feed",
         "body": "Now",
+        "url": "/suz",
+        "tag": "feed-due-suz",
     }
+    assert captured["subject"] == "mailto:test@example.com"
 
 
-def test_pushcut_feed_due_defaults_payload(client, monkeypatch):
-    captured: dict = {}
-
-    class DummyResponse:
-        def __enter__(self):
-            return self
-
-        def __exit__(self, exc_type, exc_value, traceback):
-            return False
-
-    def fake_urlopen(req, timeout=0):
-        captured["data"] = req.data
-        return DummyResponse()
-
-    from src.app.routes import pushcut as pushcut_module
-
-    monkeypatch.setattr(pushcut_module.urllib_request, "urlopen", fake_urlopen)
-
-    settings_response = client.patch(
-        "/api/settings",
-        json={"pushcut_feed_due_url": "https://pushcut.example.com/feed"},
+def test_push_subscription_requires_user_slug(client):
+    response = client.post(
+        "/api/push/subscription",
+        json={
+            "subscription": {
+                "endpoint": "https://push.example.com/device-1",
+                "keys": {"p256dh": "p256dh-1", "auth": "auth-1"},
+            },
+        },
     )
-    assert settings_response.status_code == 200
-
-    response = client.post("/api/push/feed-due", json={})
-    assert response.status_code == 200
-    assert json.loads(captured["data"].decode("utf-8")) == {
-        "title": "Feed due",
-        "body": "Time for a feed.",
-    }
+    assert response.status_code == 400
+    assert response.get_json()["error"] == "user_slug is required"

@@ -22,6 +22,22 @@ def test_enable_schedulers_invalid_value(monkeypatch):
         load_config()
 
 
+def test_vapid_keys_must_be_configured_together(monkeypatch):
+    monkeypatch.setenv("BABY_TRACKER_VAPID_PUBLIC_KEY", "public")
+    monkeypatch.delenv("BABY_TRACKER_VAPID_PRIVATE_KEY", raising=False)
+    monkeypatch.delenv("BABY_TRACKER_VAPID_SUBJECT", raising=False)
+    with pytest.raises(ValueError, match="BABY_TRACKER_VAPID_PUBLIC_KEY"):
+        load_config()
+
+
+def test_vapid_subject_required_when_keys_present(monkeypatch):
+    monkeypatch.setenv("BABY_TRACKER_VAPID_PUBLIC_KEY", "public")
+    monkeypatch.setenv("BABY_TRACKER_VAPID_PRIVATE_KEY", "private")
+    monkeypatch.delenv("BABY_TRACKER_VAPID_SUBJECT", raising=False)
+    with pytest.raises(ValueError, match="BABY_TRACKER_VAPID_SUBJECT"):
+        load_config()
+
+
 def test_storage_backend_must_be_sqlite(monkeypatch):
     monkeypatch.setenv("BABY_TRACKER_STORAGE_BACKEND", "firestore")
     with pytest.raises(ValueError, match="BABY_TRACKER_STORAGE_BACKEND must be sqlite"):
