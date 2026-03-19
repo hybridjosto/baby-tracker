@@ -8348,9 +8348,6 @@ async function saveBabySettings(patch) {
     if (defaultUserInputEl) {
       defaultUserInputEl.value = data.default_user_slug || "";
     }
-    if (pushcutFeedDueInputEl) {
-      pushcutFeedDueInputEl.value = data.pushcut_feed_due_url || "";
-    }
     if (feedSizeSmallInputEl) {
       feedSizeSmallInputEl.value = String(feedSizeSmallMl);
     }
