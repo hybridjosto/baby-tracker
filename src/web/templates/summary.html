@@ -1,1061 +1,1253 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Baby Tracker Summary</title>
-    <link rel="manifest" href="{{ base_path }}/static/manifest.json">
-    <link rel="apple-touch-icon" href="{{ base_path }}/apple-touch-icon.png">
-    <link
-      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700&display=swap"
-      rel="stylesheet"
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Baby Tracker Summary</title>
+        <link rel="manifest" href="{{ base_path }}/static/manifest.json" />
+        <link
+            rel="apple-touch-icon"
+            href="{{ base_path }}/apple-touch-icon.png"
+        />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700&display=swap"
+            rel="stylesheet"
+        />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@400,0"
+            rel="stylesheet"
+        />
+        <link
+            rel="stylesheet"
+            href="{{ base_path }}/static/styles.css?v={{ static_version }}"
+        />
+        <script>
+            (() => {
+                const stored = localStorage.getItem("baby-tracker-theme");
+                const prefersDark =
+                    window.matchMedia &&
+                    window.matchMedia("(prefers-color-scheme: dark)").matches;
+                const theme = stored || (prefersDark ? "dark" : "light");
+                if (theme === "dark") {
+                    document.documentElement.classList.add("dark");
+                }
+            })();
+        </script>
+        <style>
+            .card {
+                max-width: 520px;
+                margin: 0 auto;
+            }
+            h1 {
+                margin: 0;
+                font-size: 24px;
+            }
+            .user-chip {
+                margin-top: 8px;
+            }
+            .nav-row {
+                margin-bottom: 16px;
+            }
+            .theme-toggle,
+            .icon-btn {
+                width: 32px;
+                height: 32px;
+                border-radius: 999px;
+                border: 1px solid var(--border-light);
+                background: var(--surface-soft);
+                display: grid;
+                place-items: center;
+                cursor: pointer;
+                color: inherit;
+            }
+            .nav-icon {
+                width: 40px;
+                height: 40px;
+                border-radius: 999px;
+                border: 1px solid var(--border-light);
+                background: var(--surface-soft);
+                display: grid;
+                place-items: center;
+                cursor: pointer;
+                color: inherit;
+            }
+            html.dark .theme-toggle,
+            html.dark .icon-btn,
+            html.dark .nav-icon {
+                border-color: var(--border-dark);
+                background: rgba(255, 255, 255, 0.08);
+                color: #d3e4d7;
+            }
+            .date-row {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 12px;
+                margin-bottom: 16px;
+                padding: 10px;
+                border-radius: 14px;
+                background: var(--surface-muted);
+            }
+            html.dark .date-row {
+                background: rgba(255, 255, 255, 0.08);
+            }
+            .date-center {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 4px;
+                flex: 1;
+            }
+            .date-label {
+                font-size: 14px;
+                font-weight: 700;
+            }
+            .date-input {
+                border-radius: 10px;
+                border: 1px solid var(--border-light);
+                padding: 6px 10px;
+                font-size: 16px;
+                background: #ffffff;
+                color: var(--text-primary);
+            }
+            html.dark .date-input {
+                background: rgba(26, 44, 32, 0.9);
+                border-color: var(--border-dark);
+                color: #ffffff;
+            }
+            .summary-grid {
+                display: grid;
+                grid-template-columns: repeat(2, 1fr);
+                gap: 12px;
+                margin-bottom: 16px;
+            }
+            .summary-section-title {
+                margin: 8px 2px 10px;
+                font-size: 12px;
+                text-transform: uppercase;
+                letter-spacing: 0.18em;
+                color: var(--text-secondary);
+            }
+            .insight-grid {
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 12px;
+                margin-bottom: 16px;
+            }
+            .insight-card {
+                border-radius: 16px;
+                padding: 12px 14px;
+                border: 1px solid var(--border-light);
+                background: #ffffff;
+                display: flex;
+                flex-direction: column;
+                gap: 6px;
+            }
+            html.dark .insight-card {
+                border-color: var(--border-dark);
+                background: var(--card-dark);
+            }
+            .insight-card .summary-value {
+                font-size: 18px;
+            }
+            .insight-kicker {
+                font-size: 11px;
+                text-transform: uppercase;
+                letter-spacing: 0.12em;
+                color: var(--text-secondary);
+            }
+            .insight-table {
+                display: grid;
+                gap: 8px;
+                overflow-x: auto;
+            }
+            .insight-table-head,
+            .insight-row {
+                display: grid;
+                grid-template-columns: 0.9fr repeat(7, minmax(0, 1fr));
+                gap: 8px;
+                align-items: center;
+                min-width: 700px;
+            }
+            .insight-table-head {
+                font-size: 10px;
+                text-transform: uppercase;
+                letter-spacing: 0.14em;
+                color: var(--text-secondary);
+            }
+            .insight-row {
+                padding: 8px 10px;
+                border-radius: 12px;
+                background: var(--surface-soft);
+            }
+            html.dark .insight-row {
+                background: rgba(255, 255, 255, 0.06);
+            }
+            .insight-cell {
+                font-size: 12px;
+                color: var(--text-primary);
+            }
+            html.dark .insight-cell {
+                color: #e6f2ea;
+            }
+            .insight-cell strong {
+                display: block;
+                font-size: 13px;
+            }
+            html.dark .insight-cell strong {
+                color: #ffffff;
+            }
+            .insight-rhythm {
+                display: grid;
+                gap: 12px;
+            }
+            .rhythm-block {
+                padding: 10px 12px;
+                border-radius: 12px;
+                border: 1px dashed var(--border-light);
+                background: var(--surface-soft);
+            }
+            html.dark .rhythm-block {
+                border-color: var(--border-dark);
+                background: rgba(26, 44, 32, 0.75);
+            }
+            .rhythm-title {
+                font-size: 11px;
+                text-transform: uppercase;
+                letter-spacing: 0.12em;
+                color: var(--text-secondary);
+                margin-bottom: 8px;
+            }
+            .hour-grid {
+                display: grid;
+                grid-template-columns: repeat(24, minmax(0, 1fr));
+                gap: 3px;
+                align-items: end;
+                height: 56px;
+            }
+            .hour-bar {
+                width: 100%;
+                border-radius: 4px 4px 2px 2px;
+                background: rgba(19, 236, 91, 0.55);
+                min-height: 6px;
+            }
+            .hour-bar.express {
+                background: rgba(125, 211, 252, 0.55);
+            }
+            .hour-labels {
+                display: flex;
+                justify-content: space-between;
+                font-size: 10px;
+                color: var(--text-secondary);
+                margin-top: 6px;
+            }
+            .trend-row {
+                display: grid;
+                grid-template-columns: 120px minmax(0, 1fr);
+                gap: 10px;
+                align-items: center;
+                padding: 6px 0;
+            }
+            .trend-label {
+                font-size: 12px;
+                color: var(--text-secondary);
+            }
+            .trend-bars {
+                display: grid;
+                grid-template-columns: repeat(14, minmax(0, 1fr));
+                gap: 4px;
+                align-items: end;
+                height: 48px;
+            }
+            .trend-bar {
+                border-radius: 4px 4px 2px 2px;
+                background: rgba(19, 236, 91, 0.55);
+                min-height: 6px;
+            }
+            .trend-bar.express {
+                background: rgba(125, 211, 252, 0.55);
+            }
+            @media (max-width: 540px) {
+                .insight-grid {
+                    grid-template-columns: 1fr;
+                }
+                .trend-row {
+                    grid-template-columns: 1fr;
+                    gap: 6px;
+                }
+                .trend-bars {
+                    height: 42px;
+                }
+            }
+            .summary-card {
+                border-radius: 14px;
+                padding: 12px;
+                border: 1px solid var(--border-light);
+                background: #ffffff;
+            }
+            html.dark .summary-card {
+                border-color: var(--border-dark);
+                background: var(--card-dark);
+            }
+            .summary-label {
+                font-size: 11px;
+                text-transform: uppercase;
+                letter-spacing: 0.12em;
+                color: var(--text-secondary);
+            }
+            .summary-value {
+                font-size: 20px;
+                font-weight: 700;
+                margin-top: 6px;
+            }
+            .summary-sub {
+                font-size: 12px;
+                color: var(--text-secondary);
+                margin-top: 4px;
+            }
+            .summary-panel {
+                border-radius: 16px;
+                padding: 14px;
+                border: 1px solid var(--border-light);
+                background: #ffffff;
+            }
+            html.dark .summary-panel {
+                border-color: var(--border-dark);
+                background: var(--card-dark);
+            }
+            .summary-panel-header {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 8px;
+                margin-bottom: 10px;
+            }
+            .summary-panel-header h2 {
+                margin: 0;
+                font-size: 16px;
+            }
+            .summary-panel-meta {
+                display: flex;
+                flex-direction: column;
+                align-items: flex-end;
+                gap: 2px;
+                font-size: 12px;
+                color: var(--text-secondary);
+                text-align: right;
+            }
+            .sleep-gantt-controls {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 6px;
+                margin-top: 6px;
+            }
+            .sleep-gantt-toggle {
+                border: 1px solid var(--border-light);
+                border-radius: 999px;
+                padding: 4px 10px;
+                background: var(--surface-soft);
+                color: var(--text-primary);
+                font-size: 10px;
+                letter-spacing: 0.08em;
+                text-transform: uppercase;
+                cursor: pointer;
+            }
+            .sleep-gantt-toggle.active {
+                color: #0f1a12;
+                border-color: transparent;
+            }
+            .sleep-gantt-board {
+                margin-top: 12px;
+                border: 1px dashed var(--border-light);
+                border-radius: 12px;
+                background: var(--surface-soft);
+                overflow: hidden;
+            }
+            html.dark .sleep-gantt-toggle {
+                border-color: var(--border-dark);
+                background: rgba(255, 255, 255, 0.08);
+                color: #e6f2ea;
+            }
+            html.dark .sleep-gantt-board {
+                border-color: var(--border-dark);
+                background: rgba(26, 44, 32, 0.75);
+            }
+            #sleep-gantt-chart {
+                width: 100%;
+                height: 168px;
+                display: block;
+            }
+            .sleep-gantt-readout {
+                font-size: 12px;
+                color: var(--text-secondary);
+                border-top: 1px solid var(--border-light);
+                padding: 8px 10px;
+            }
+            html.dark .sleep-gantt-readout {
+                border-top-color: var(--border-dark);
+            }
+            .sleep-gantt-empty {
+                display: none;
+                padding: 14px;
+                text-align: center;
+                font-size: 13px;
+                color: var(--text-secondary);
+            }
+            .sleep-gantt-legend {
+                margin-top: 10px;
+                display: flex;
+                flex-wrap: wrap;
+                gap: 10px;
+                font-size: 11px;
+                color: var(--text-secondary);
+            }
+            .sleep-gantt-legend-item {
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+            }
+            .sleep-gantt-legend-dot {
+                width: 9px;
+                height: 9px;
+                border-radius: 999px;
+                display: inline-block;
+            }
+            .skeleton-text {
+                position: relative;
+                display: inline-block;
+                min-width: 4ch;
+                border-radius: 999px;
+            }
+            .skeleton-text.skeleton-mid {
+                min-width: 8ch;
+            }
+            .skeleton-text.skeleton-wide {
+                min-width: 14ch;
+            }
+            .skeleton-block {
+                position: relative;
+                border-radius: 12px;
+                overflow: hidden;
+            }
+            .skeleton-text::after,
+            .skeleton-block::after {
+                content: "";
+                position: absolute;
+                inset: 0;
+                background: linear-gradient(
+                    90deg,
+                    var(--skeleton-base) 0%,
+                    var(--skeleton-glow) 45%,
+                    var(--skeleton-base) 100%
+                );
+                background-size: 200% 100%;
+                opacity: 0;
+            }
+            .is-loading .skeleton-text {
+                color: transparent;
+            }
+            .is-loading .skeleton-text::after,
+            .is-loading .skeleton-block::after {
+                opacity: 1;
+                animation: skeleton-shimmer 1.2s ease-in-out infinite;
+            }
+            .milk-sparkline {
+                position: relative;
+                margin: 10px 0 12px;
+                padding: 10px 12px;
+                border-radius: 12px;
+                border: 1px dashed var(--border-light);
+                background: var(--surface-soft);
+            }
+            html.dark .milk-sparkline {
+                border-color: var(--border-dark);
+                background: rgba(26, 44, 32, 0.75);
+            }
+            .milk-sparkline-header {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                font-size: 11px;
+                letter-spacing: 0.08em;
+                text-transform: uppercase;
+                color: var(--text-secondary);
+            }
+            .milk-sparkline-toggle {
+                display: inline-flex;
+                gap: 4px;
+                padding: 2px;
+                border-radius: 999px;
+                border: 1px solid var(--border-light);
+                background: #ffffff;
+            }
+            html.dark .milk-sparkline-toggle {
+                border-color: var(--border-dark);
+                background: rgba(255, 255, 255, 0.04);
+            }
+            .sparkline-toggle-btn {
+                border: none;
+                background: transparent;
+                color: inherit;
+                font-size: 10px;
+                text-transform: uppercase;
+                letter-spacing: 0.08em;
+                padding: 2px 8px;
+                border-radius: 999px;
+                cursor: pointer;
+            }
+            .sparkline-toggle-btn.is-active {
+                background: var(--primary);
+                color: #0f1a12;
+            }
+            .milk-sparkline svg {
+                display: block;
+                width: 100%;
+                height: 64px;
+                margin-top: 8px;
+            }
+            .milk-sparkline-track {
+                stroke: var(--border-light);
+                stroke-width: 2;
+            }
+            html.dark .milk-sparkline-track {
+                stroke: var(--border-dark);
+            }
+            .milk-sparkline-path {
+                stroke: var(--primary);
+                stroke-width: 2.5;
+                fill: none;
+            }
+            .milk-sparkline-dot {
+                fill: var(--primary);
+            }
+            .milk-list {
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+            }
+            .milk-item {
+                display: flex;
+                justify-content: space-between;
+                gap: 12px;
+                padding: 8px 10px;
+                border-radius: 12px;
+                background: var(--surface-soft);
+            }
+            html.dark .milk-item {
+                background: rgba(255, 255, 255, 0.06);
+            }
+            .milk-time {
+                font-size: 13px;
+                font-weight: 600;
+            }
+            .milk-notes {
+                font-size: 12px;
+                color: var(--text-secondary);
+                text-align: right;
+            }
+            .milk-meta {
+                font-size: 12px;
+                color: var(--text-secondary);
+                text-align: right;
+            }
+            .milk-sparkline-skeleton {
+                display: none;
+                position: absolute;
+                inset: 10px 12px;
+            }
+            .milk-skeleton {
+                display: none;
+                flex-direction: column;
+                gap: 8px;
+            }
+            .milk-skeleton-item {
+                height: 38px;
+            }
+            .is-loading .milk-sparkline-skeleton {
+                display: block;
+            }
+            .is-loading #milk-express-sparkline {
+                opacity: 0;
+            }
+            .is-loading #milk-express-list,
+            .is-loading #milk-express-empty {
+                display: none;
+            }
+            .is-loading .milk-skeleton {
+                display: flex;
+            }
+            @keyframes skeleton-shimmer {
+                0% {
+                    background-position: 200% 0;
+                }
+                100% {
+                    background-position: -200% 0;
+                }
+            }
+            .summary-empty {
+                display: none;
+                padding: 14px;
+                text-align: center;
+                font-size: 13px;
+                color: var(--text-secondary);
+            }
+            .ruler-wrap {
+                position: relative;
+                margin-top: 16px;
+                border-radius: 16px;
+                padding: 14px;
+                border: 1px solid var(--border-light);
+                background: #ffffff;
+                --ruler-expressed: #13ec5b;
+                --ruler-formula: #f8b13c;
+                --ruler-track: #e0e7e1;
+                --ruler-window: rgba(19, 236, 91, 0.12);
+                --ruler-anchor: #0f1a12;
+            }
+            html.dark .ruler-wrap {
+                border-color: var(--border-dark);
+                background: var(--card-dark);
+                --ruler-expressed: #28f278;
+                --ruler-formula: #f5b453;
+                --ruler-track: rgba(255, 255, 255, 0.12);
+                --ruler-window: rgba(19, 236, 91, 0.16);
+                --ruler-anchor: #f2f6f4;
+            }
+            .ruler-header {
+                display: flex;
+                align-items: baseline;
+                justify-content: space-between;
+                gap: 12px;
+                margin-bottom: 10px;
+            }
+            .ruler-title {
+                margin: 0;
+                font-size: 12px;
+                text-transform: uppercase;
+                letter-spacing: 0.14em;
+                color: var(--text-secondary);
+            }
+            .ruler-actions {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                flex-wrap: wrap;
+                justify-content: flex-end;
+            }
+            .ruler-legend {
+                display: flex;
+                gap: 10px;
+                font-size: 11px;
+                color: var(--text-secondary);
+            }
+            .ruler-legend span {
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+            }
+            .ruler-dot {
+                width: 10px;
+                height: 10px;
+                border-radius: 999px;
+                display: inline-block;
+            }
+            .ruler-toggle,
+            .ruler-now {
+                border: 1px solid var(--border-light);
+                border-radius: 999px;
+                padding: 5px 10px;
+                background: var(--surface-soft);
+                color: var(--text-primary);
+                font-size: 10px;
+                text-transform: uppercase;
+                letter-spacing: 0.08em;
+                cursor: pointer;
+            }
+            .ruler-toggle.active {
+                background: var(--text-primary);
+                color: #f3f6f4;
+            }
+            html.dark .ruler-toggle,
+            html.dark .ruler-now {
+                border-color: var(--border-dark);
+                background: rgba(255, 255, 255, 0.08);
+                color: #d3e4d7;
+            }
+            .ruler-body {
+                position: relative;
+                height: 242px;
+            }
+            #ruler-canvas {
+                width: 100%;
+                height: 170px;
+                display: block;
+                touch-action: pan-y;
+            }
+            .ruler-readout {
+                position: absolute;
+                top: 178px;
+                min-width: 170px;
+                padding: 10px 12px;
+                border-radius: 12px;
+                background: rgba(20, 22, 28, 0.92);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+                box-shadow: 0 10px 24px rgba(0, 0, 0, 0.3);
+                pointer-events: none;
+                transform: translateX(-50%);
+                color: #f3f6f4;
+            }
+            .ruler-readout h3 {
+                margin: 0;
+                font-size: 10px;
+                text-transform: uppercase;
+                letter-spacing: 0.14em;
+                color: rgba(243, 246, 244, 0.7);
+            }
+            .ruler-metric {
+                font-size: 18px;
+                font-weight: 700;
+                margin-top: 4px;
+            }
+            .ruler-detail,
+            .ruler-goal {
+                margin-top: 4px;
+                font-size: 12px;
+            }
+            .ruler-goal {
+                font-weight: 700;
+            }
+            .ruler-labels {
+                margin-top: 8px;
+                display: flex;
+                justify-content: space-between;
+                font-size: 11px;
+                color: var(--text-secondary);
+            }
+            .ruler-empty {
+                display: none;
+                align-items: center;
+                justify-content: center;
+                padding: 12px;
+                font-size: 12px;
+                color: var(--text-secondary);
+            }
+            @media (max-width: 540px) {
+                .ruler-header {
+                    align-items: flex-start;
+                    flex-direction: column;
+                }
+                .ruler-actions {
+                    justify-content: flex-start;
+                }
+            }
+            .status {
+                font-size: 12px;
+                color: var(--text-secondary);
+                margin-top: 10px;
+            }
+            .user-setup {
+                margin-top: 12px;
+                padding: 12px;
+                border-radius: 14px;
+                border: 1px dashed var(--border-light);
+                background: var(--surface-soft);
+            }
+            html.dark .user-setup {
+                border-color: var(--border-dark);
+                background: rgba(26, 44, 32, 0.9);
+            }
+            .user-setup label {
+                font-size: 11px;
+                text-transform: uppercase;
+                letter-spacing: 0.12em;
+                color: var(--text-secondary);
+            }
+            .user-row {
+                display: flex;
+                gap: 8px;
+                margin-top: 8px;
+            }
+            .user-input {
+                flex: 1;
+                border-radius: 10px;
+                border: 1px solid var(--border-light);
+                padding: 10px 12px;
+                font-size: 16px;
+                background: #ffffff;
+                color: var(--text-primary);
+            }
+            html.dark .user-input {
+                background: rgba(26, 44, 32, 0.9);
+                border-color: var(--border-dark);
+                color: #ffffff;
+            }
+            .user-btn {
+                border-radius: 10px;
+                border: none;
+                padding: 0 16px;
+                background: var(--primary);
+                color: #0f1a12;
+                font-weight: 700;
+                cursor: pointer;
+            }
+            .disabled {
+                opacity: 0.5;
+                pointer-events: none;
+            }
+        </style>
+    </head>
+    <body
+        data-user="{{ user_slug }}"
+        data-user-valid="{{ 'true' if user_valid else 'false' }}"
+        data-page="{{ page }}"
+        data-base-path="{{ base_path }}"
     >
-    <link
-      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@400,0"
-      rel="stylesheet"
-    >
-    <link rel="stylesheet" href="{{ base_path }}/static/styles.css?v={{ static_version }}">
-    <script>
-      (() => {
-        const stored = localStorage.getItem("baby-tracker-theme");
-        const prefersDark = window.matchMedia
-          && window.matchMedia("(prefers-color-scheme: dark)").matches;
-        const theme = stored || (prefersDark ? "dark" : "light");
-        if (theme === "dark") {
-          document.documentElement.classList.add("dark");
-        }
-      })();
-    </script>
-    <style>
-      .card {
-        max-width: 520px;
-        margin: 0 auto;
-      }
-      h1 {
-        margin: 0;
-        font-size: 24px;
-      }
-      .user-chip {
-        margin-top: 8px;
-      }
-      .nav-row {
-        margin-bottom: 16px;
-      }
-      .theme-toggle,
-      .icon-btn {
-        width: 32px;
-        height: 32px;
-        border-radius: 999px;
-        border: 1px solid var(--border-light);
-        background: var(--surface-soft);
-        display: grid;
-        place-items: center;
-        cursor: pointer;
-        color: inherit;
-      }
-      .nav-icon {
-        width: 40px;
-        height: 40px;
-        border-radius: 999px;
-        border: 1px solid var(--border-light);
-        background: var(--surface-soft);
-        display: grid;
-        place-items: center;
-        cursor: pointer;
-        color: inherit;
-      }
-      html.dark .theme-toggle,
-      html.dark .icon-btn,
-      html.dark .nav-icon {
-        border-color: var(--border-dark);
-        background: rgba(255, 255, 255, 0.08);
-        color: #d3e4d7;
-      }
-      .date-row {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 12px;
-        margin-bottom: 16px;
-        padding: 10px;
-        border-radius: 14px;
-        background: var(--surface-muted);
-      }
-      html.dark .date-row {
-        background: rgba(255, 255, 255, 0.08);
-      }
-      .date-center {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 4px;
-        flex: 1;
-      }
-      .date-label {
-        font-size: 14px;
-        font-weight: 700;
-      }
-      .date-input {
-        border-radius: 10px;
-        border: 1px solid var(--border-light);
-        padding: 6px 10px;
-        font-size: 16px;
-        background: #ffffff;
-        color: var(--text-primary);
-      }
-      html.dark .date-input {
-        background: rgba(26, 44, 32, 0.9);
-        border-color: var(--border-dark);
-        color: #ffffff;
-      }
-      .summary-grid {
-        display: grid;
-        grid-template-columns: repeat(2, 1fr);
-        gap: 12px;
-        margin-bottom: 16px;
-      }
-      .summary-section-title {
-        margin: 8px 2px 10px;
-        font-size: 12px;
-        text-transform: uppercase;
-        letter-spacing: 0.18em;
-        color: var(--text-secondary);
-      }
-      .insight-grid {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 12px;
-        margin-bottom: 16px;
-      }
-      .insight-card {
-        border-radius: 16px;
-        padding: 12px 14px;
-        border: 1px solid var(--border-light);
-        background: #ffffff;
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
-      }
-      html.dark .insight-card {
-        border-color: var(--border-dark);
-        background: var(--card-dark);
-      }
-      .insight-card .summary-value {
-        font-size: 18px;
-      }
-      .insight-kicker {
-        font-size: 11px;
-        text-transform: uppercase;
-        letter-spacing: 0.12em;
-        color: var(--text-secondary);
-      }
-      .insight-table {
-        display: grid;
-        gap: 8px;
-        overflow-x: auto;
-      }
-      .insight-table-head,
-      .insight-row {
-        display: grid;
-        grid-template-columns: 0.9fr repeat(7, minmax(0, 1fr));
-        gap: 8px;
-        align-items: center;
-        min-width: 700px;
-      }
-      .insight-table-head {
-        font-size: 10px;
-        text-transform: uppercase;
-        letter-spacing: 0.14em;
-        color: var(--text-secondary);
-      }
-      .insight-row {
-        padding: 8px 10px;
-        border-radius: 12px;
-        background: var(--surface-soft);
-      }
-      html.dark .insight-row {
-        background: rgba(255, 255, 255, 0.06);
-      }
-      .insight-cell {
-        font-size: 12px;
-        color: var(--text-primary);
-      }
-      html.dark .insight-cell {
-        color: #e6f2ea;
-      }
-      .insight-cell strong {
-        display: block;
-        font-size: 13px;
-      }
-      html.dark .insight-cell strong {
-        color: #ffffff;
-      }
-      .insight-rhythm {
-        display: grid;
-        gap: 12px;
-      }
-      .rhythm-block {
-        padding: 10px 12px;
-        border-radius: 12px;
-        border: 1px dashed var(--border-light);
-        background: var(--surface-soft);
-      }
-      html.dark .rhythm-block {
-        border-color: var(--border-dark);
-        background: rgba(26, 44, 32, 0.75);
-      }
-      .rhythm-title {
-        font-size: 11px;
-        text-transform: uppercase;
-        letter-spacing: 0.12em;
-        color: var(--text-secondary);
-        margin-bottom: 8px;
-      }
-      .hour-grid {
-        display: grid;
-        grid-template-columns: repeat(24, minmax(0, 1fr));
-        gap: 3px;
-        align-items: end;
-        height: 56px;
-      }
-      .hour-bar {
-        width: 100%;
-        border-radius: 4px 4px 2px 2px;
-        background: rgba(19, 236, 91, 0.55);
-        min-height: 6px;
-      }
-      .hour-bar.express {
-        background: rgba(125, 211, 252, 0.55);
-      }
-      .hour-labels {
-        display: flex;
-        justify-content: space-between;
-        font-size: 10px;
-        color: var(--text-secondary);
-        margin-top: 6px;
-      }
-      .trend-row {
-        display: grid;
-        grid-template-columns: 120px minmax(0, 1fr);
-        gap: 10px;
-        align-items: center;
-        padding: 6px 0;
-      }
-      .trend-label {
-        font-size: 12px;
-        color: var(--text-secondary);
-      }
-      .trend-bars {
-        display: grid;
-        grid-template-columns: repeat(14, minmax(0, 1fr));
-        gap: 4px;
-        align-items: end;
-        height: 48px;
-      }
-      .trend-bar {
-        border-radius: 4px 4px 2px 2px;
-        background: rgba(19, 236, 91, 0.55);
-        min-height: 6px;
-      }
-      .trend-bar.express {
-        background: rgba(125, 211, 252, 0.55);
-      }
-      @media (max-width: 540px) {
-        .insight-grid {
-          grid-template-columns: 1fr;
-        }
-        .trend-row {
-          grid-template-columns: 1fr;
-          gap: 6px;
-        }
-        .trend-bars {
-          height: 42px;
-        }
-      }
-      .summary-card {
-        border-radius: 14px;
-        padding: 12px;
-        border: 1px solid var(--border-light);
-        background: #ffffff;
-      }
-      html.dark .summary-card {
-        border-color: var(--border-dark);
-        background: var(--card-dark);
-      }
-      .summary-label {
-        font-size: 11px;
-        text-transform: uppercase;
-        letter-spacing: 0.12em;
-        color: var(--text-secondary);
-      }
-      .summary-value {
-        font-size: 20px;
-        font-weight: 700;
-        margin-top: 6px;
-      }
-      .summary-sub {
-        font-size: 12px;
-        color: var(--text-secondary);
-        margin-top: 4px;
-      }
-      .summary-panel {
-        border-radius: 16px;
-        padding: 14px;
-        border: 1px solid var(--border-light);
-        background: #ffffff;
-      }
-      html.dark .summary-panel {
-        border-color: var(--border-dark);
-        background: var(--card-dark);
-      }
-      .summary-panel-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 8px;
-        margin-bottom: 10px;
-      }
-      .summary-panel-header h2 {
-        margin: 0;
-        font-size: 16px;
-      }
-      .summary-panel-meta {
-        display: flex;
-        flex-direction: column;
-        align-items: flex-end;
-        gap: 2px;
-        font-size: 12px;
-        color: var(--text-secondary);
-        text-align: right;
-      }
-      .sleep-gantt-controls {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 6px;
-        margin-top: 6px;
-      }
-      .sleep-gantt-toggle {
-        border: 1px solid var(--border-light);
-        border-radius: 999px;
-        padding: 4px 10px;
-        background: var(--surface-soft);
-        color: var(--text-primary);
-        font-size: 10px;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-        cursor: pointer;
-      }
-      .sleep-gantt-toggle.active {
-        color: #0f1a12;
-        border-color: transparent;
-      }
-      .sleep-gantt-board {
-        margin-top: 12px;
-        border: 1px dashed var(--border-light);
-        border-radius: 12px;
-        background: var(--surface-soft);
-        overflow: hidden;
-      }
-      html.dark .sleep-gantt-toggle {
-        border-color: var(--border-dark);
-        background: rgba(255, 255, 255, 0.08);
-        color: #e6f2ea;
-      }
-      html.dark .sleep-gantt-board {
-        border-color: var(--border-dark);
-        background: rgba(26, 44, 32, 0.75);
-      }
-      #sleep-gantt-chart {
-        width: 100%;
-        height: 168px;
-        display: block;
-      }
-      .sleep-gantt-readout {
-        font-size: 12px;
-        color: var(--text-secondary);
-        border-top: 1px solid var(--border-light);
-        padding: 8px 10px;
-      }
-      html.dark .sleep-gantt-readout {
-        border-top-color: var(--border-dark);
-      }
-      .sleep-gantt-empty {
-        display: none;
-        padding: 14px;
-        text-align: center;
-        font-size: 13px;
-        color: var(--text-secondary);
-      }
-      .sleep-gantt-legend {
-        margin-top: 10px;
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
-        font-size: 11px;
-        color: var(--text-secondary);
-      }
-      .sleep-gantt-legend-item {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-      }
-      .sleep-gantt-legend-dot {
-        width: 9px;
-        height: 9px;
-        border-radius: 999px;
-        display: inline-block;
-      }
-      .skeleton-text {
-        position: relative;
-        display: inline-block;
-        min-width: 4ch;
-        border-radius: 999px;
-      }
-      .skeleton-text.skeleton-mid {
-        min-width: 8ch;
-      }
-      .skeleton-text.skeleton-wide {
-        min-width: 14ch;
-      }
-      .skeleton-block {
-        position: relative;
-        border-radius: 12px;
-        overflow: hidden;
-      }
-      .skeleton-text::after,
-      .skeleton-block::after {
-        content: "";
-        position: absolute;
-        inset: 0;
-        background: linear-gradient(
-          90deg,
-          var(--skeleton-base) 0%,
-          var(--skeleton-glow) 45%,
-          var(--skeleton-base) 100%
-        );
-        background-size: 200% 100%;
-        opacity: 0;
-      }
-      .is-loading .skeleton-text {
-        color: transparent;
-      }
-      .is-loading .skeleton-text::after,
-      .is-loading .skeleton-block::after {
-        opacity: 1;
-        animation: skeleton-shimmer 1.2s ease-in-out infinite;
-      }
-      .milk-sparkline {
-        position: relative;
-        margin: 10px 0 12px;
-        padding: 10px 12px;
-        border-radius: 12px;
-        border: 1px dashed var(--border-light);
-        background: var(--surface-soft);
-      }
-      html.dark .milk-sparkline {
-        border-color: var(--border-dark);
-        background: rgba(26, 44, 32, 0.75);
-      }
-      .milk-sparkline-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        font-size: 11px;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-        color: var(--text-secondary);
-      }
-      .milk-sparkline-toggle {
-        display: inline-flex;
-        gap: 4px;
-        padding: 2px;
-        border-radius: 999px;
-        border: 1px solid var(--border-light);
-        background: #ffffff;
-      }
-      html.dark .milk-sparkline-toggle {
-        border-color: var(--border-dark);
-        background: rgba(255, 255, 255, 0.04);
-      }
-      .sparkline-toggle-btn {
-        border: none;
-        background: transparent;
-        color: inherit;
-        font-size: 10px;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        padding: 2px 8px;
-        border-radius: 999px;
-        cursor: pointer;
-      }
-      .sparkline-toggle-btn.is-active {
-        background: var(--primary);
-        color: #0f1a12;
-      }
-      .milk-sparkline svg {
-        display: block;
-        width: 100%;
-        height: 64px;
-        margin-top: 8px;
-      }
-      .milk-sparkline-track {
-        stroke: var(--border-light);
-        stroke-width: 2;
-      }
-      html.dark .milk-sparkline-track {
-        stroke: var(--border-dark);
-      }
-      .milk-sparkline-path {
-        stroke: var(--primary);
-        stroke-width: 2.5;
-        fill: none;
-      }
-      .milk-sparkline-dot {
-        fill: var(--primary);
-      }
-      .milk-list {
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-      }
-      .milk-item {
-        display: flex;
-        justify-content: space-between;
-        gap: 12px;
-        padding: 8px 10px;
-        border-radius: 12px;
-        background: var(--surface-soft);
-      }
-      html.dark .milk-item {
-        background: rgba(255, 255, 255, 0.06);
-      }
-      .milk-time {
-        font-size: 13px;
-        font-weight: 600;
-      }
-      .milk-notes {
-        font-size: 12px;
-        color: var(--text-secondary);
-        text-align: right;
-      }
-      .milk-meta {
-        font-size: 12px;
-        color: var(--text-secondary);
-        text-align: right;
-      }
-      .milk-sparkline-skeleton {
-        display: none;
-        position: absolute;
-        inset: 10px 12px;
-      }
-      .milk-skeleton {
-        display: none;
-        flex-direction: column;
-        gap: 8px;
-      }
-      .milk-skeleton-item {
-        height: 38px;
-      }
-      .is-loading .milk-sparkline-skeleton {
-        display: block;
-      }
-      .is-loading #milk-express-sparkline {
-        opacity: 0;
-      }
-      .is-loading #milk-express-list,
-      .is-loading #milk-express-empty {
-        display: none;
-      }
-      .is-loading .milk-skeleton {
-        display: flex;
-      }
-      @keyframes skeleton-shimmer {
-        0% {
-          background-position: 200% 0;
-        }
-        100% {
-          background-position: -200% 0;
-        }
-      }
-      .summary-empty {
-        display: none;
-        padding: 14px;
-        text-align: center;
-        font-size: 13px;
-        color: var(--text-secondary);
-      }
-      .ruler-wrap {
-        position: relative;
-        margin-top: 16px;
-        border-radius: 16px;
-        padding: 14px;
-        border: 1px solid var(--border-light);
-        background: #ffffff;
-        --ruler-expressed: #13ec5b;
-        --ruler-formula: #f8b13c;
-        --ruler-track: #e0e7e1;
-        --ruler-window: rgba(19, 236, 91, 0.12);
-        --ruler-anchor: #0f1a12;
-      }
-      html.dark .ruler-wrap {
-        border-color: var(--border-dark);
-        background: var(--card-dark);
-        --ruler-expressed: #28f278;
-        --ruler-formula: #f5b453;
-        --ruler-track: rgba(255, 255, 255, 0.12);
-        --ruler-window: rgba(19, 236, 91, 0.16);
-        --ruler-anchor: #f2f6f4;
-      }
-      .ruler-header {
-        display: flex;
-        align-items: baseline;
-        justify-content: space-between;
-        gap: 12px;
-        margin-bottom: 10px;
-      }
-      .ruler-title {
-        margin: 0;
-        font-size: 12px;
-        text-transform: uppercase;
-        letter-spacing: 0.14em;
-        color: var(--text-secondary);
-      }
-      .ruler-actions {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        flex-wrap: wrap;
-        justify-content: flex-end;
-      }
-      .ruler-legend {
-        display: flex;
-        gap: 10px;
-        font-size: 11px;
-        color: var(--text-secondary);
-      }
-      .ruler-legend span {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-      }
-      .ruler-dot {
-        width: 10px;
-        height: 10px;
-        border-radius: 999px;
-        display: inline-block;
-      }
-      .ruler-toggle,
-      .ruler-now {
-        border: 1px solid var(--border-light);
-        border-radius: 999px;
-        padding: 5px 10px;
-        background: var(--surface-soft);
-        color: var(--text-primary);
-        font-size: 10px;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        cursor: pointer;
-      }
-      .ruler-toggle.active {
-        background: var(--text-primary);
-        color: #f3f6f4;
-      }
-      html.dark .ruler-toggle,
-      html.dark .ruler-now {
-        border-color: var(--border-dark);
-        background: rgba(255, 255, 255, 0.08);
-        color: #d3e4d7;
-      }
-      .ruler-body {
-        position: relative;
-        height: 242px;
-      }
-      #ruler-canvas {
-        width: 100%;
-        height: 170px;
-        display: block;
-        touch-action: pan-y;
-      }
-      .ruler-readout {
-        position: absolute;
-        top: 178px;
-        min-width: 170px;
-        padding: 10px 12px;
-        border-radius: 12px;
-        background: rgba(20, 22, 28, 0.92);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        box-shadow: 0 10px 24px rgba(0, 0, 0, 0.3);
-        pointer-events: none;
-        transform: translateX(-50%);
-        color: #f3f6f4;
-      }
-      .ruler-readout h3 {
-        margin: 0;
-        font-size: 10px;
-        text-transform: uppercase;
-        letter-spacing: 0.14em;
-        color: rgba(243, 246, 244, 0.7);
-      }
-      .ruler-metric {
-        font-size: 18px;
-        font-weight: 700;
-        margin-top: 4px;
-      }
-      .ruler-detail,
-      .ruler-goal {
-        margin-top: 4px;
-        font-size: 12px;
-      }
-      .ruler-goal {
-        font-weight: 700;
-      }
-      .ruler-labels {
-        margin-top: 8px;
-        display: flex;
-        justify-content: space-between;
-        font-size: 11px;
-        color: var(--text-secondary);
-      }
-      .ruler-empty {
-        display: none;
-        align-items: center;
-        justify-content: center;
-        padding: 12px;
-        font-size: 12px;
-        color: var(--text-secondary);
-      }
-      @media (max-width: 540px) {
-        .ruler-header {
-          align-items: flex-start;
-          flex-direction: column;
-        }
-        .ruler-actions {
-          justify-content: flex-start;
-        }
-      }
-      .status {
-        font-size: 12px;
-        color: var(--text-secondary);
-        margin-top: 10px;
-      }
-      .user-setup {
-        margin-top: 12px;
-        padding: 12px;
-        border-radius: 14px;
-        border: 1px dashed var(--border-light);
-        background: var(--surface-soft);
-      }
-      html.dark .user-setup {
-        border-color: var(--border-dark);
-        background: rgba(26, 44, 32, 0.9);
-      }
-      .user-setup label {
-        font-size: 11px;
-        text-transform: uppercase;
-        letter-spacing: 0.12em;
-        color: var(--text-secondary);
-      }
-      .user-row {
-        display: flex;
-        gap: 8px;
-        margin-top: 8px;
-      }
-      .user-input {
-        flex: 1;
-        border-radius: 10px;
-        border: 1px solid var(--border-light);
-        padding: 10px 12px;
-        font-size: 16px;
-        background: #ffffff;
-        color: var(--text-primary);
-      }
-      html.dark .user-input {
-        background: rgba(26, 44, 32, 0.9);
-        border-color: var(--border-dark);
-        color: #ffffff;
-      }
-      .user-btn {
-        border-radius: 10px;
-        border: none;
-        padding: 0 16px;
-        background: var(--primary);
-        color: #0f1a12;
-        font-weight: 700;
-        cursor: pointer;
-      }
-      .disabled {
-        opacity: 0.5;
-        pointer-events: none;
-      }
-    </style>
-  </head>
-  <body data-user="{{ user_slug }}" data-user-valid="{{ 'true' if user_valid else 'false' }}" data-page="{{ page }}" data-base-path="{{ base_path }}">
-    <div class="page">
-      <div class="card">
-        <div class="nav-row">
-          <div>
-            <h1>Summary</h1>
-            <div class="user-chip" id="user-message">{{ user_message }}</div>
-          </div>
-          <div class="nav-actions">
-            <button class="nav-menu-toggle" id="nav-menu-toggle" type="button" aria-label="Open navigation menu" aria-haspopup="true" aria-expanded="false" aria-controls="nav-menu-panel">
-              <span class="material-symbols-outlined" aria-hidden="true">menu</span>
-              <span>Menu</span>
-            </button>
-            <div class="nav-menu-panel" id="nav-menu-panel" role="menu" aria-hidden="true">
-              <a class="nav-menu-item" id="home-link" href="#" role="menuitem">
-                <span class="material-symbols-outlined" aria-hidden="true">home</span>
-                <span class="nav-menu-label">Home</span>
-              </a>
-              <a class="nav-menu-item" id="log-link" href="#" role="menuitem">
-                <span class="material-symbols-outlined" aria-hidden="true">list_alt</span>
-                <span class="nav-menu-label">Event log</span>
-              </a>
-              <a class="nav-menu-item" id="timeline-link" href="#" role="menuitem">
-                <span class="material-symbols-outlined" aria-hidden="true">history</span>
-                <span class="nav-menu-label">Timeline</span>
-              </a>
-              <a class="nav-menu-item" href="{{ base_path }}/summary" role="menuitem">
-                <span class="material-symbols-outlined" aria-hidden="true">query_stats</span>
-                <span class="nav-menu-label">Summary</span>
-              </a>
-              <a class="nav-menu-item" href="{{ base_path }}/calendar" role="menuitem">
-                <span class="material-symbols-outlined" aria-hidden="true">calendar_month</span>
-                <span class="nav-menu-label">Calendar</span>
-              </a>
-              <a class="nav-menu-item" href="{{ base_path }}/milk-express" role="menuitem">
-                <span class="material-symbols-outlined" aria-hidden="true">science</span>
-                <span class="nav-menu-label">Milk express</span>
-              </a>
-              <a class="nav-menu-item" id="goals-link" href="{{ base_path }}/goals" role="menuitem">
-                <span class="material-symbols-outlined" aria-hidden="true">track_changes</span>
-                <span class="nav-menu-label">Feeding goals</span>
-              </a>
-              <a class="nav-menu-item" id="bottles-link" href="{{ base_path }}/bottles" role="menuitem">
-                <span class="material-symbols-outlined" aria-hidden="true">local_drink</span>
-                <span class="nav-menu-label">Bottle library</span>
-              </a>
-              <button class="nav-menu-item" id="refresh-btn" type="button" role="menuitem">
-                <span class="material-symbols-outlined" aria-hidden="true">refresh</span>
-                <span class="nav-menu-label">Refresh summary</span>
-              </button>
-              <a class="nav-menu-item" href="{{ base_path }}/settings" role="menuitem">
-                <span class="material-symbols-outlined" aria-hidden="true">settings</span>
-                <span class="nav-menu-label">Settings</span>
-              </a>
-              <button class="nav-menu-item" id="theme-toggle" type="button" role="menuitem" aria-label="Switch to light mode">
-                <span class="material-symbols-outlined" aria-hidden="true">dark_mode</span>
-                <span class="nav-menu-label">Theme</span>
-              </button>
+        <div class="page">
+            <div class="card">
+                <div class="nav-row">
+                    <div>
+                        <h1>Summary</h1>
+                        <div class="user-chip" id="user-message">
+                            {{ user_message }}
+                        </div>
+                    </div>
+                    <div class="nav-actions">
+                        <button
+                            class="nav-menu-toggle"
+                            id="nav-menu-toggle"
+                            type="button"
+                            aria-label="Open navigation menu"
+                            aria-haspopup="true"
+                            aria-expanded="false"
+                            aria-controls="nav-menu-panel"
+                        >
+                            <span
+                                class="material-symbols-outlined"
+                                aria-hidden="true"
+                                >menu</span
+                            >
+                            <span>Menu</span>
+                        </button>
+                        <div
+                            class="nav-menu-panel"
+                            id="nav-menu-panel"
+                            role="menu"
+                            aria-hidden="true"
+                        >
+                            <a
+                                class="nav-menu-item"
+                                id="home-link"
+                                href="#"
+                                role="menuitem"
+                            >
+                                <span
+                                    class="material-symbols-outlined"
+                                    aria-hidden="true"
+                                    >home</span
+                                >
+                                <span class="nav-menu-label">Home</span>
+                            </a>
+                            <a
+                                class="nav-menu-item"
+                                id="log-link"
+                                href="#"
+                                role="menuitem"
+                            >
+                                <span
+                                    class="material-symbols-outlined"
+                                    aria-hidden="true"
+                                    >list_alt</span
+                                >
+                                <span class="nav-menu-label">Event log</span>
+                            </a>
+                            <a
+                                class="nav-menu-item"
+                                id="timeline-link"
+                                href="#"
+                                role="menuitem"
+                            >
+                                <span
+                                    class="material-symbols-outlined"
+                                    aria-hidden="true"
+                                    >history</span
+                                >
+                                <span class="nav-menu-label">Timeline</span>
+                            </a>
+                            <a
+                                class="nav-menu-item"
+                                href="{{ base_path }}/summary"
+                                role="menuitem"
+                            >
+                                <span
+                                    class="material-symbols-outlined"
+                                    aria-hidden="true"
+                                    >query_stats</span
+                                >
+                                <span class="nav-menu-label">Summary</span>
+                            </a>
+                            <a
+                                class="nav-menu-item"
+                                href="{{ base_path }}/calendar"
+                                role="menuitem"
+                            >
+                                <span
+                                    class="material-symbols-outlined"
+                                    aria-hidden="true"
+                                    >calendar_month</span
+                                >
+                                <span class="nav-menu-label">Calendar</span>
+                            </a>
+                            <a
+                                class="nav-menu-item"
+                                href="{{ base_path }}/milk-express"
+                                role="menuitem"
+                            >
+                                <span
+                                    class="material-symbols-outlined"
+                                    aria-hidden="true"
+                                    >science</span
+                                >
+                                <span class="nav-menu-label">Milk express</span>
+                            </a>
+                            <a
+                                class="nav-menu-item"
+                                id="goals-link"
+                                href="{{ base_path }}/goals"
+                                role="menuitem"
+                            >
+                                <span
+                                    class="material-symbols-outlined"
+                                    aria-hidden="true"
+                                    >track_changes</span
+                                >
+                                <span class="nav-menu-label"
+                                    >Feeding goals</span
+                                >
+                            </a>
+                            <a
+                                class="nav-menu-item"
+                                id="bottles-link"
+                                href="{{ base_path }}/bottles"
+                                role="menuitem"
+                            >
+                                <span
+                                    class="material-symbols-outlined"
+                                    aria-hidden="true"
+                                    >local_drink</span
+                                >
+                                <span class="nav-menu-label"
+                                    >Bottle library</span
+                                >
+                            </a>
+                            <button
+                                class="nav-menu-item"
+                                id="refresh-btn"
+                                type="button"
+                                role="menuitem"
+                            >
+                                <span
+                                    class="material-symbols-outlined"
+                                    aria-hidden="true"
+                                    >refresh</span
+                                >
+                                <span class="nav-menu-label"
+                                    >Refresh summary</span
+                                >
+                            </button>
+                            <a
+                                class="nav-menu-item"
+                                href="{{ base_path }}/settings"
+                                role="menuitem"
+                            >
+                                <span
+                                    class="material-symbols-outlined"
+                                    aria-hidden="true"
+                                    >settings</span
+                                >
+                                <span class="nav-menu-label">Settings</span>
+                            </a>
+                            <button
+                                class="nav-menu-item"
+                                id="theme-toggle"
+                                type="button"
+                                role="menuitem"
+                                aria-label="Switch to light mode"
+                            >
+                                <span
+                                    class="material-symbols-outlined"
+                                    aria-hidden="true"
+                                    >dark_mode</span
+                                >
+                                <span class="nav-menu-label">Theme</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="date-row">
+                    <button
+                        class="icon-btn"
+                        id="summary-prev"
+                        type="button"
+                        aria-label="Previous day"
+                    >
+                        <span class="material-symbols-outlined"
+                            >chevron_left</span
+                        >
+                    </button>
+                    <div class="date-center">
+                        <div class="date-label" id="summary-date-label">
+                            Today
+                        </div>
+                        <input
+                            class="date-input"
+                            id="summary-date"
+                            type="date"
+                        />
+                    </div>
+                    <button
+                        class="icon-btn"
+                        id="summary-next"
+                        type="button"
+                        aria-label="Next day"
+                    >
+                        <span class="material-symbols-outlined"
+                            >chevron_right</span
+                        >
+                    </button>
+                </div>
+
+                <div class="summary-section-title">Feed totals</div>
+                <section class="summary-grid">
+                    <div class="summary-card">
+                        <div class="summary-label">Total intake</div>
+                        <div
+                            class="summary-value skeleton-text skeleton-mid"
+                            id="summary-total-intake-amount"
+                        >
+                            0 ml
+                        </div>
+                        <div
+                            class="summary-sub skeleton-text skeleton-wide"
+                            id="summary-total-intake-avg"
+                        >
+                            Avg / feed: --
+                        </div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="summary-label">Total sleep time</div>
+                        <div
+                            class="summary-value skeleton-text skeleton-mid"
+                            id="summary-sleep-duration"
+                        >
+                            0 min
+                        </div>
+                        <div
+                            class="summary-sub skeleton-text skeleton-wide"
+                            id="summary-sleep-duration-avg"
+                        >
+                            Avg / sleep: --
+                        </div>
+                    </div>
+                </section>
+
+                <section class="summary-panel">
+                    <div class="summary-panel-header">
+                        <h2>Sleep timeline</h2>
+                        <div class="summary-panel-meta">Selected day (24h)</div>
+                    </div>
+                    <div
+                        class="sleep-gantt-controls"
+                        id="sleep-gantt-type-options"
+                    ></div>
+                    <div class="sleep-gantt-board">
+                        <svg
+                            id="sleep-gantt-chart"
+                            viewBox="0 0 360 168"
+                            role="img"
+                            aria-label="Sleep timeline and event markers"
+                        ></svg>
+                        <div
+                            class="sleep-gantt-readout"
+                            id="sleep-gantt-readout"
+                        >
+                            Tap or hover an event for details.
+                        </div>
+                        <div class="sleep-gantt-empty" id="sleep-gantt-empty">
+                            No sleep or selected events for this day.
+                        </div>
+                    </div>
+                    <div class="sleep-gantt-legend">
+                        <span class="sleep-gantt-legend-item"
+                            ><i
+                                class="sleep-gantt-legend-dot"
+                                style="background: #7c83ff"
+                            ></i
+                            >Sleep</span
+                        >
+                        <span class="sleep-gantt-legend-item"
+                            ><i
+                                class="sleep-gantt-legend-dot"
+                                style="background: #13ec5b"
+                            ></i
+                            >Feed</span
+                        >
+                        <span class="sleep-gantt-legend-item"
+                            ><i
+                                class="sleep-gantt-legend-dot"
+                                style="background: #fb7185"
+                            ></i
+                            >Cry</span
+                        >
+                        <span class="sleep-gantt-legend-item"
+                            ><i
+                                class="sleep-gantt-legend-dot"
+                                style="background: #7dd3fc"
+                            ></i
+                            >Wee</span
+                        >
+                        <span class="sleep-gantt-legend-item"
+                            ><i
+                                class="sleep-gantt-legend-dot"
+                                style="background: #fbbf24"
+                            ></i
+                            >Poo</span
+                        >
+                    </div>
+                </section>
+
+                <div class="summary-section-title">Insight dashboard</div>
+                <section class="insight-grid">
+                    <div class="insight-card">
+                        <div class="insight-kicker">Last feed</div>
+                        <div
+                            class="summary-value skeleton-text skeleton-mid"
+                            id="insight-last-feed"
+                        >
+                            --
+                        </div>
+                        <div
+                            class="summary-sub skeleton-text skeleton-wide"
+                            id="insight-last-feed-sub"
+                        >
+                            --
+                        </div>
+                    </div>
+                    <div class="insight-card">
+                        <div class="insight-kicker">Feed interval (24h)</div>
+                        <div
+                            class="summary-value skeleton-text skeleton-mid"
+                            id="insight-feed-interval-24"
+                        >
+                            --
+                        </div>
+                        <div
+                            class="summary-sub skeleton-text skeleton-wide"
+                            id="insight-feed-interval-24-sub"
+                        >
+                            --
+                        </div>
+                    </div>
+                    <div class="insight-card">
+                        <div class="insight-kicker">Feed interval (7d)</div>
+                        <div
+                            class="summary-value skeleton-text skeleton-mid"
+                            id="insight-feed-interval-7d"
+                        >
+                            --
+                        </div>
+                        <div
+                            class="summary-sub skeleton-text skeleton-wide"
+                            id="insight-feed-interval-7d-sub"
+                        >
+                            --
+                        </div>
+                    </div>
+                    <div class="insight-card">
+                        <div class="insight-kicker">Diapers (24h)</div>
+                        <div
+                            class="summary-value skeleton-text skeleton-mid"
+                            id="insight-diaper-24"
+                        >
+                            --
+                        </div>
+                        <div
+                            class="summary-sub skeleton-text skeleton-wide"
+                            id="insight-diaper-24-sub"
+                        >
+                            --
+                        </div>
+                    </div>
+                    <div class="insight-card">
+                        <div class="insight-kicker">Diapers (7d)</div>
+                        <div
+                            class="summary-value skeleton-text skeleton-mid"
+                            id="insight-diaper-7"
+                        >
+                            --
+                        </div>
+                        <div
+                            class="summary-sub skeleton-text skeleton-wide"
+                            id="insight-diaper-7-sub"
+                        >
+                            --
+                        </div>
+                    </div>
+                </section>
+
+                <section class="summary-panel">
+                    <div class="summary-panel-header">
+                        <h2>Timeframe breakdown</h2>
+                        <div>
+                            <div
+                                class="summary-panel-meta"
+                                id="insight-anchor-label"
+                            >
+                                As of today
+                            </div>
+                            <div
+                                class="summary-panel-meta"
+                                id="insight-progress-label"
+                            ></div>
+                        </div>
+                    </div>
+                    <div class="insight-table">
+                        <div class="insight-table-head">
+                            <div>Window</div>
+                            <div>Feeds</div>
+                            <div>Avg gap</div>
+                            <div>Avg feed total</div>
+                            <div>Sleep avg / day</div>
+                            <div>Feed mins</div>
+                            <div>Express</div>
+                            <div>Avg express</div>
+                        </div>
+                        <div id="insight-timeframe-body"></div>
+                    </div>
+                </section>
+
+                <div class="status" id="status"></div>
+
+                <form class="user-setup" id="user-form" hidden>
+                    <label for="user-input">User</label>
+                    <div class="user-row">
+                        <input
+                            class="user-input"
+                            id="user-input"
+                            type="text"
+                            inputmode="latin-prose"
+                            autocapitalize="none"
+                            autocomplete="off"
+                            placeholder="Name (e.g. josh)"
+                        />
+                        <button class="user-btn" id="user-save" type="submit">
+                            Use
+                        </button>
+                    </div>
+                </form>
             </div>
-          </div>
         </div>
-
-        <div class="date-row">
-          <button class="icon-btn" id="summary-prev" type="button" aria-label="Previous day">
-            <span class="material-symbols-outlined">chevron_left</span>
-          </button>
-          <div class="date-center">
-            <div class="date-label" id="summary-date-label">Today</div>
-            <input class="date-input" id="summary-date" type="date">
-          </div>
-          <button class="icon-btn" id="summary-next" type="button" aria-label="Next day">
-            <span class="material-symbols-outlined">chevron_right</span>
-          </button>
-        </div>
-
-        <div class="summary-section-title">Feed totals</div>
-        <section class="summary-grid">
-          <div class="summary-card">
-            <div class="summary-label">Total feed duration</div>
-            <div class="summary-value skeleton-text skeleton-mid" id="summary-feed-duration">0 min</div>
-            <div class="summary-sub skeleton-text skeleton-wide" id="summary-feed-duration-avg">Avg / feed: --</div>
-          </div>
-          <div class="summary-card">
-            <div class="summary-label">Expressed total</div>
-            <div class="summary-value skeleton-text skeleton-mid" id="summary-expressed-amount">0 ml</div>
-            <div class="summary-sub skeleton-text skeleton-wide" id="summary-expressed-avg">Avg / feed: --</div>
-          </div>
-          <div class="summary-card">
-            <div class="summary-label">Formula total</div>
-            <div class="summary-value skeleton-text skeleton-mid" id="summary-formula-amount">0 ml</div>
-            <div class="summary-sub skeleton-text skeleton-wide" id="summary-formula-avg">Avg / feed: --</div>
-          </div>
-          <div class="summary-card">
-            <div class="summary-label">Total intake</div>
-            <div class="summary-value skeleton-text skeleton-mid" id="summary-total-intake-amount">0 ml</div>
-            <div class="summary-sub skeleton-text skeleton-wide" id="summary-total-intake-avg">Avg / feed: --</div>
-          </div>
-          <div class="summary-card">
-            <div class="summary-label">Total sleep time</div>
-            <div class="summary-value skeleton-text skeleton-mid" id="summary-sleep-duration">0 min</div>
-            <div class="summary-sub skeleton-text skeleton-wide" id="summary-sleep-duration-avg">Avg / sleep: --</div>
-          </div>
-        </section>
-
-        <section class="summary-panel">
-          <div class="summary-panel-header">
-            <h2>Sleep timeline</h2>
-            <div class="summary-panel-meta">Selected day (24h)</div>
-          </div>
-          <div class="sleep-gantt-controls" id="sleep-gantt-type-options"></div>
-          <div class="sleep-gantt-board">
-            <svg id="sleep-gantt-chart" viewBox="0 0 360 168" role="img" aria-label="Sleep timeline and event markers"></svg>
-            <div class="sleep-gantt-readout" id="sleep-gantt-readout">Tap or hover an event for details.</div>
-            <div class="sleep-gantt-empty" id="sleep-gantt-empty">No sleep or selected events for this day.</div>
-          </div>
-          <div class="sleep-gantt-legend">
-            <span class="sleep-gantt-legend-item"><i class="sleep-gantt-legend-dot" style="background:#7c83ff"></i>Sleep</span>
-            <span class="sleep-gantt-legend-item"><i class="sleep-gantt-legend-dot" style="background:#13ec5b"></i>Feed</span>
-            <span class="sleep-gantt-legend-item"><i class="sleep-gantt-legend-dot" style="background:#fb7185"></i>Cry</span>
-            <span class="sleep-gantt-legend-item"><i class="sleep-gantt-legend-dot" style="background:#7dd3fc"></i>Wee</span>
-            <span class="sleep-gantt-legend-item"><i class="sleep-gantt-legend-dot" style="background:#fbbf24"></i>Poo</span>
-          </div>
-        </section>
-
-        <section class="summary-panel">
-          <div class="summary-panel-header">
-            <h2>Milk express</h2>
-            <div class="summary-panel-meta">
-              <div class="skeleton-text skeleton-mid" id="milk-express-count">0 events</div>
-              <div class="skeleton-text skeleton-mid" id="milk-express-totals">0 ml • 0 min</div>
-            </div>
-          </div>
-          <div class="milk-sparkline" id="milk-express-sparkline-wrap">
-            <div class="milk-sparkline-skeleton skeleton-block" aria-hidden="true"></div>
-            <div class="milk-sparkline-header">
-              <div class="skeleton-text skeleton-mid" id="milk-express-sparkline-range">All time</div>
-              <div class="milk-sparkline-toggle" role="tablist" aria-label="Milk express range">
-                <button class="sparkline-toggle-btn is-active" type="button" data-milk-sparkline-mode="all">All time</button>
-                <button class="sparkline-toggle-btn" type="button" data-milk-sparkline-mode="today">Today</button>
-              </div>
-              <div class="skeleton-text skeleton-mid" id="milk-express-sparkline-total">0 ml</div>
-            </div>
-            <svg id="milk-express-sparkline" viewBox="0 0 320 64" role="img" aria-label="Milk express progress"></svg>
-          </div>
-          <div class="milk-list" id="milk-express-list"></div>
-          <div class="milk-skeleton" aria-hidden="true">
-            <div class="milk-skeleton-item skeleton-block"></div>
-            <div class="milk-skeleton-item skeleton-block"></div>
-            <div class="milk-skeleton-item skeleton-block"></div>
-          </div>
-          <div class="summary-empty" id="milk-express-empty">No milk express events for this day.</div>
-        </section>
-
-        <div class="summary-section-title">Insight dashboard</div>
-        <section class="insight-grid">
-          <div class="insight-card">
-            <div class="insight-kicker">Last feed</div>
-            <div class="summary-value skeleton-text skeleton-mid" id="insight-last-feed">--</div>
-            <div class="summary-sub skeleton-text skeleton-wide" id="insight-last-feed-sub">--</div>
-          </div>
-          <div class="insight-card">
-            <div class="insight-kicker">Last express</div>
-            <div class="summary-value skeleton-text skeleton-mid" id="insight-last-express">--</div>
-            <div class="summary-sub skeleton-text skeleton-wide" id="insight-last-express-sub">--</div>
-          </div>
-          <div class="insight-card">
-            <div class="insight-kicker">Feed interval (24h)</div>
-            <div class="summary-value skeleton-text skeleton-mid" id="insight-feed-interval-24">--</div>
-            <div class="summary-sub skeleton-text skeleton-wide" id="insight-feed-interval-24-sub">--</div>
-          </div>
-          <div class="insight-card">
-            <div class="insight-kicker">Feed interval (7d)</div>
-            <div class="summary-value skeleton-text skeleton-mid" id="insight-feed-interval-7d">--</div>
-            <div class="summary-sub skeleton-text skeleton-wide" id="insight-feed-interval-7d-sub">--</div>
-          </div>
-          <div class="insight-card">
-            <div class="insight-kicker">Expressed total (24h)</div>
-            <div class="summary-value skeleton-text skeleton-mid" id="insight-express-total-24">--</div>
-            <div class="summary-sub skeleton-text skeleton-wide" id="insight-express-total-24-sub">--</div>
-          </div>
-          <div class="insight-card">
-            <div class="insight-kicker">Expressed total (7d)</div>
-            <div class="summary-value skeleton-text skeleton-mid" id="insight-express-total-7">--</div>
-            <div class="summary-sub skeleton-text skeleton-wide" id="insight-express-total-7-sub">--</div>
-          </div>
-          <div class="insight-card">
-            <div class="insight-kicker">Diapers (24h)</div>
-            <div class="summary-value skeleton-text skeleton-mid" id="insight-diaper-24">--</div>
-            <div class="summary-sub skeleton-text skeleton-wide" id="insight-diaper-24-sub">--</div>
-          </div>
-          <div class="insight-card">
-            <div class="insight-kicker">Diapers (7d)</div>
-            <div class="summary-value skeleton-text skeleton-mid" id="insight-diaper-7">--</div>
-            <div class="summary-sub skeleton-text skeleton-wide" id="insight-diaper-7-sub">--</div>
-          </div>
-        </section>
-
-        <section class="summary-panel">
-          <div class="summary-panel-header">
-            <h2>Timeframe breakdown</h2>
-            <div>
-              <div class="summary-panel-meta" id="insight-anchor-label">As of today</div>
-              <div class="summary-panel-meta" id="insight-progress-label"></div>
-            </div>
-          </div>
-          <div class="insight-table">
-            <div class="insight-table-head">
-              <div>Window</div>
-              <div>Feeds</div>
-              <div>Avg gap</div>
-              <div>Avg feed total</div>
-              <div>Sleep avg / day</div>
-              <div>Feed mins</div>
-              <div>Express</div>
-              <div>Avg express</div>
-            </div>
-            <div id="insight-timeframe-body"></div>
-          </div>
-        </section>
-
-        <section class="ruler-wrap" id="ruler-wrap">
-          <div class="ruler-header">
-            <h2 class="ruler-title">Rolling 24h Feed Window</h2>
-            <div class="ruler-actions">
-              <div class="ruler-legend">
-                <span><i class="ruler-dot" style="background: var(--ruler-expressed);"></i>Total volume</span>
-              </div>
-              <button class="ruler-toggle active" id="ruler-snap-toggle" type="button">Snap to feeds</button>
-              <button class="ruler-now" id="ruler-now-btn" type="button">Jump to now</button>
-            </div>
-          </div>
-          <div class="ruler-body" id="ruler-body">
-            <canvas id="ruler-canvas"></canvas>
-            <div class="ruler-readout" id="ruler-readout">
-              <h3>Rolling 24h</h3>
-              <div class="ruler-metric" id="ruler-total">0 ml</div>
-              <div class="ruler-detail" id="ruler-detail">Total feed volume in trailing 24h window</div>
-              <div class="ruler-goal" id="ruler-goal">0% of 700 ml goal</div>
-            </div>
-          </div>
-          <div class="ruler-labels">
-            <span id="ruler-start">--</span>
-            <span id="ruler-end">--</span>
-          </div>
-          <div class="ruler-empty" id="ruler-empty">No feed entries in the last 7 days.</div>
-        </section>
-
-        <div class="status" id="status"></div>
-
-        <form class="user-setup" id="user-form" hidden>
-          <label for="user-input">User</label>
-          <div class="user-row">
-            <input
-              class="user-input"
-              id="user-input"
-              type="text"
-              inputmode="latin-prose"
-              autocapitalize="none"
-              autocomplete="off"
-              placeholder="Name (e.g. josh)"
-            >
-            <button class="user-btn" id="user-save" type="submit">Use</button>
-          </div>
-        </form>
-      </div>
-    </div>
-    {% include "logging_footer.html" %}
-    <script src="{{ base_path }}/static/app.js?v={{ static_version }}"></script>
-  </body>
+        {% include "logging_footer.html" %}
+        <script src="{{ base_path }}/static/app.js?v={{ static_version }}"></script>
+    </body>
 </html>
