@@ -9,10 +9,21 @@
 - align the milk express ledger page format (menu + general look and feel) to the rest of the app.
 - remove breastfeed from the feed quick-log popup.
 - reorganise the Summary page layout and information hierarchy.
-- add a sleep tracker line chart showing total hours slept per day.
 - gradual frontend refactor of `src/web/static/app.js` into modules. *plan in `docs/plans/2026-03-18-app-js-refactor-plan.md`
 
 ## DONE
+- changed the Summary sleep trend to show today plus the prior 7 complete days on 2026-03-19, while calculating the average from only those 7 complete days in `src/web/static/app.js` and `src/web/templates/summary.html`.
+- moved the Summary sleep trend average legend fully outside the chart area on 2026-03-19 so it cannot overlap any plotted data in `src/web/templates/summary.html` and `src/web/static/app.js`.
+- moved the Summary sleep trend average label to the top edge of the chart on 2026-03-19 so it stays clear of all data lines in `src/web/static/app.js`.
+- softened the Summary sleep trend average dashed line colors for both light and dark mode on 2026-03-19 in `src/web/templates/summary.html`.
+- moved the Summary sleep trend average label to the left side and softened its light/dark theme pill colors on 2026-03-19 in `src/web/static/app.js` and `src/web/templates/summary.html`.
+- moved the Summary sleep trend average label up and onto a small background pill on 2026-03-19 so it does not clash with the chart line in `src/web/static/app.js` and `src/web/templates/summary.html`.
+- added a dashed red average line with an inline label to the Summary sleep trend chart on 2026-03-19 in `src/web/static/app.js` and `src/web/templates/summary.html`.
+- added a sleep trend line chart on the Summary page showing total sleep per day over the last 7 days with minimal styling in `src/web/templates/summary.html` and `src/web/static/app.js` on 2026-03-19.
+- fixed blank Summary totals on 2026-03-19 by making `renderSummaryStats(...)` update whichever summary cards are present in `src/web/templates/summary.html`, instead of aborting when older feed-duration/expressed/formula cards are missing.
+- fixed local homepage stale-entry rendering after feed-time edits on 2026-03-19 by making IndexedDB entry filtering/sorting compare parsed timestamps instead of raw ISO strings, so mixed frontend (`...Z`) and backend (`...+00:00`) timestamp formats no longer break latest-event/chart ordering.
+- fixed homepage stale-entry refresh after edit on 2026-03-19 by making fallback entry fetches wait for any in-flight sync before reloading server data, so recent edits are not immediately overwritten by pre-sync API responses; also restored the `toLocalDateTimeValue(...)` import used by entry-edit flows.
+- started checkpoint 1/2 of the `src/web/static/app.js` refactor on 2026-03-19 by extracting `app/core/{config,state,dates,formatters}.js`, converting page templates to load `app.js` as an ES module, and keeping `src/web/static/app.js` as the bootstrap/runtime entrypoint.
 - updated native push subscription activation on 2026-03-19 so saving a device subscription immediately runs a feed-due check, avoiding the wait for the next scheduler poll when a feed is already overdue at the moment reminders are enabled.
 - simplified service-worker notification options and fixed container asset packaging on 2026-03-19 by removing icon/badge from `showNotification`, copying `apple-touch-icon.png` into the container image, cleaning up the manifest icon list, and bumping `.env` `BABY_TRACKER_STATIC_VERSION` again so iOS PWAs refresh the worker.
 - updated `scripts/apple-container-restart.sh` on 2026-03-19 to load `.env`, pass VAPID vars into the web container, start a separate scheduler container, and bumped `.env` `BABY_TRACKER_STATIC_VERSION` to force the new frontend/service-worker assets to refresh.
@@ -56,6 +67,18 @@
 - added integration coverage for timed-event start APIs in `tests/integration/test_feed_log_api.py` (default user slug, user override, and payload fields) on 2026-03-08.
 
 ## NOTES
+- tests run on 2026-03-19 after Summary 8-day trend / 7-complete-day average update: `./.venv/bin/pytest` -> `103 passed, 6 skipped`.
+- tests run on 2026-03-19 after Summary average legend moved outside chart: `./.venv/bin/pytest` -> `103 passed, 6 skipped`.
+- tests run on 2026-03-19 after Summary average-label top-edge move: `./.venv/bin/pytest` -> `103 passed, 6 skipped`.
+- tests run on 2026-03-19 after Summary average-line color softening: `./.venv/bin/pytest` -> `103 passed, 6 skipped`.
+- tests run on 2026-03-19 after Summary average-label left-align/theme update: `./.venv/bin/pytest` -> `103 passed, 6 skipped`.
+- tests run on 2026-03-19 after Summary sleep trend average-label pill update: `./.venv/bin/pytest` -> `103 passed, 6 skipped`.
+- tests run on 2026-03-19 after Summary sleep trend average-line update: `./.venv/bin/pytest` -> `103 passed, 6 skipped`.
+- tests run on 2026-03-19 after Summary totals fix: `./.venv/bin/pytest` -> `103 passed, 6 skipped`.
+- debug note on 2026-03-19: IndexedDB cache ordering/range checks were comparing timestamp strings lexicographically; after editing an entry locally, mixed `Z` vs `+00:00` timestamp formats could leave the updated entry out of the expected local sort/window even before sync finished.
+- debug note on 2026-03-19: homepage refresh could show stale latest-event/chart data right after an edit because `loadEntriesWithFallback(...)` fetched `/api/entries` in parallel with `syncNow()`, letting pre-sync server data overwrite fresher IndexedDB edits during the same refresh cycle.
+- GitButler branch `app-js-refactor-phase-1` now owns the current `app.js` refactor slice; the new/edited frontend files were staged onto branch `ap` with `but rub zz ap --json --status-after`.
+- syntax check run on 2026-03-19 for the new ES-module frontend slice: `node --input-type=module --check < src/web/static/app.js && node --input-type=module --check < src/web/static/app/core/config.js && node --input-type=module --check < src/web/static/app/core/state.js && node --input-type=module --check < src/web/static/app/core/dates.js && node --input-type=module --check < src/web/static/app/core/formatters.js`.
 - `just restart` previously ignored `.env` values for VAPID and did not start the scheduler container, which made native push appear unavailable even after keys were added; the restart script now fixes both for the Apple container workflow.
 - native feed reminders now depend on `BABY_TRACKER_VAPID_PUBLIC_KEY`, `BABY_TRACKER_VAPID_PRIVATE_KEY`, and `BABY_TRACKER_VAPID_SUBJECT`; browsers must access the app over HTTPS outside localhost for push to work.
 - native feed reminders are now per `user_slug` with one active browser/device per user; enabling reminders on a new device replaces the old device for that user.

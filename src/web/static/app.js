@@ -1,43 +1,81 @@
-const statusEl = document.getElementById("status");
-const bodyEl = document.body;
-let activeUser = bodyEl.dataset.user || "";
-let userValid = bodyEl.dataset.userValid === "true";
-const pageType = bodyEl.dataset.page || "home";
-const logFilterType = bodyEl.dataset.logType || "";
-const logWindowHours = Number.parseInt(bodyEl.dataset.logWindowHours || "", 10);
-const basePath = bodyEl.dataset.basePath || "";
-const buildUrl = (path) => `${basePath}${path}`;
+import {
+  bodyEl,
+  BREASTFEED_COMPLETE_NOTE,
+  BREASTFEED_IN_PROGRESS_NOTE,
+  BREASTFEED_TIMER_KEY,
+  buildUrl,
+  CHART_CONFIG,
+  CHART_EVENT_TYPES,
+  CUSTOM_TYPE_RE,
+  DB_NAME,
+  DB_VERSION,
+  INDEX_ENTRIES_TS,
+  INDEX_ENTRIES_TYPE_TS,
+  INDEX_ENTRIES_USER,
+  INDEX_ENTRIES_USER_TS,
+  logFilterType,
+  logWindowHours,
+  META_DEVICE_ID,
+  META_SYNC_CURSOR,
+  MILK_EXPRESS_TYPE,
+  OFFLINE_WINDOW_DAYS,
+  pageType,
+  RESERVED_USER_SLUGS,
+  SLEEP_GANTT_DEFAULT_OVERLAYS,
+  SLEEP_GANTT_TYPE_COLORS,
+  statusEl,
+  STORE_ENTRIES,
+  STORE_META,
+  STORE_OUTBOX,
+  THEME_KEY,
+  TIMED_EVENT_TIMER_KEY,
+  TIMED_EVENT_TYPES,
+  USER_KEY,
+} from "./app/core/config.js";
+import {
+  formatDateInputValue,
+  getDateKey,
+  getDateKeyFromTimestamp,
+  getGoalDayWindow,
+  getHourKey,
+  getLocalMidnightTs,
+  getNextLocalMidnightTs,
+  getSummaryDayWindow,
+  isSameDay,
+  parseDateInputValue,
+  parseDob,
+  startOfWeekMonday,
+  toLocalDateTimeValue,
+} from "./app/core/dates.js";
+import {
+  buildFeedShortcutUrl,
+  formatAge,
+  formatAverageDuration,
+  formatAverageMl,
+  formatDayDate,
+  formatDayLabel,
+  formatDurationMinutes,
+  formatEntryTypeLabel,
+  formatFeedTime,
+  formatGoalDateLabel,
+  formatMl,
+  formatRangeLabel,
+  formatRelativeTime,
+  formatSummaryDateLabel,
+  formatSummaryTime,
+  formatTimeUntil,
+  formatTimelineDay,
+  formatTimelineHour,
+  formatTimestamp,
+  formatWeekRange,
+  getTimelineTypeConfig,
+  hexToRgba,
+  normalizeEntryType,
+  normalizeUserSlug,
+  parseMilkExpressNotes,
+} from "./app/core/formatters.js";
+import { state } from "./app/core/state.js";
 
-const THEME_KEY = "baby-tracker-theme";
-const USER_KEY = "baby-tracker-user";
-const BREASTFEED_TIMER_KEY = "baby-tracker-breastfeed-start";
-const BREASTFEED_IN_PROGRESS_NOTE = "Breastfeeding (started)";
-const BREASTFEED_COMPLETE_NOTE = "Breastfed";
-const TIMED_EVENT_TIMER_KEY = "baby-tracker-timed-event-start";
-const TIMED_EVENT_TYPES = ["sleep", "cry"];
-const OFFLINE_WINDOW_DAYS = 30;
-const DB_NAME = "baby-tracker";
-const DB_VERSION = 2;
-const STORE_ENTRIES = "entries";
-const STORE_OUTBOX = "outbox";
-const STORE_META = "meta";
-const INDEX_ENTRIES_TS = "by_timestamp_utc";
-const INDEX_ENTRIES_USER = "by_user_slug";
-const INDEX_ENTRIES_USER_TS = "by_user_slug_timestamp";
-const INDEX_ENTRIES_TYPE_TS = "by_type_timestamp";
-const META_DEVICE_ID = "device_id";
-const META_SYNC_CURSOR = "sync_cursor";
-const USER_RE = /^[a-z0-9-]{1,24}$/;
-const RESERVED_USER_SLUGS = new Set([
-  "timeline",
-  "calendar",
-  "summary",
-  "log",
-  "settings",
-  "goals",
-  "milk-express",
-  "bottles",
-]);
 const themeToggleBtn = document.getElementById("theme-toggle");
 const navMenuToggleBtn = document.getElementById("nav-menu-toggle");
 const navMenuPanelEl = document.getElementById("nav-menu-panel");
@@ -135,6 +173,9 @@ const insightDiaper7SubEl = document.getElementById("insight-diaper-7-sub");
 const insightAnchorLabelEl = document.getElementById("insight-anchor-label");
 const insightProgressLabelEl = document.getElementById("insight-progress-label");
 const insightTimeframeBodyEl = document.getElementById("insight-timeframe-body");
+const sleepTrendChartEl = document.getElementById("sleep-trend-chart");
+const sleepTrendLabelsEl = document.getElementById("sleep-trend-labels");
+const sleepTrendAverageChipEl = document.getElementById("sleep-trend-average-chip");
 
 const timelineWrapEl = document.getElementById("timeline-wrap");
 const timelineTrackEl = document.getElementById("timeline-track");
@@ -285,11 +326,6 @@ const bottleTotalWeightEl = document.getElementById("bottle-total-weight");
 const bottleResultValueEl = document.getElementById("bottle-result-value");
 const bottleLogMilkBtnEl = document.getElementById("bottle-log-milk");
 
-let babyDob = null;
-let feedIntervalMinutes = null;
-let feedSizeSmallMl = 120;
-let feedSizeBigMl = 150;
-let customEventTypes = [];
 let breastfeedTickerId = null;
 let miscTimedEventTickerId = null;
 let miscTimedEventTypeSelectEl = null;
@@ -321,36 +357,6 @@ let pushReminderState = {
   configured: false,
 };
 
-const CUSTOM_TYPE_RE = /^[A-Za-z0-9][A-Za-z0-9 /-]{0,31}$/;
-const MILK_EXPRESS_TYPE = "milk express";
-const SLEEP_GANTT_DEFAULT_OVERLAYS = new Set(["feed", "cry", "wee", "poo"]);
-const SLEEP_GANTT_TYPE_COLORS = {
-  sleep: "#7c83ff",
-  feed: "#13ec5b",
-  cry: "#fb7185",
-  wee: "#7dd3fc",
-  poo: "#fbbf24",
-};
-
-const CHART_CONFIG = {
-  width: 360,
-  height: 150,
-  paddingX: 16,
-  axisY: 122,
-  sleepY: 22,
-  weeY: 42,
-  feedY: 62,
-  cryY: 82,
-  pooY: 102,
-};
-
-const CHART_EVENT_TYPES = {
-  sleep: { y: CHART_CONFIG.sleepY, color: "#7c83ff" },
-  wee: { y: CHART_CONFIG.weeY, color: "#7dd3fc" },
-  feed: { y: CHART_CONFIG.feedY, color: "#13ec5b" },
-  cry: { y: CHART_CONFIG.cryY, color: "#fb7185" },
-  poo: { y: CHART_CONFIG.pooY, color: "#fbbf24" },
-};
 
 function getPreferredTheme() {
   const stored = window.localStorage.getItem(THEME_KEY);
@@ -388,19 +394,8 @@ function toggleTheme() {
   applyTheme(next);
 }
 
-function normalizeUserSlug(value) {
-  if (!value) {
-    return "";
-  }
-  const slug = value.trim().toLowerCase();
-  if (!USER_RE.test(slug)) {
-    return "";
-  }
-  return slug;
-}
-
 function getFeedIntervalMinutes() {
-  return feedIntervalMinutes;
+  return state.feedIntervalMinutes;
 }
 
 function getFeedEntryTotalMl(entry) {
@@ -423,16 +418,6 @@ function getFeedEntryTotalMl(entry) {
 function getPrevious24hFeedEntries(anchorTs) {
   const startTs = anchorTs - RULER_WINDOW_MS;
   return recentFeedVolumeEntries.filter((entry) => entry.ts >= startTs && entry.ts <= anchorTs);
-}
-
-function getLocalMidnightTs(anchorTs = Date.now()) {
-  const date = new Date(anchorTs);
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
-}
-
-function getNextLocalMidnightTs(anchorTs = Date.now()) {
-  const date = new Date(anchorTs);
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1).getTime();
 }
 
 function getTodayFeedTotalMl(anchorTs = Date.now()) {
@@ -472,8 +457,8 @@ function planDayFeedSuggestions(daySchedule, consumedDayMl, goalValue) {
     const averageMl = remainingMl / remainingFeeds;
     const options = [
       { category: null, ml: 0 },
-      { category: "small", ml: feedSizeSmallMl },
-      { category: "big", ml: feedSizeBigMl },
+      { category: "small", ml: state.feedSizeSmallMl },
+      { category: "big", ml: state.feedSizeBigMl },
     ].filter((option) => option.ml <= remainingMl);
 
     options.sort((left, right) => {
@@ -498,7 +483,7 @@ function planDayFeedSuggestions(daySchedule, consumedDayMl, goalValue) {
 }
 
 function getUpcomingFeedSuggestionPlan({ nowTs, firstFeedTs, intervalMinutes, feedCount }) {
-  const goalValue = Number.parseFloat(activeFeedingGoal && activeFeedingGoal.goal_ml);
+  const goalValue = Number.parseFloat(state.activeFeedingGoal && state.activeFeedingGoal.goal_ml);
   if (!Number.isFinite(goalValue) || goalValue <= 0) {
     return [];
   }
@@ -690,16 +675,16 @@ function getBreastfeedStart() {
   if (raw) {
     return parseBreastfeedPayload(raw, key);
   }
-  if (activeUser) {
-    const legacyKey = `${BREASTFEED_TIMER_KEY}:${activeUser}`;
+  if (state.activeUser) {
+    const legacyKey = `${BREASTFEED_TIMER_KEY}:${state.activeUser}`;
     const legacyRaw = window.localStorage.getItem(legacyKey);
     const legacyParsed = parseBreastfeedPayload(legacyRaw, legacyKey);
     if (legacyParsed) {
-      setBreastfeedStart(legacyParsed.start, activeUser, null);
+      setBreastfeedStart(legacyParsed.start, state.activeUser, null);
       window.localStorage.removeItem(legacyKey);
       return {
         start: legacyParsed.start,
-        startedBy: activeUser,
+        startedBy: state.activeUser,
         clientEventId: null,
       };
     }
@@ -748,8 +733,8 @@ function clearBreastfeedStart() {
     return;
   }
   window.localStorage.removeItem(key);
-  if (activeUser) {
-    window.localStorage.removeItem(`${BREASTFEED_TIMER_KEY}:${activeUser}`);
+  if (state.activeUser) {
+    window.localStorage.removeItem(`${BREASTFEED_TIMER_KEY}:${state.activeUser}`);
   }
 }
 
@@ -791,7 +776,7 @@ function updateTimedEventBanner(startInfo, durationMinutes) {
   }
   const label = formatEntryTypeLabel(startInfo.type);
   const startedBy = startInfo.startedBy || "--";
-  const meta = userValid
+  const meta = state.userValid
     ? `Started by ${startedBy}`
     : `Started by ${startedBy} · Choose a user to stop`;
   timedEventBannerEl.classList.add("is-active");
@@ -799,9 +784,9 @@ function updateTimedEventBanner(startInfo, durationMinutes) {
   timedEventBannerTimerEl.textContent = `${durationMinutes} min`;
   timedEventBannerMetaEl.textContent = meta;
   if (timedEventBannerActionEl) {
-    timedEventBannerActionEl.disabled = !userValid;
+    timedEventBannerActionEl.disabled = !state.userValid;
     timedEventBannerActionEl.textContent = `End ${label}`;
-    timedEventBannerActionEl.title = userValid
+    timedEventBannerActionEl.title = state.userValid
       ? `End ${label.toLowerCase()}`
       : "Choose a user to log the event";
   }
@@ -832,7 +817,7 @@ function updateMiscTimedEventControls() {
     miscTimedEventTypeSelectEl.value = startInfo.type;
     miscTimedEventTypeSelectEl.disabled = true;
     miscTimedEventToggleBtn.textContent = `End ${label} (${durationMinutes} min)`;
-    miscTimedEventToggleBtn.disabled = !userValid;
+    miscTimedEventToggleBtn.disabled = !state.userValid;
     const starter = startInfo.startedBy ? ` by ${startInfo.startedBy}` : "";
     miscTimedEventToggleBtn.title = `Started${starter} ${formatTimestamp(startInfo.start.toISOString())}`;
     updateTimedEventBanner(startInfo, durationMinutes);
@@ -844,7 +829,7 @@ function updateMiscTimedEventControls() {
     miscTimedEventTypeSelectEl.value = TIMED_EVENT_TYPES[0];
   }
   miscTimedEventToggleBtn.textContent = "Start timed event";
-  miscTimedEventToggleBtn.disabled = !userValid;
+  miscTimedEventToggleBtn.disabled = !state.userValid;
   miscTimedEventToggleBtn.removeAttribute("title");
   updateTimedEventBanner(null, 0);
   stopMiscTimedEventTicker();
@@ -880,15 +865,15 @@ function updateBreastfeedBanner(startInfo, durationMinutes) {
     return;
   }
   const startedBy = startInfo.startedBy || "--";
-  const meta = userValid
+  const meta = state.userValid
     ? `Started by ${startedBy}`
     : `Started by ${startedBy} · Choose a user to stop`;
   breastfeedBannerEl.classList.add("is-active");
   breastfeedBannerTimerEl.textContent = `${durationMinutes} min`;
   breastfeedBannerMetaEl.textContent = meta;
   if (breastfeedBannerActionEl) {
-    breastfeedBannerActionEl.disabled = !userValid;
-    breastfeedBannerActionEl.title = userValid
+    breastfeedBannerActionEl.disabled = !state.userValid;
+    breastfeedBannerActionEl.title = state.userValid
       ? "End breastfeeding"
       : "Choose a user to log the feed";
   }
@@ -1109,40 +1094,11 @@ async function hydrateTimedEventFromLocalEntries() {
   }
 }
 
-function parseDob(value) {
-  if (!value) {
-    return null;
-  }
-  const date = new Date(`${value}T00:00:00`);
-  if (Number.isNaN(date.getTime())) {
-    return null;
-  }
-  return date;
-}
-
-function formatAge(dob) {
-  if (!dob) {
-    return "Age: --";
-  }
-  const today = new Date();
-  const diffMs = today.getTime() - dob.getTime();
-  if (diffMs < 0) {
-    return "Age: --";
-  }
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-  const weeks = Math.floor(diffDays / 7);
-  const days = diffDays % 7;
-  if (weeks < 1) {
-    return `Age: ${days} day${days === 1 ? "" : "s"}`;
-  }
-  return `Age: ${weeks}w ${days}d`;
-}
-
 function updateAgeDisplay() {
   if (!ageOutputEl) {
     return;
   }
-  const dob = parseDob(dobInputEl ? dobInputEl.value : babyDob || "");
+  const dob = parseDob(dobInputEl ? dobInputEl.value : state.babyDob || "");
   ageOutputEl.textContent = formatAge(dob);
 }
 
@@ -1169,7 +1125,7 @@ function renderCustomTypeList() {
     return;
   }
   customTypeListEl.innerHTML = "";
-  if (!customEventTypes.length) {
+  if (!state.customEventTypes.length) {
     if (customTypeEmptyEl) {
       customTypeEmptyEl.style.display = "block";
     }
@@ -1178,7 +1134,7 @@ function renderCustomTypeList() {
   if (customTypeEmptyEl) {
     customTypeEmptyEl.style.display = "none";
   }
-  customEventTypes.forEach((type) => {
+  state.customEventTypes.forEach((type) => {
     const item = document.createElement("li");
     item.className = "pill-item";
     const label = document.createElement("span");
@@ -1191,11 +1147,11 @@ function renderCustomTypeList() {
       if (!window.confirm(`Remove "${type}" from misc events?`)) {
         return;
       }
-      const next = customEventTypes.filter((entry) => entry !== type);
-      customEventTypes = next;
+      const next = state.customEventTypes.filter((entry) => entry !== type);
+      state.customEventTypes = next;
       renderCustomTypeList();
       renderMiscMenu();
-      void saveBabySettings({ custom_event_types: customEventTypes });
+      void saveBabySettings({ custom_event_types: state.customEventTypes });
     });
     item.appendChild(label);
     item.appendChild(removeBtn);
@@ -1235,7 +1191,7 @@ function renderMiscMenu() {
   miscTimedEventToggleBtn = timedToggleBtn;
   updateMiscTimedEventControls();
 
-  customEventTypes
+  state.customEventTypes
     .filter((type) => !TIMED_EVENT_TYPES.includes(normalizeEntryType(type)))
     .forEach((type) => {
     const button = document.createElement("button");
@@ -1257,15 +1213,15 @@ function applyCustomEventTypes() {
   renderSleepGanttTypeOptions(summaryEntries);
   renderSleepGantt(summaryGanttEntries.length ? summaryGanttEntries : summaryEntries);
   if (miscBtn) {
-    toggleDisabled(miscBtn, !userValid);
+    toggleDisabled(miscBtn, !state.userValid);
   }
 }
 
 function updateUserDisplay() {
   if (userMessageEl) {
     if (pageType === "settings") {
-      userMessageEl.textContent = userValid
-        ? `Logging as ${activeUser}`
+      userMessageEl.textContent = state.userValid
+        ? `Logging as ${state.activeUser}`
         : "Choose a user to log.";
     } else if (pageType === "goals") {
       userMessageEl.textContent = "Goals stay active until a later-dated entry is logged.";
@@ -1278,13 +1234,13 @@ function updateUserDisplay() {
     } else if (pageType === "milk-express") {
       userMessageEl.textContent = "Last 48 hours • All milk express";
     } else {
-      userMessageEl.textContent = userValid
-        ? `Logging as ${activeUser}`
+      userMessageEl.textContent = state.userValid
+        ? `Logging as ${state.activeUser}`
         : "Choose a user to log.";
     }
   }
   if (userChipEl) {
-    userChipEl.textContent = activeUser ? activeUser.slice(0, 2).toUpperCase() : "BT";
+    userChipEl.textContent = state.activeUser ? state.activeUser.slice(0, 2).toUpperCase() : "BT";
   }
 }
 
@@ -1329,7 +1285,6 @@ let hasLoadedFeedingGoals = false;
 let calendarWeekOffset = 0;
 let calendarWeekStart = null;
 let calendarLoading = false;
-let activeFeedingGoal = null;
 let latestFeedTotalsMl = { today: 0, rolling24h: 0 };
 let recentFeedVolumeEntries = [];
 const HOME_STAT_VIEW_TODAY = "today";
@@ -1381,7 +1336,7 @@ function initHomeHandlers() {
   homeInitialized = true;
   if (refreshBtn) {
     refreshBtn.addEventListener("click", () => {
-      if (userValid) {
+      if (state.userValid) {
         void loadHomeEntries();
       }
     });
@@ -1431,7 +1386,7 @@ function syncHomeStatCardState(card) {
 }
 
 function toggleHomeStatCard(card) {
-  if (!card || !userValid || card.classList.contains("disabled")) {
+  if (!card || !state.userValid || card.classList.contains("disabled")) {
     return;
   }
   const statKey = card.dataset.homeStatKey;
@@ -1517,7 +1472,7 @@ function initQuickLogHandlers() {
   }
   if (manualFeedBtn) {
     manualFeedBtn.addEventListener("click", () => {
-      if (!userValid) {
+      if (!state.userValid) {
         setStatus("Choose a user below to start logging.");
         return;
       }
@@ -1621,7 +1576,7 @@ function initLogHandlers() {
   logInitialized = true;
   if (refreshBtn) {
     refreshBtn.addEventListener("click", () => {
-      if (userValid) {
+      if (state.userValid) {
         void loadLogEntries();
       }
     });
@@ -1648,7 +1603,7 @@ function initSummaryHandlers() {
       const base = summaryDate ? new Date(summaryDate) : new Date();
       base.setDate(base.getDate() - 1);
       setSummaryDate(base);
-      if (userValid) {
+      if (state.userValid) {
         void loadSummaryEntries();
       }
     });
@@ -1658,7 +1613,7 @@ function initSummaryHandlers() {
       const base = summaryDate ? new Date(summaryDate) : new Date();
       base.setDate(base.getDate() + 1);
       setSummaryDate(base);
-      if (userValid) {
+      if (state.userValid) {
         void loadSummaryEntries();
       }
     });
@@ -1668,7 +1623,7 @@ function initSummaryHandlers() {
       const selected = parseDateInputValue(summaryDateInputEl.value);
       if (selected) {
         setSummaryDate(selected);
-        if (userValid) {
+        if (state.userValid) {
           void loadSummaryEntries();
         }
       }
@@ -1697,7 +1652,7 @@ function initSummaryHandlers() {
   }
   if (refreshBtn) {
     refreshBtn.addEventListener("click", () => {
-      if (userValid) {
+      if (state.userValid) {
         void loadSummaryEntries();
         void loadRulerFeeds({ reset: true });
       }
@@ -1753,7 +1708,7 @@ function initSettingsHandlers() {
     feedSizeSmallInputEl.addEventListener("change", () => {
       const nextValue = Number.parseFloat(feedSizeSmallInputEl.value);
       if (Number.isNaN(nextValue) || nextValue <= 0) {
-        feedSizeSmallInputEl.value = String(feedSizeSmallMl);
+        feedSizeSmallInputEl.value = String(state.feedSizeSmallMl);
         return;
       }
       void saveBabySettings({ feed_size_small_ml: nextValue });
@@ -1763,7 +1718,7 @@ function initSettingsHandlers() {
     feedSizeBigInputEl.addEventListener("change", () => {
       const nextValue = Number.parseFloat(feedSizeBigInputEl.value);
       if (Number.isNaN(nextValue) || nextValue <= 0) {
-        feedSizeBigInputEl.value = String(feedSizeBigMl);
+        feedSizeBigInputEl.value = String(state.feedSizeBigMl);
         return;
       }
       void saveBabySettings({ feed_size_big_ml: nextValue });
@@ -1777,19 +1732,19 @@ function initSettingsHandlers() {
         customTypeInputEl.focus();
         return;
       }
-      const exists = customEventTypes.some(
+      const exists = state.customEventTypes.some(
         (entry) => entry.toLowerCase() === normalized.toLowerCase(),
       );
       if (exists) {
         setCustomTypeHint("That type already exists.");
         return;
       }
-      customEventTypes = [...customEventTypes, normalized];
+      state.customEventTypes = [...state.customEventTypes, normalized];
       customTypeInputEl.value = "";
       setCustomTypeHint("Added.");
       renderCustomTypeList();
       renderMiscMenu();
-      void saveBabySettings({ custom_event_types: customEventTypes });
+      void saveBabySettings({ custom_event_types: state.customEventTypes });
     };
     customTypeAddBtn.addEventListener("click", handleAdd);
     customTypeInputEl.addEventListener("keydown", (event) => {
@@ -1836,7 +1791,7 @@ function initSettingsHandlers() {
     exportCsvBtn.addEventListener("click", () => {
       void handleCsvExport();
     });
-    toggleDisabled(exportCsvBtn, !userValid);
+    toggleDisabled(exportCsvBtn, !state.userValid);
   }
   if (testFeedDueNotificationBtn) {
     testFeedDueNotificationBtn.addEventListener("click", () => {
@@ -1932,7 +1887,7 @@ function updateBottleLogButton() {
   if (!bottleLogMilkBtnEl) {
     return;
   }
-  const canLog = userValid && Number.isFinite(bottleExpressedMl) && bottleExpressedMl > 0;
+  const canLog = state.userValid && Number.isFinite(bottleExpressedMl) && bottleExpressedMl > 0;
   toggleDisabled(bottleLogMilkBtnEl, !canLog);
   if (canLog) {
     bottleLogMilkBtnEl.removeAttribute("disabled");
@@ -2089,7 +2044,7 @@ function initBottlesHandlers() {
   }
   if (bottleLogMilkBtnEl) {
     bottleLogMilkBtnEl.addEventListener("click", async () => {
-      if (!userValid) {
+      if (!state.userValid) {
         setStatus("Choose a user below to start logging.");
         return;
       }
@@ -2110,18 +2065,18 @@ function initBottlesHandlers() {
 
 function applyUserState() {
   initQuickLogHandlers();
-  toggleDisabled(feedBtn, !userValid);
-  toggleDisabled(nappyBtn, !userValid);
-  toggleDisabled(miscBtn, !userValid);
-  toggleDisabled(pooBtn, !userValid);
-  toggleDisabled(weeBtn, !userValid);
+  toggleDisabled(feedBtn, !state.userValid);
+  toggleDisabled(nappyBtn, !state.userValid);
+  toggleDisabled(miscBtn, !state.userValid);
+  toggleDisabled(pooBtn, !state.userValid);
+  toggleDisabled(weeBtn, !state.userValid);
 
   if (pageType === "settings") {
     initSettingsHandlers();
     updateUserDisplay();
     void refreshPushReminderState();
     if (exportCsvBtn) {
-      toggleDisabled(exportCsvBtn, !userValid);
+      toggleDisabled(exportCsvBtn, !state.userValid);
     }
     return;
   }
@@ -2143,17 +2098,17 @@ function applyUserState() {
   const allowSharedPage = allowTimeline || pageType === "calendar" || pageType === "calendar-form";
   toggleDisabled(refreshBtn, false);
   if (csvFileEl) {
-    csvFileEl.disabled = !userValid;
+    csvFileEl.disabled = !state.userValid;
   }
   if (csvUploadBtn) {
-    csvUploadBtn.disabled = !userValid;
+    csvUploadBtn.disabled = !state.userValid;
   }
   statCardEls.forEach((card) => {
-    card.classList.toggle("is-clickable", userValid);
-    toggleDisabled(card, !userValid);
+    card.classList.toggle("is-clickable", state.userValid);
+    toggleDisabled(card, !state.userValid);
   });
   homeStatFlipCardEls.forEach((card) => {
-    toggleDisabled(card, !userValid);
+    toggleDisabled(card, !state.userValid);
     syncHomeStatCardState(card);
   });
   initLinks();
@@ -2163,9 +2118,9 @@ function applyUserState() {
   updateBreastfeedButton();
   updateMiscTimedEventControls();
   if (userFormEl) {
-    userFormEl.hidden = userValid || allowSharedPage;
+    userFormEl.hidden = state.userValid || allowSharedPage;
   }
-  if (!userValid && !allowSharedPage) {
+  if (!state.userValid && !allowSharedPage) {
     closeFeedMenu();
     setStatus("Choose a user below to start logging.");
   } else {
@@ -2206,13 +2161,13 @@ function applyUserState() {
 
 function setActiveUser(value, persist = true) {
   const normalized = normalizeUserSlug(value);
-  activeUser = normalized;
-  userValid = Boolean(normalized);
-  bodyEl.dataset.user = activeUser;
-  bodyEl.dataset.userValid = userValid ? "true" : "false";
+  state.activeUser = normalized;
+  state.userValid = Boolean(normalized);
+  bodyEl.dataset.user = state.activeUser;
+  bodyEl.dataset.userValid = state.userValid ? "true" : "false";
   if (persist) {
-    if (userValid) {
-      window.localStorage.setItem(USER_KEY, activeUser);
+    if (state.userValid) {
+      window.localStorage.setItem(USER_KEY, state.activeUser);
     } else {
       window.localStorage.removeItem(USER_KEY);
     }
@@ -2221,23 +2176,23 @@ function setActiveUser(value, persist = true) {
 }
 
 function initializeUser() {
-  const initialUser = normalizeUserSlug(activeUser);
-  if (userValid && !initialUser) {
-    userValid = false;
+  const initialUser = normalizeUserSlug(state.activeUser);
+  if (state.userValid && !initialUser) {
+    state.userValid = false;
   }
-  activeUser = initialUser;
-  if (!userValid) {
+  state.activeUser = initialUser;
+  if (!state.userValid) {
     const stored = normalizeUserSlug(window.localStorage.getItem(USER_KEY));
     if (stored && !RESERVED_USER_SLUGS.has(stored)) {
-      activeUser = stored;
-      userValid = true;
+      state.activeUser = stored;
+      state.userValid = true;
     }
   }
-  if (userValid) {
-    window.localStorage.setItem(USER_KEY, activeUser);
+  if (state.userValid) {
+    window.localStorage.setItem(USER_KEY, state.activeUser);
   }
-  bodyEl.dataset.user = activeUser;
-  bodyEl.dataset.userValid = userValid ? "true" : "false";
+  bodyEl.dataset.user = state.activeUser;
+  bodyEl.dataset.userValid = state.userValid ? "true" : "false";
   applyUserState();
 }
 
@@ -2298,7 +2253,7 @@ function openMiscMenu() {
   if (!miscMenu || !miscBtn) {
     return;
   }
-  if (!customEventTypes.length) {
+  if (!state.customEventTypes.length) {
     return;
   }
   miscMenu.classList.add("open");
@@ -2335,7 +2290,7 @@ function toggleMiscMenu() {
 }
 
 function openFeedMenu() {
-  if (!feedMenu || !feedBtn || !userValid) {
+  if (!feedMenu || !feedBtn || !state.userValid) {
     return;
   }
   feedMenu.classList.add("open");
@@ -2406,7 +2361,7 @@ function setQuickFeedKind(kind) {
 }
 
 function handleQuickLog(amountMl) {
-  if (!userValid) {
+  if (!state.userValid) {
     setStatus("Choose a user below to start logging.");
     return;
   }
@@ -2434,7 +2389,7 @@ function setLoadingState(isLoading) {
 
 async function handleCsvUpload(event) {
   event.preventDefault();
-  if (!userValid) {
+  if (!state.userValid) {
     setStatus("Choose a user below to start logging.");
     return;
   }
@@ -2447,7 +2402,7 @@ async function handleCsvUpload(event) {
   formData.append("file", file);
   setStatus("Uploading CSV...");
   try {
-    const response = await fetch(buildUrl(`/api/users/${activeUser}/entries/import`), {
+    const response = await fetch(buildUrl(`/api/users/${state.activeUser}/entries/import`), {
       method: "POST",
       body: formData,
     });
@@ -2469,7 +2424,7 @@ async function handleCsvUpload(event) {
 }
 
 async function handleCsvExport() {
-  if (!userValid || !activeUser) {
+  if (!state.userValid || !state.activeUser) {
     setStatus("Choose a user below to export entries.");
     return;
   }
@@ -2492,7 +2447,7 @@ async function handleCsvExport() {
     const link = document.createElement("a");
     const dateStamp = new Date().toISOString().slice(0, 10);
     link.href = url;
-    link.download = `baby-tracker-events-${activeUser}-${dateStamp}.csv`;
+    link.download = `baby-tracker-events-${state.activeUser}-${dateStamp}.csv`;
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -2505,7 +2460,7 @@ async function handleCsvExport() {
 
 async function handleTestFeedDueNotification() {
   setStatus("Sending test notification...");
-  if (!userValid || !activeUser) {
+  if (!state.userValid || !state.activeUser) {
     setStatus("Choose a user before testing reminders");
     return;
   }
@@ -2514,7 +2469,7 @@ async function handleTestFeedDueNotification() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        user_slug: activeUser,
+        user_slug: state.activeUser,
         title: "Feed due (test)",
         body: "This is a test notification from Baby Tracker settings.",
       }),
@@ -2556,8 +2511,8 @@ async function getCurrentPushSubscription() {
 
 function renderPushReminderState() {
   if (pushReminderUserEl) {
-    if (userValid && activeUser) {
-      pushReminderUserEl.textContent = `Current user: ${activeUser}`;
+    if (state.userValid && state.activeUser) {
+      pushReminderUserEl.textContent = `Current user: ${state.activeUser}`;
     } else {
       pushReminderUserEl.textContent = "Choose a user to enable reminders.";
     }
@@ -2569,7 +2524,7 @@ function renderPushReminderState() {
     pushReminderStatusEl.textContent = "This browser does not support native push notifications.";
   } else if (!pushReminderState.configured) {
     pushReminderStatusEl.textContent = "Push notifications are not configured on the server yet.";
-  } else if (!userValid || !activeUser) {
+  } else if (!state.userValid || !state.activeUser) {
     pushReminderStatusEl.textContent = "Choose a user to enable reminders on this device.";
   } else if (pushReminderState.permission === "denied") {
     pushReminderStatusEl.textContent = "Notifications are blocked in this browser. Allow them in browser settings to continue.";
@@ -2584,16 +2539,16 @@ function renderPushReminderState() {
     enablePushRemindersBtn.disabled = (
       !pushReminderState.supported
       || !pushReminderState.configured
-      || !userValid
+      || !state.userValid
       || pushReminderState.permission === "denied"
     );
   }
   if (disablePushRemindersBtn) {
-    disablePushRemindersBtn.disabled = !userValid || !pushReminderState.supported;
+    disablePushRemindersBtn.disabled = !state.userValid || !pushReminderState.supported;
   }
   if (testFeedDueNotificationBtn) {
     testFeedDueNotificationBtn.disabled = (
-      !userValid
+      !state.userValid
       || !pushReminderState.configured
       || !pushReminderState.enabled
     );
@@ -2610,13 +2565,13 @@ async function refreshPushReminderState() {
   pushReminderState.endpoint = "";
   pushReminderState.isCurrentDevice = false;
   renderPushReminderState();
-  if (!pushReminderState.supported || !userValid || !activeUser) {
+  if (!pushReminderState.supported || !state.userValid || !state.activeUser) {
     return;
   }
   try {
     const [registration, response] = await Promise.all([
       getCurrentPushSubscription(),
-      fetch(buildUrl(`/api/push/subscription?user_slug=${encodeURIComponent(activeUser)}`)),
+      fetch(buildUrl(`/api/push/subscription?user_slug=${encodeURIComponent(state.activeUser)}`)),
     ]);
     pushReminderState.configured = response.status !== 404;
     if (!response.ok) {
@@ -2637,7 +2592,7 @@ async function refreshPushReminderState() {
 }
 
 async function enablePushReminders() {
-  if (!userValid || !activeUser) {
+  if (!state.userValid || !state.activeUser) {
     setStatus("Choose a user before enabling reminders");
     return;
   }
@@ -2674,7 +2629,7 @@ async function enablePushReminders() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        user_slug: activeUser,
+        user_slug: state.activeUser,
         subscription: subscription.toJSON(),
       }),
     });
@@ -2696,7 +2651,7 @@ async function enablePushReminders() {
 }
 
 async function disablePushReminders() {
-  if (!userValid || !activeUser) {
+  if (!state.userValid || !state.activeUser) {
     setStatus("Choose a user before disabling reminders");
     return;
   }
@@ -2706,7 +2661,7 @@ async function disablePushReminders() {
     await fetch(buildUrl("/api/push/subscription"), {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ user_slug: activeUser }),
+      body: JSON.stringify({ user_slug: state.activeUser }),
     });
     if (subscription) {
       await subscription.unsubscribe().catch(() => false);
@@ -2727,7 +2682,7 @@ function startAutoRefresh(refreshFn) {
     return;
   }
   refreshTimer = window.setInterval(() => {
-    if (userValid) {
+    if (state.userValid) {
       void refreshFn();
     }
   }, 120000);
@@ -2866,6 +2821,20 @@ function toComparableIso(value) {
   return value;
 }
 
+function toComparableTimestampMs(value) {
+  if (typeof value !== "string") {
+    return null;
+  }
+  if (!value.trim()) {
+    return null;
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+  return parsed.getTime();
+}
+
 function createIsoNowMinusDays(days) {
   return new Date(Date.now() - (days * 24 * 60 * 60 * 1000)).toISOString();
 }
@@ -2890,14 +2859,16 @@ function shouldIncludeLocalEntry(entry, params, lowerBoundIso, upperBoundIso) {
   if (params.type && entry.type !== params.type) {
     return false;
   }
-  const timestampIso = toComparableIso(entry.timestamp_utc);
-  if (!timestampIso) {
+  const timestampMs = toComparableTimestampMs(entry.timestamp_utc);
+  if (timestampMs === null) {
     return false;
   }
-  if (lowerBoundIso && timestampIso < lowerBoundIso) {
+  const lowerBoundMs = toComparableTimestampMs(lowerBoundIso);
+  if (lowerBoundMs !== null && timestampMs < lowerBoundMs) {
     return false;
   }
-  if (upperBoundIso && timestampIso > upperBoundIso) {
+  const upperBoundMs = toComparableTimestampMs(upperBoundIso);
+  if (upperBoundMs !== null && timestampMs > upperBoundMs) {
     return false;
   }
   return true;
@@ -2974,69 +2945,14 @@ async function listEntriesLocalIndexed(params = {}) {
   const limit = Number.isFinite(params.limit)
     ? Math.max(1, Number.parseInt(String(params.limit), 10))
     : null;
-
-  return new Promise((resolve, reject) => {
-    const results = [];
-    let finished = false;
-
-    const finish = (value) => {
-      if (finished) {
-        return;
-      }
-      finished = true;
-      resolve(value);
-    };
-
-    const fail = (err) => {
-      if (finished) {
-        return;
-      }
-      finished = true;
-      reject(err);
-    };
-
-    let source = store.index(INDEX_ENTRIES_TS);
-    let range = null;
-
-    if (params.user_slug && store.indexNames.contains(INDEX_ENTRIES_USER_TS)) {
-      source = store.index(INDEX_ENTRIES_USER_TS);
-      const lower = [params.user_slug, lowerBoundIso || ""];
-      const upper = [params.user_slug, upperBoundIso || "\uffff"];
-      range = window.IDBKeyRange.bound(lower, upper);
-    } else if (params.type && store.indexNames.contains(INDEX_ENTRIES_TYPE_TS)) {
-      source = store.index(INDEX_ENTRIES_TYPE_TS);
-      const lower = [params.type, lowerBoundIso || ""];
-      const upper = [params.type, upperBoundIso || "\uffff"];
-      range = window.IDBKeyRange.bound(lower, upper);
-    } else if (lowerBoundIso && upperBoundIso) {
-      range = window.IDBKeyRange.bound(lowerBoundIso, upperBoundIso);
-    } else if (lowerBoundIso) {
-      range = window.IDBKeyRange.lowerBound(lowerBoundIso);
-    } else if (upperBoundIso) {
-      range = window.IDBKeyRange.upperBound(upperBoundIso);
-    }
-
-    const request = source.openCursor(range, "prev");
-    request.onsuccess = (event) => {
-      const cursor = event.target.result;
-      if (!cursor) {
-        finish(results);
-        return;
-      }
-      const entry = cursor.value;
-      if (shouldIncludeLocalEntry(entry, params, lowerBoundIso, upperBoundIso)) {
-        results.push(entry);
-        if (limit && results.length >= limit) {
-          finish(results);
-          return;
-        }
-      }
-      cursor.continue();
-    };
-    request.onerror = () => fail(request.error);
-    tx.onabort = () => fail(tx.error);
-    tx.onerror = () => fail(tx.error);
-  });
+  const allEntries = await requestToPromise(store.getAll());
+  const filtered = sortEntriesByTimestampDesc(allEntries.filter((entry) => (
+    shouldIncludeLocalEntry(entry, params, lowerBoundIso, upperBoundIso)
+  )));
+  if (limit) {
+    return filtered.slice(0, limit);
+  }
+  return filtered;
 }
 
 async function listEntriesLocalLegacy(params = {}) {
@@ -3051,17 +2967,9 @@ async function listEntriesLocalLegacy(params = {}) {
   const lowerBoundIso = maxIso(cutoffIso, sinceIso);
   const upperBoundIso = untilIso;
 
-  const filtered = allEntries.filter((entry) => (
+  const filtered = sortEntriesByTimestampDesc(allEntries.filter((entry) => (
     shouldIncludeLocalEntry(entry, params, lowerBoundIso, upperBoundIso)
-  ));
-  filtered.sort((a, b) => {
-    const left = toComparableIso(a.timestamp_utc) || "";
-    const right = toComparableIso(b.timestamp_utc) || "";
-    if (left === right) {
-      return 0;
-    }
-    return left < right ? 1 : -1;
-  });
+  )));
   if (Number.isFinite(params.limit)) {
     return filtered.slice(0, Math.max(1, Number.parseInt(String(params.limit), 10)));
   }
@@ -3195,188 +3103,6 @@ function scheduleSync() {
   syncTimerId = window.setInterval(() => {
     void syncNow();
   }, 60000);
-}
-
-function formatTimestamp(value) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-  return date.toLocaleString();
-}
-
-function formatTimelineDay(value) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return String(value);
-  }
-  return date.toLocaleDateString([], {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-  });
-}
-
-function formatTimelineHour(value) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return String(value);
-  }
-  return date.toLocaleTimeString([], { hour: "numeric" });
-}
-
-function getDateKey(value) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return String(value);
-  }
-  const pad = (item) => String(item).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-}
-
-function getHourKey(value) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return String(value);
-  }
-  const pad = (item) => String(item).padStart(2, "0");
-  return `${getDateKey(date)}T${pad(date.getHours())}`;
-}
-
-function hashString(value) {
-  let hash = 0;
-  for (let i = 0; i < value.length; i += 1) {
-    hash = (hash << 5) - hash + value.charCodeAt(i);
-    hash |= 0;
-  }
-  return Math.abs(hash);
-}
-
-function hexToRgba(hex, alpha) {
-  const cleaned = hex.replace("#", "");
-  if (cleaned.length !== 6) {
-    return `rgba(0, 0, 0, ${alpha})`;
-  }
-  const r = Number.parseInt(cleaned.slice(0, 2), 16);
-  const g = Number.parseInt(cleaned.slice(2, 4), 16);
-  const b = Number.parseInt(cleaned.slice(4, 6), 16);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-}
-
-function getTimelineTypeConfig(type) {
-  const normalized = normalizeEntryType(type);
-  const palette = [
-    { color: "#ff8a5b", icon: "local_fire_department" },
-    { color: "#2dd4bf", icon: "water_drop" },
-    { color: "#fbbf24", icon: "spa" },
-    { color: "#38bdf8", icon: "rainy" },
-    { color: "#a78bfa", icon: "bedtime" },
-    { color: "#f97316", icon: "local_cafe" },
-    { color: "#22c55e", icon: "event" },
-  ];
-
-  if (normalized.includes("feed")) {
-    return { color: "#23c96b", icon: "local_drink" };
-  }
-  if (normalized.includes("breast")) {
-    return { color: "#f97316", icon: "favorite" };
-  }
-  if (normalized.includes("formula")) {
-    return { color: "#38bdf8", icon: "science" };
-  }
-  if (normalized.includes("express") || normalized.includes("pump")) {
-    return { color: "#f59e0b", icon: "local_cafe" };
-  }
-  if (normalized.includes("wee") || normalized.includes("wet")) {
-    return { color: "#38bdf8", icon: "rainy" };
-  }
-  if (normalized.includes("poo") || normalized.includes("soiled")) {
-    return { color: "#fbbf24", icon: "spa" };
-  }
-  if (normalized.includes("sleep") || normalized.includes("nap")) {
-    return { color: "#a78bfa", icon: "bedtime" };
-  }
-  if (normalized.includes("cry")) {
-    return { color: "#f97316", icon: "mood_bad" };
-  }
-
-  const pick = palette[hashString(normalized || "event") % palette.length];
-  return { color: pick.color, icon: pick.icon };
-}
-
-function formatSummaryTime(value) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-  return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-}
-
-function toLocalDateTimeValue(value) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return "";
-  }
-  const pad = (item) => String(item).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
-
-function formatRelativeTime(value) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-  const diffMs = Date.now() - date.getTime();
-  const diffMinutes = Math.max(0, Math.floor(diffMs / 60000));
-  if (diffMinutes < 1) {
-    return "just now";
-  }
-  if (diffMinutes < 60) {
-    return `${diffMinutes} min${diffMinutes === 1 ? "" : "s"}`;
-  }
-  const diffHours = Math.floor(diffMinutes / 60);
-  if (diffHours < 24) {
-    return `${diffHours} hour${diffHours === 1 ? "" : "s"}`;
-  }
-  const diffDays = Math.floor(diffHours / 24);
-  return `${diffDays} day${diffDays === 1 ? "" : "s"}`;
-}
-
-function formatTimeUntil(target) {
-  if (!target || Number.isNaN(target.getTime())) {
-    return "--";
-  }
-  const diffMs = target.getTime() - Date.now();
-  if (diffMs <= 0) {
-    return "due now";
-  }
-  const diffMinutes = Math.round(diffMs / 60000);
-  if (diffMinutes < 60) {
-    return `in ${diffMinutes}m`;
-  }
-  const hours = Math.floor(diffMinutes / 60);
-  const minutes = diffMinutes % 60;
-  if (minutes === 0) {
-    return `in ${hours}h`;
-  }
-  return `in ${hours}h ${minutes}m`;
-}
-
-function formatFeedTime(value) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return "--";
-  }
-  return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-}
-
-function buildFeedShortcutUrl(target) {
-  const inputValue = toLocalDateTimeValue(target);
-  if (!inputValue) {
-    return "";
-  }
-  const encoded = encodeURIComponent(inputValue);
-  return `shortcuts://run-shortcut?name=feedreminderpwa&input=${encoded}`;
 }
 
 function setNextFeedShortcut(enabled, href) {
@@ -4003,47 +3729,6 @@ function initRulerHandlers() {
   void loadRulerFeeds({ reset: true });
 }
 
-function formatDateInputValue(date) {
-  const pad = (value) => String(value).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-}
-
-function parseDateInputValue(value) {
-  if (!value) {
-    return null;
-  }
-  const parsed = new Date(`${value}T00:00:00`);
-  if (Number.isNaN(parsed.getTime())) {
-    return null;
-  }
-  return parsed;
-}
-
-function isSameDay(a, b) {
-  return a.getFullYear() === b.getFullYear()
-    && a.getMonth() === b.getMonth()
-    && a.getDate() === b.getDate();
-}
-
-function getDateKeyFromTimestamp(value) {
-  if (!value) {
-    return null;
-  }
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    return null;
-  }
-  return formatDateInputValue(parsed);
-}
-
-function getGoalDayWindow(dateKey) {
-  const parsed = parseDateInputValue(dateKey);
-  if (!parsed) {
-    return null;
-  }
-  return getSummaryDayWindow(parsed);
-}
-
 function computeFeedTotalMl(entries) {
   let totalMl = 0;
   entries.forEach((entry) => {
@@ -4063,18 +3748,6 @@ function computeFeedTotalMl(entries) {
   return totalMl;
 }
 
-function formatSummaryDateLabel(date) {
-  const today = new Date();
-  if (isSameDay(date, today)) {
-    return "Today";
-  }
-  return date.toLocaleDateString(undefined, {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-  });
-}
-
 function setSummaryDate(date) {
   summaryDate = date;
   if (summaryDateInputEl) {
@@ -4092,20 +3765,6 @@ function setSummaryDate(date) {
   }
 }
 
-function getSummaryDayWindow(date) {
-  const start = new Date(date);
-  start.setHours(0, 0, 0, 0);
-  const end = new Date(start);
-  end.setDate(end.getDate() + 1);
-  end.setMilliseconds(end.getMilliseconds() - 1);
-  return {
-    since: start,
-    until: end,
-    sinceIso: start.toISOString(),
-    untilIso: end.toISOString(),
-  };
-}
-
 function getSummaryGanttWindow(date) {
   const dayWindow = getSummaryDayWindow(date);
   const lookbackSince = new Date(dayWindow.since);
@@ -4115,55 +3774,6 @@ function getSummaryGanttWindow(date) {
     lookbackSince,
     lookbackSinceIso: lookbackSince.toISOString(),
   };
-}
-
-function formatDurationMinutes(totalMinutes) {
-  if (!Number.isFinite(totalMinutes) || totalMinutes <= 0) {
-    return "0 min";
-  }
-  const rounded = Math.round(totalMinutes);
-  const hours = Math.floor(rounded / 60);
-  const minutes = rounded % 60;
-  if (!hours) {
-    return `${minutes} min`;
-  }
-  if (!minutes) {
-    return `${hours}h`;
-  }
-  return `${hours}h ${minutes}m`;
-}
-
-function formatMl(value) {
-  if (!Number.isFinite(value) || value <= 0) {
-    return "0 ml";
-  }
-  const rounded = Math.round(value * 10) / 10;
-  return Number.isInteger(rounded) ? `${rounded} ml` : `${rounded.toFixed(1)} ml`;
-}
-
-function formatAverageDuration(totalMinutes, feedCount) {
-  if (!feedCount) {
-    return "--";
-  }
-  return formatDurationMinutes(totalMinutes / feedCount);
-}
-
-function formatAverageMl(totalMl, feedCount) {
-  if (!feedCount) {
-    return "--";
-  }
-  return formatMl(totalMl / feedCount);
-}
-
-function normalizeEntryType(value) {
-  if (typeof value !== "string") {
-    return "";
-  }
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/[-_]+/g, " ")
-    .replace(/\s+/g, " ");
 }
 
 function isMilkExpressType(value) {
@@ -4176,29 +3786,6 @@ function isFeedType(value) {
 
 function isSleepType(value) {
   return normalizeEntryType(value) === "sleep";
-}
-
-function parseMilkExpressNotes(value) {
-  if (typeof value !== "string") {
-    return { ml: 0, minutes: 0 };
-  }
-  let ml = 0;
-  let minutes = 0;
-  const pattern = /(\d+(?:\.\d+)?)(?:\s*(ml|milliliter|milliliters|min|mins|minute|minutes))?/gi;
-  let match = pattern.exec(value);
-  while (match) {
-    const amount = Number.parseFloat(match[1]);
-    if (Number.isFinite(amount)) {
-      const unit = (match[2] || "").toLowerCase();
-      if (unit.startsWith("min")) {
-        minutes += amount;
-      } else {
-        ml += amount;
-      }
-    }
-    match = pattern.exec(value);
-  }
-  return { ml, minutes };
 }
 
 function getMilkExpressAmounts(entry) {
@@ -4225,17 +3812,6 @@ function formatMilkExpressDetails(entry) {
     parts.push(formatDurationMinutes(minutes));
   }
   return parts.join(" • ");
-}
-
-function formatEntryTypeLabel(type) {
-  const normalized = normalizeEntryType(type);
-  if (!normalized) {
-    return "Event";
-  }
-  return normalized
-    .split(" ")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
 }
 
 function renderLatestEntry(entry) {
@@ -4327,12 +3903,7 @@ function renderLatestEntry(entry) {
 }
 
 function renderSummaryStats(entries) {
-  if (
-    !summaryFeedDurationEl
-    || !summaryExpressedEl
-    || !summaryFormulaEl
-    || !summaryTotalIntakeEl
-  ) {
+  if (!summaryTotalIntakeEl && !summarySleepDurationEl) {
     return;
   }
   let feedCount = 0;
@@ -4369,10 +3940,18 @@ function renderSummaryStats(entries) {
     }
   });
   const totalIntake = expressedTotal + formulaTotal;
-  summaryFeedDurationEl.textContent = formatDurationMinutes(durationTotal);
-  summaryExpressedEl.textContent = formatMl(expressedTotal);
-  summaryFormulaEl.textContent = formatMl(formulaTotal);
-  summaryTotalIntakeEl.textContent = formatMl(totalIntake);
+  if (summaryFeedDurationEl) {
+    summaryFeedDurationEl.textContent = formatDurationMinutes(durationTotal);
+  }
+  if (summaryExpressedEl) {
+    summaryExpressedEl.textContent = formatMl(expressedTotal);
+  }
+  if (summaryFormulaEl) {
+    summaryFormulaEl.textContent = formatMl(formulaTotal);
+  }
+  if (summaryTotalIntakeEl) {
+    summaryTotalIntakeEl.textContent = formatMl(totalIntake);
+  }
   if (summarySleepDurationEl) {
     summarySleepDurationEl.textContent = formatDurationMinutes(sleepDurationTotal);
   }
@@ -4541,6 +4120,108 @@ function renderMilkExpressSparkline(dayMatches) {
   dot.setAttribute("r", "3.2");
   dot.setAttribute("class", "milk-sparkline-dot");
   milkExpressSparklineEl.appendChild(dot);
+}
+
+function renderSleepTrendChart(entries) {
+  if (!sleepTrendChartEl || !sleepTrendLabelsEl || !sleepTrendAverageChipEl) {
+    return;
+  }
+  sleepTrendChartEl.innerHTML = "";
+  sleepTrendLabelsEl.innerHTML = "";
+  sleepTrendAverageChipEl.textContent = "";
+
+  const today = new Date();
+  const daysShown = 8;
+  const averageWindowDays = 7;
+  const dailyTotals = [];
+
+  for (let i = daysShown - 1; i >= 0; i--) {
+    const date = new Date(today);
+    date.setDate(date.getDate() - i);
+    date.setHours(0, 0, 0, 0);
+    const nextDate = new Date(date);
+    nextDate.setDate(nextDate.getDate() + 1);
+
+    const dayEntries = entries.filter((entry) => {
+      if (!isSleepType(entry.type)) return false;
+      const entryDate = new Date(entry.timestamp_utc);
+      return entryDate >= date && entryDate < nextDate;
+    });
+
+    const totalMinutes = dayEntries.reduce((sum, entry) => {
+      const duration = Number.parseFloat(entry.feed_duration_min);
+      return sum + (Number.isFinite(duration) && duration > 0 ? duration : 0);
+    }, 0);
+
+    dailyTotals.push({ date, totalMinutes });
+  }
+
+  const averageWindowTotals = dailyTotals.slice(0, averageWindowDays);
+  const maxMinutes = Math.max(...dailyTotals.map((d) => d.totalMinutes), 1);
+  const averageMinutes = averageWindowTotals.reduce((sum, day) => sum + day.totalMinutes, 0)
+    / averageWindowDays;
+  const svgNS = "http://www.w3.org/2000/svg";
+  const width = 320;
+  const height = 80;
+  const paddingX = 8;
+  const paddingY = 8;
+  const plotWidth = width - paddingX * 2;
+  const plotHeight = height - paddingY * 2;
+
+  const gridLine = document.createElementNS(svgNS, "line");
+  gridLine.setAttribute("x1", paddingX);
+  gridLine.setAttribute("x2", width - paddingX);
+  gridLine.setAttribute("y1", height - paddingY);
+  gridLine.setAttribute("y2", height - paddingY);
+  gridLine.setAttribute("class", "sleep-trend-grid");
+  sleepTrendChartEl.appendChild(gridLine);
+
+  if (averageMinutes > 0) {
+    sleepTrendAverageChipEl.textContent = `Avg last 7 complete days: ${formatDurationMinutes(averageMinutes)}`;
+    const averageY = height - paddingY - (averageMinutes / maxMinutes) * plotHeight;
+    const averageLine = document.createElementNS(svgNS, "line");
+    averageLine.setAttribute("x1", paddingX);
+    averageLine.setAttribute("x2", width - paddingX);
+    averageLine.setAttribute("y1", averageY.toFixed(1));
+    averageLine.setAttribute("y2", averageY.toFixed(1));
+    averageLine.setAttribute("class", "sleep-trend-average-line");
+    sleepTrendChartEl.appendChild(averageLine);
+  } else {
+    sleepTrendAverageChipEl.textContent = "Avg last 7 complete days: --";
+  }
+
+  const points = dailyTotals.map((day, index) => {
+    const x = paddingX + (index / (daysShown - 1)) * plotWidth;
+    const y = height - paddingY - (day.totalMinutes / maxMinutes) * plotHeight;
+    return { x, y };
+  });
+
+  if (points.length > 1) {
+    const path = document.createElementNS(svgNS, "path");
+    const d = points
+      .map((point, index) => {
+        const cmd = index === 0 ? "M" : "L";
+        return `${cmd}${point.x.toFixed(1)} ${point.y.toFixed(1)}`;
+      })
+      .join(" ");
+    path.setAttribute("d", d);
+    path.setAttribute("class", "sleep-trend-line");
+    sleepTrendChartEl.appendChild(path);
+  }
+
+  points.forEach((point, index) => {
+    const dot = document.createElementNS(svgNS, "circle");
+    dot.setAttribute("cx", point.x.toFixed(1));
+    dot.setAttribute("cy", point.y.toFixed(1));
+    dot.setAttribute("r", "3");
+    dot.setAttribute("class", "sleep-trend-dot");
+    sleepTrendChartEl.appendChild(dot);
+
+    const label = dailyTotals[index].date.toLocaleDateString(undefined, { weekday: "short" });
+    const labelEl = document.createElement("span");
+    labelEl.textContent = label;
+    sleepTrendLabelsEl.appendChild(labelEl);
+  });
 }
 
 function sumMilkExpressMl(entries) {
@@ -5064,7 +4745,7 @@ function getSleepGanttOverlayTypeOptions(entries) {
 
   ["feed", "cry", "wee", "poo"].forEach(pushType);
   TIMED_EVENT_TYPES.forEach(pushType);
-  customEventTypes.forEach(pushType);
+  state.customEventTypes.forEach(pushType);
   (entries || []).forEach((entry) => pushType(entry.type));
   return options;
 }
@@ -5343,6 +5024,9 @@ async function listEntriesLocalSafe(params) {
 async function loadEntriesWithFallback(params) {
   const localEntriesPromise = listEntriesLocalSafe(params);
   try {
+    if (syncInFlight) {
+      await syncInFlight;
+    }
     const serverEntries = await fetchEntries(params);
     try {
       await applyServerEntries(serverEntries);
@@ -5365,6 +5049,9 @@ async function loadEntriesWithFallback(params) {
 async function loadLatestEntryWithFallback() {
   const localEntriesPromise = listEntriesLocalSafe({ limit: 1 });
   try {
+    if (syncInFlight) {
+      await syncInFlight;
+    }
     const serverEntries = await fetchEntries({ limit: 1 });
     try {
       await applyServerEntries(serverEntries);
@@ -6255,32 +5942,6 @@ function toLocalIsoDate(date) {
   return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
 }
 
-function startOfWeekMonday(value) {
-  const date = new Date(value);
-  const day = date.getDay();
-  const diff = (day + 6) % 7;
-  date.setDate(date.getDate() - diff);
-  date.setHours(0, 0, 0, 0);
-  return date;
-}
-
-function formatWeekRange(startDate) {
-  const endDate = new Date(startDate);
-  endDate.setDate(startDate.getDate() + 6);
-  const fmt = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short" });
-  return `Week of ${fmt.format(startDate)} – ${fmt.format(endDate)}`;
-}
-
-function formatDayLabel(date) {
-  const fmt = new Intl.DateTimeFormat(undefined, { weekday: "short" });
-  return fmt.format(date);
-}
-
-function formatDayDate(date) {
-  const fmt = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short" });
-  return fmt.format(date);
-}
-
 function buildCalendarEventCard(event) {
   const card = document.createElement("article");
   card.className = "calendar-event";
@@ -6914,23 +6575,11 @@ function renderStats(entries) {
   }
 }
 
-function formatGoalDateLabel(value) {
-  const parsed = parseDateInputValue(value);
-  if (!parsed) {
-    return value || "--";
-  }
-  return parsed.toLocaleDateString(undefined, {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-  });
-}
-
 function renderGoalComparison() {
   if (!statGoalProgressTodayEl || !statGoalDetailTodayEl) {
     return;
   }
-  if (!activeFeedingGoal) {
+  if (!state.activeFeedingGoal) {
     statGoalProgressTodayEl.textContent = "--";
     statGoalDetailTodayEl.textContent = "Set a 24h goal";
     if (statGoalProgress24hEl) {
@@ -6941,7 +6590,7 @@ function renderGoalComparison() {
     }
     return;
   }
-  const goalValue = Number.parseFloat(activeFeedingGoal.goal_ml);
+  const goalValue = Number.parseFloat(state.activeFeedingGoal.goal_ml);
   if (!Number.isFinite(goalValue) || goalValue <= 0) {
     statGoalProgressTodayEl.textContent = "--";
     statGoalDetailTodayEl.textContent = "Set a 24h goal";
@@ -6982,7 +6631,7 @@ function renderGoalHistory(goals) {
     const metaWrap = document.createElement("div");
     const label = document.createElement("div");
     label.className = "goal-meta";
-    const badge = activeFeedingGoal && goal.id === activeFeedingGoal.id
+    const badge = state.activeFeedingGoal && goal.id === state.activeFeedingGoal.id
       ? "Active"
       : (index === 0 ? "Latest" : "Past");
     label.textContent = `${badge} · ${formatGoalDateLabel(goal.start_date)}`;
@@ -7043,14 +6692,6 @@ function renderGoalHistory(goals) {
     item.appendChild(actions);
     goalHistoryEl.appendChild(item);
   });
-}
-
-function formatRangeLabel(since, until) {
-  const pad = (value) => String(value).padStart(2, "0");
-  const format = (value) => {
-    return `${pad(value.getMonth() + 1)}/${pad(value.getDate())} ${pad(value.getHours())}:${pad(value.getMinutes())}`;
-  };
-  return `${format(since)} - ${format(until)}`;
 }
 
 function renderStatsWindow(windowBounds) {
@@ -7133,7 +6774,7 @@ function buildLogTypeUrl(type) {
 }
 
 function handleStatCardNavigate(event) {
-  if (!userValid) {
+  if (!state.userValid) {
     return;
   }
   const target = event.currentTarget;
@@ -7164,7 +6805,7 @@ function buildEntryPayload(type) {
     type,
     timestamp_utc: new Date().toISOString(),
     client_event_id: generateId(),
-    user_slug: activeUser || null,
+    user_slug: state.activeUser || null,
   };
 }
 
@@ -7173,7 +6814,7 @@ async function saveEntry(payload) {
   const now = new Date().toISOString();
   const entry = {
     ...payload,
-    user_slug: activeUser,
+    user_slug: state.activeUser,
     created_at_utc: now,
     updated_at_utc: now,
     deleted_at_utc: null,
@@ -7194,7 +6835,7 @@ async function saveEntry(payload) {
     }
   } catch (err) {
     try {
-      const response = await fetch(buildUrl(`/api/users/${activeUser}/entries`), {
+      const response = await fetch(buildUrl(`/api/users/${state.activeUser}/entries`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -7415,7 +7056,7 @@ async function getBreastfeedEntryForUpdate(startInfo) {
     client_event_id: startInfo && startInfo.clientEventId
       ? startInfo.clientEventId
       : generateId(),
-    user_slug: (startInfo && startInfo.startedBy) || activeUser || null,
+    user_slug: (startInfo && startInfo.startedBy) || state.activeUser || null,
     type: "feed",
     timestamp_utc: startIso,
     notes: BREASTFEED_IN_PROGRESS_NOTE,
@@ -7444,7 +7085,7 @@ async function getTimedEventEntryForUpdate(startInfo) {
     client_event_id: startInfo && startInfo.clientEventId
       ? startInfo.clientEventId
       : generateId(),
-    user_slug: (startInfo && startInfo.startedBy) || activeUser || null,
+    user_slug: (startInfo && startInfo.startedBy) || state.activeUser || null,
     type: eventType,
     timestamp_utc: startIso,
     notes: null,
@@ -7460,7 +7101,7 @@ async function getTimedEventEntryForUpdate(startInfo) {
 }
 
 async function handleBreastfeedToggle() {
-  if (!userValid) {
+  if (!state.userValid) {
     setStatus("Choose a user below to start logging.");
     return;
   }
@@ -7471,7 +7112,7 @@ async function handleBreastfeedToggle() {
     payload.timestamp_utc = start.toISOString();
     payload.notes = BREASTFEED_IN_PROGRESS_NOTE;
     payload.feed_duration_min = null;
-    setBreastfeedStart(start, activeUser || null, payload.client_event_id);
+    setBreastfeedStart(start, state.activeUser || null, payload.client_event_id);
     updateBreastfeedButton();
     closeFeedMenu();
     setStatus("Breastfeed started");
@@ -7495,7 +7136,7 @@ async function handleBreastfeedToggle() {
 }
 
 async function handleTimedEventToggle(selectedType) {
-  if (!userValid) {
+  if (!state.userValid) {
     setStatus("Choose a user below to start logging.");
     return;
   }
@@ -7510,7 +7151,7 @@ async function handleTimedEventToggle(selectedType) {
     const payload = buildEntryPayload(normalizedType);
     payload.timestamp_utc = start.toISOString();
     payload.feed_duration_min = null;
-    setTimedEventStart(start, normalizedType, activeUser || null, payload.client_event_id);
+    setTimedEventStart(start, normalizedType, state.activeUser || null, payload.client_event_id);
     updateMiscTimedEventControls();
     closeMiscMenu();
     setStatus(`${formatEntryTypeLabel(normalizedType)} started`);
@@ -7536,7 +7177,7 @@ async function handleTimedEventToggle(selectedType) {
 }
 
 async function handleMlEntry(inputEl, label) {
-  if (!userValid) {
+  if (!state.userValid) {
     setStatus("Choose a user below to start logging.");
     return;
   }
@@ -7569,7 +7210,7 @@ function renderEditEntryTypeOptions(currentType) {
   }
   const normalizedCurrent = String(currentType || "").trim().toLowerCase();
   const baseOptions = ["feed", "wee", "poo", "milk express", ...TIMED_EVENT_TYPES];
-  const options = [...new Set([...baseOptions, ...customEventTypes])].filter(Boolean);
+  const options = [...new Set([...baseOptions, ...state.customEventTypes])].filter(Boolean);
   if (normalizedCurrent && !options.includes(normalizedCurrent)) {
     options.push(normalizedCurrent);
   }
@@ -8084,7 +7725,7 @@ async function loadGoalHistory() {
   try {
     const goals = await loadFeedingGoals(50);
     const currentGoal = await loadCurrentGoal();
-    activeFeedingGoal = currentGoal;
+    state.activeFeedingGoal = currentGoal;
     renderGoalHistory(goals);
     renderGoalComparison();
     if (goalStartDateInputEl && !goalStartDateInputEl.value) {
@@ -8140,7 +7781,7 @@ async function loadHomeEntries() {
       }),
       loadCurrentGoal(),
     ]);
-    activeFeedingGoal = currentGoal;
+    state.activeFeedingGoal = currentGoal;
     const chartEntries = entries.filter((entry) => entryOverlapsChartWindow(entry, chartWindow));
     renderChart(chartEntries, chartWindow);
     renderStats(entries);
@@ -8173,6 +7814,13 @@ async function loadSummaryEntries() {
       sinceIso: ganttWindow.sinceIso,
       untilIso: ganttWindow.untilIso,
     };
+    const trendWindow = {
+      since: new Date(ganttWindow.since),
+      until: ganttWindow.until,
+    };
+    trendWindow.since.setDate(trendWindow.since.getDate() - 6);
+    trendWindow.sinceIso = trendWindow.since.toISOString();
+    trendWindow.untilIso = trendWindow.until.toISOString();
     const cachedEntries = await listEntriesLocalSafe({
       limit: 200,
       since: dayWindow.sinceIso,
@@ -8183,6 +7831,11 @@ async function loadSummaryEntries() {
       since: ganttWindow.lookbackSinceIso,
       until: ganttWindow.untilIso,
     });
+    const cachedTrendEntries = await listEntriesLocalSafe({
+      limit: 500,
+      since: trendWindow.sinceIso,
+      until: trendWindow.untilIso,
+    });
     if (cachedEntries) {
       summaryEntries = cachedEntries;
       summaryGanttEntries = cachedGanttEntries || cachedEntries;
@@ -8190,11 +7843,12 @@ async function loadSummaryEntries() {
       renderSleepGanttTypeOptions(cachedEntries);
       renderSleepGantt(summaryGanttEntries.length ? summaryGanttEntries : cachedEntries);
       renderMilkExpressSummary(cachedEntries);
+      renderSleepTrendChart(cachedTrendEntries || cachedEntries);
     }
 
     void syncNow();
 
-    const [entries, ganttEntries] = await Promise.all([
+    const [entries, ganttEntries, trendEntries] = await Promise.all([
       loadEntriesWithFallback({
         limit: 200,
         since: dayWindow.sinceIso,
@@ -8205,6 +7859,11 @@ async function loadSummaryEntries() {
         since: ganttWindow.lookbackSinceIso,
         until: ganttWindow.untilIso,
       }),
+      loadEntriesWithFallback({
+        limit: 500,
+        since: trendWindow.sinceIso,
+        until: trendWindow.untilIso,
+      }),
       ensureMilkExpressAllEntries(),
     ]);
     summaryEntries = entries;
@@ -8213,6 +7872,7 @@ async function loadSummaryEntries() {
     renderSleepGanttTypeOptions(entries);
     renderSleepGantt(ganttEntries.length ? ganttEntries : entries);
     renderMilkExpressSummary(entries);
+    renderSleepTrendChart(trendEntries);
     await loadSummaryInsights();
   } catch (err) {
     setStatus(`Failed to load entries: ${err.message || "unknown error"}`);
@@ -8481,25 +8141,25 @@ async function loadBabySettings() {
       return;
     }
     const data = await response.json();
-    babyDob = data.dob || null;
-    feedIntervalMinutes = Number.isInteger(data.feed_interval_min)
+    state.babyDob = data.dob || null;
+    state.feedIntervalMinutes = Number.isInteger(data.feed_interval_min)
       ? data.feed_interval_min
       : null;
-    customEventTypes = Array.isArray(data.custom_event_types)
+    state.customEventTypes = Array.isArray(data.custom_event_types)
       ? data.custom_event_types
       : [];
-    feedSizeSmallMl = Number.isFinite(Number.parseFloat(data.feed_size_small_ml))
+    state.feedSizeSmallMl = Number.isFinite(Number.parseFloat(data.feed_size_small_ml))
       ? Number.parseFloat(data.feed_size_small_ml)
       : 120;
-    feedSizeBigMl = Number.isFinite(Number.parseFloat(data.feed_size_big_ml))
+    state.feedSizeBigMl = Number.isFinite(Number.parseFloat(data.feed_size_big_ml))
       ? Number.parseFloat(data.feed_size_big_ml)
       : 150;
     if (dobInputEl) {
-      dobInputEl.value = babyDob || "";
+      dobInputEl.value = state.babyDob || "";
     }
     if (intervalInputEl) {
-      intervalInputEl.value = feedIntervalMinutes
-        ? String(feedIntervalMinutes / 60)
+      intervalInputEl.value = state.feedIntervalMinutes
+        ? String(state.feedIntervalMinutes / 60)
         : "";
     }
     if (entryWebhookInputEl) {
@@ -8512,10 +8172,10 @@ async function loadBabySettings() {
       defaultUserInputEl.value = data.default_user_slug || "";
     }
     if (feedSizeSmallInputEl) {
-      feedSizeSmallInputEl.value = String(feedSizeSmallMl);
+      feedSizeSmallInputEl.value = String(state.feedSizeSmallMl);
     }
     if (feedSizeBigInputEl) {
-      feedSizeBigInputEl.value = String(feedSizeBigMl);
+      feedSizeBigInputEl.value = String(state.feedSizeBigMl);
     }
     applyCustomEventTypes();
     updateAgeDisplay();
@@ -8539,17 +8199,17 @@ async function saveBabySettings(patch) {
       return;
     }
     const data = await response.json();
-    babyDob = data.dob || null;
-    feedIntervalMinutes = Number.isInteger(data.feed_interval_min)
+    state.babyDob = data.dob || null;
+    state.feedIntervalMinutes = Number.isInteger(data.feed_interval_min)
       ? data.feed_interval_min
       : null;
-    customEventTypes = Array.isArray(data.custom_event_types)
+    state.customEventTypes = Array.isArray(data.custom_event_types)
       ? data.custom_event_types
       : [];
-    feedSizeSmallMl = Number.isFinite(Number.parseFloat(data.feed_size_small_ml))
+    state.feedSizeSmallMl = Number.isFinite(Number.parseFloat(data.feed_size_small_ml))
       ? Number.parseFloat(data.feed_size_small_ml)
       : 120;
-    feedSizeBigMl = Number.isFinite(Number.parseFloat(data.feed_size_big_ml))
+    state.feedSizeBigMl = Number.isFinite(Number.parseFloat(data.feed_size_big_ml))
       ? Number.parseFloat(data.feed_size_big_ml)
       : 150;
     if (entryWebhookInputEl) {
@@ -8562,10 +8222,10 @@ async function saveBabySettings(patch) {
       defaultUserInputEl.value = data.default_user_slug || "";
     }
     if (feedSizeSmallInputEl) {
-      feedSizeSmallInputEl.value = String(feedSizeSmallMl);
+      feedSizeSmallInputEl.value = String(state.feedSizeSmallMl);
     }
     if (feedSizeBigInputEl) {
-      feedSizeBigInputEl.value = String(feedSizeBigMl);
+      feedSizeBigInputEl.value = String(state.feedSizeBigMl);
     }
     applyCustomEventTypes();
     updateAgeDisplay();
