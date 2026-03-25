@@ -404,6 +404,106 @@
         font-size: 13px;
         color: var(--text-secondary);
       }
+      .home-sleep-trend-card {
+        margin-top: 16px;
+        background: #ffffff;
+        border-radius: 18px;
+        padding: 16px;
+        border: 1px solid #e5ebe6;
+        box-shadow: 0 8px 18px rgba(0, 0, 0, 0.08);
+      }
+      html.dark .home-sleep-trend-card {
+        background: var(--card-dark);
+        border-color: rgba(255, 255, 255, 0.06);
+      }
+      .home-sleep-trend-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 12px;
+      }
+      .home-sleep-trend-header h3 {
+        margin: 0;
+        font-size: 15px;
+        font-weight: 700;
+      }
+      .home-sleep-trend-meta-copy {
+        margin-top: 3px;
+        font-size: 11px;
+        color: var(--text-secondary);
+      }
+      .sleep-trend-chart-wrap {
+        padding: 10px 0;
+      }
+      .sleep-trend-meta {
+        display: flex;
+        justify-content: flex-start;
+        margin: 0 0 8px;
+      }
+      .sleep-trend-chart-wrap svg {
+        display: block;
+        width: 100%;
+        height: 80px;
+      }
+      .sleep-trend-line {
+        stroke: #7c83ff;
+        stroke-width: 2;
+        fill: none;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      .sleep-trend-dot {
+        fill: #7c83ff;
+      }
+      .sleep-trend-grid {
+        stroke: var(--border-light);
+        stroke-width: 1;
+      }
+      html.dark .sleep-trend-grid {
+        stroke: var(--border-dark);
+      }
+      .sleep-trend-average-line {
+        stroke: #de6b6b;
+        stroke-width: 1.5;
+        stroke-dasharray: 5 4;
+      }
+      html.dark .sleep-trend-average-line {
+        stroke: #f08a8a;
+      }
+      .sleep-trend-average-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 10px;
+        border-radius: 999px;
+        background: rgba(255, 241, 241, 0.96);
+        border: 1px solid rgba(209, 67, 67, 0.22);
+        color: #d14343;
+        font-size: 11px;
+        font-weight: 700;
+        line-height: 1;
+      }
+      .sleep-trend-average-chip::before {
+        content: "";
+        width: 14px;
+        height: 0;
+        border-top: 2px dashed currentColor;
+        opacity: 0.85;
+      }
+      html.dark .sleep-trend-average-chip {
+        background: rgba(127, 29, 29, 0.28);
+        border-color: rgba(255, 180, 180, 0.34);
+        color: #ffb4b4;
+      }
+      .sleep-trend-labels {
+        display: flex;
+        justify-content: space-between;
+        font-size: 10px;
+        color: var(--text-secondary);
+        padding: 0 4px;
+        margin-top: 4px;
+      }
       .edit-modal-backdrop {
         position: fixed;
         inset: 0;
@@ -1387,6 +1487,10 @@
               <span class="material-symbols-outlined" aria-hidden="true">track_changes</span>
               <span class="nav-menu-label">Feeding goals</span>
             </a>
+            <a class="nav-menu-item" id="weight-link" href="{{ base_path }}/weight" role="menuitem">
+              <span class="material-symbols-outlined" aria-hidden="true">monitor_weight</span>
+              <span class="nav-menu-label">Weight</span>
+            </a>
             <a class="nav-menu-item" id="bottles-link" href="{{ base_path }}/bottles" role="menuitem">
               <span class="material-symbols-outlined" aria-hidden="true">local_drink</span>
               <span class="nav-menu-label">Bottle library</span>
@@ -1629,6 +1733,22 @@
             </div>
             <div class="user-hint">Saved on this device.</div>
           </form>
+        </section>
+
+        <section class="home-sleep-trend-card">
+          <div class="home-sleep-trend-header">
+            <div>
+              <h3>Sleep trend</h3>
+              <div class="home-sleep-trend-meta-copy">Today + last 7 complete days</div>
+            </div>
+          </div>
+          <div class="sleep-trend-chart-wrap">
+            <div class="sleep-trend-meta">
+              <div class="sleep-trend-average-chip" id="home-sleep-trend-average-chip"></div>
+            </div>
+            <svg id="home-sleep-trend-chart" viewBox="0 0 320 80" role="img" aria-label="Daily sleep trend for today plus the last 7 complete days"></svg>
+            <div class="sleep-trend-labels" id="home-sleep-trend-labels"></div>
+          </div>
         </section>
 
         <div class="edit-modal-backdrop" id="edit-entry-backdrop" hidden></div>

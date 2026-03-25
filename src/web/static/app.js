@@ -176,6 +176,9 @@ const insightTimeframeBodyEl = document.getElementById("insight-timeframe-body")
 const sleepTrendChartEl = document.getElementById("sleep-trend-chart");
 const sleepTrendLabelsEl = document.getElementById("sleep-trend-labels");
 const sleepTrendAverageChipEl = document.getElementById("sleep-trend-average-chip");
+const homeSleepTrendChartEl = document.getElementById("home-sleep-trend-chart");
+const homeSleepTrendLabelsEl = document.getElementById("home-sleep-trend-labels");
+const homeSleepTrendAverageChipEl = document.getElementById("home-sleep-trend-average-chip");
 
 const timelineWrapEl = document.getElementById("timeline-wrap");
 const timelineTrackEl = document.getElementById("timeline-track");
@@ -3902,6 +3905,29 @@ function renderLatestEntry(entry) {
   }
 }
 
+function getClippedSleepMinutesForDay(entries, date) {
+  const dayWindow = getSummaryDayWindow(date || new Date());
+  const dayStartMs = dayWindow.since.getTime();
+  const dayEndMs = dayWindow.until.getTime();
+  return (entries || []).reduce((total, entry) => {
+    if (!entry || !isSleepType(entry.type) || entry.deleted_at_utc) {
+      return total;
+    }
+    const startMs = Date.parse(entry.timestamp_utc || "");
+    const durationMin = Number.parseFloat(entry.feed_duration_min);
+    if (!Number.isFinite(startMs) || !Number.isFinite(durationMin) || durationMin <= 0) {
+      return total;
+    }
+    const endMs = startMs + durationMin * 60000;
+    const clippedStartMs = Math.max(dayStartMs, startMs);
+    const clippedEndMs = Math.min(dayEndMs, endMs);
+    if (clippedEndMs <= clippedStartMs) {
+      return total;
+    }
+    return total + ((clippedEndMs - clippedStartMs) / 60000);
+  }, 0);
+}
+
 function renderSummaryStats(entries) {
   if (!summaryTotalIntakeEl && !summarySleepDurationEl) {
     return;
@@ -3953,7 +3979,10 @@ function renderSummaryStats(entries) {
     summaryTotalIntakeEl.textContent = formatMl(totalIntake);
   }
   if (summarySleepDurationEl) {
-    summarySleepDurationEl.textContent = formatDurationMinutes(sleepDurationTotal);
+    const displayedSleepDuration = pageType === "summary"
+      ? getClippedSleepMinutesForDay(summaryGanttEntries.length ? summaryGanttEntries : entries, summaryDate)
+      : sleepDurationTotal;
+    summarySleepDurationEl.textContent = formatDurationMinutes(displayedSleepDuration);
   }
   if (summaryFeedDurationAvgEl) {
     summaryFeedDurationAvgEl.textContent = `Avg / feed: ${formatAverageDuration(
@@ -4122,15 +4151,15 @@ function renderMilkExpressSparkline(dayMatches) {
   milkExpressSparklineEl.appendChild(dot);
 }
 
-function renderSleepTrendChart(entries) {
-  if (!sleepTrendChartEl || !sleepTrendLabelsEl || !sleepTrendAverageChipEl) {
+function renderSleepTrendChartInto(entries, { chartEl, labelsEl, averageChipEl, baseDate }) {
+  if (!chartEl || !labelsEl || !averageChipEl) {
     return;
   }
-  sleepTrendChartEl.innerHTML = "";
-  sleepTrendLabelsEl.innerHTML = "";
-  sleepTrendAverageChipEl.textContent = "";
+  chartEl.innerHTML = "";
+  labelsEl.innerHTML = "";
+  averageChipEl.textContent = "";
 
-  const today = new Date();
+  const today = baseDate ? new Date(baseDate) : new Date();
   const daysShown = 8;
   const averageWindowDays = 7;
   const dailyTotals = [];
@@ -4174,10 +4203,10 @@ function renderSleepTrendChart(entries) {
   gridLine.setAttribute("y1", height - paddingY);
   gridLine.setAttribute("y2", height - paddingY);
   gridLine.setAttribute("class", "sleep-trend-grid");
-  sleepTrendChartEl.appendChild(gridLine);
+  chartEl.appendChild(gridLine);
 
   if (averageMinutes > 0) {
-    sleepTrendAverageChipEl.textContent = `Avg last 7 complete days: ${formatDurationMinutes(averageMinutes)}`;
+    averageChipEl.textContent = `Avg last 7 complete days: ${formatDurationMinutes(averageMinutes)}`;
     const averageY = height - paddingY - (averageMinutes / maxMinutes) * plotHeight;
     const averageLine = document.createElementNS(svgNS, "line");
     averageLine.setAttribute("x1", paddingX);
@@ -4185,9 +4214,9 @@ function renderSleepTrendChart(entries) {
     averageLine.setAttribute("y1", averageY.toFixed(1));
     averageLine.setAttribute("y2", averageY.toFixed(1));
     averageLine.setAttribute("class", "sleep-trend-average-line");
-    sleepTrendChartEl.appendChild(averageLine);
+    chartEl.appendChild(averageLine);
   } else {
-    sleepTrendAverageChipEl.textContent = "Avg last 7 complete days: --";
+    averageChipEl.textContent = "Avg last 7 complete days: --";
   }
 
   const points = dailyTotals.map((day, index) => {
@@ -4202,11 +4231,11 @@ function renderSleepTrendChart(entries) {
       .map((point, index) => {
         const cmd = index === 0 ? "M" : "L";
         return `${cmd}${point.x.toFixed(1)} ${point.y.toFixed(1)}`;
-      })
+    })
       .join(" ");
     path.setAttribute("d", d);
     path.setAttribute("class", "sleep-trend-line");
-    sleepTrendChartEl.appendChild(path);
+    chartEl.appendChild(path);
   }
 
   points.forEach((point, index) => {
@@ -4215,12 +4244,30 @@ function renderSleepTrendChart(entries) {
     dot.setAttribute("cy", point.y.toFixed(1));
     dot.setAttribute("r", "3");
     dot.setAttribute("class", "sleep-trend-dot");
-    sleepTrendChartEl.appendChild(dot);
+    chartEl.appendChild(dot);
 
     const label = dailyTotals[index].date.toLocaleDateString(undefined, { weekday: "short" });
     const labelEl = document.createElement("span");
     labelEl.textContent = label;
-    sleepTrendLabelsEl.appendChild(labelEl);
+    labelsEl.appendChild(labelEl);
+  });
+}
+
+function renderSleepTrendChart(entries) {
+  renderSleepTrendChartInto(entries, {
+    chartEl: sleepTrendChartEl,
+    labelsEl: sleepTrendLabelsEl,
+    averageChipEl: sleepTrendAverageChipEl,
+    baseDate: summaryDate || new Date(),
+  });
+}
+
+function renderHomeSleepTrendChart(entries) {
+  renderSleepTrendChartInto(entries, {
+    chartEl: homeSleepTrendChartEl,
+    labelsEl: homeSleepTrendLabelsEl,
+    averageChipEl: homeSleepTrendAverageChipEl,
+    baseDate: new Date(),
   });
 }
 
@@ -4973,7 +5020,10 @@ function renderSleepGantt(entries) {
     sleepGanttChartEl.appendChild(marker);
   });
 
-  const sleepMinutes = sleepBars.reduce((total, bar) => total + bar.durationMin, 0);
+  const sleepMinutes = sleepBars.reduce(
+    (total, bar) => total + ((bar.clippedEndMs - bar.clippedStartMs) / 60000),
+    0,
+  );
   setSleepGanttReadout(
     `${formatDurationMinutes(sleepMinutes)} sleep across ${sleepBars.length} session${sleepBars.length === 1 ? "" : "s"} • ${overlays.length} selected event${overlays.length === 1 ? "" : "s"}.`,
   );
@@ -7752,11 +7802,23 @@ async function loadHomeEntries() {
       since: new Date(now.getFullYear(), now.getMonth(), now.getDate()),
       until: now,
     };
+    const homeSleepTrendWindow = {
+      since: new Date(todayWindow.since),
+      until: now,
+    };
+    homeSleepTrendWindow.since.setDate(homeSleepTrendWindow.since.getDate() - 7);
+    homeSleepTrendWindow.sinceIso = homeSleepTrendWindow.since.toISOString();
+    homeSleepTrendWindow.untilIso = homeSleepTrendWindow.until.toISOString();
     const chartWindow = computeWindow(6);
     const cachedEntries = await listEntriesLocalSafe({
       limit: 200,
       since: statsWindow.sinceIso,
       until: statsWindow.untilIso,
+    });
+    const cachedSleepTrendEntries = await listEntriesLocalSafe({
+      limit: 500,
+      since: homeSleepTrendWindow.sinceIso,
+      until: homeSleepTrendWindow.untilIso,
     });
     if (cachedEntries) {
       const cachedChartEntries = cachedEntries.filter((entry) => entryOverlapsChartWindow(entry, chartWindow));
@@ -7767,19 +7829,26 @@ async function loadHomeEntries() {
       renderLastActivity(cachedEntries);
       renderLastByType(cachedEntries);
       renderLatestEntry(cachedEntries[0] || null);
+      renderHomeSleepTrendChart(cachedSleepTrendEntries || cachedEntries);
     } else {
       renderLatestEntry(null);
+      renderHomeSleepTrendChart(cachedSleepTrendEntries || []);
     }
 
     void syncNow();
 
-    const [entries, currentGoal] = await Promise.all([
+    const [entries, currentGoal, sleepTrendEntries] = await Promise.all([
       loadEntriesWithFallback({
         limit: 200,
         since: statsWindow.sinceIso,
         until: statsWindow.untilIso,
       }),
       loadCurrentGoal(),
+      loadEntriesWithFallback({
+        limit: 500,
+        since: homeSleepTrendWindow.sinceIso,
+        until: homeSleepTrendWindow.untilIso,
+      }),
     ]);
     state.activeFeedingGoal = currentGoal;
     const chartEntries = entries.filter((entry) => entryOverlapsChartWindow(entry, chartWindow));
@@ -7790,6 +7859,7 @@ async function loadHomeEntries() {
     renderLastActivity(entries);
     renderLastByType(entries);
     renderLatestEntry(entries[0] || null);
+    renderHomeSleepTrendChart(sleepTrendEntries);
   } catch (err) {
     setStatus(`Failed to load entries: ${err.message || "unknown error"}`);
   } finally {
@@ -7818,7 +7888,7 @@ async function loadSummaryEntries() {
       since: new Date(ganttWindow.since),
       until: ganttWindow.until,
     };
-    trendWindow.since.setDate(trendWindow.since.getDate() - 6);
+    trendWindow.since.setDate(trendWindow.since.getDate() - 7);
     trendWindow.sinceIso = trendWindow.since.toISOString();
     trendWindow.untilIso = trendWindow.until.toISOString();
     const cachedEntries = await listEntriesLocalSafe({

@@ -12,6 +12,19 @@
 - gradual frontend refactor of `src/web/static/app.js` into modules. *plan in `docs/plans/2026-03-18-app-js-refactor-plan.md`
 
 ## DONE
+- aligned the Summary total sleep card with the 24h sleep timeline on 2026-03-25 by clipping sleep totals to the selected midnight-to-midnight day in `src/web/static/app.js`.
+- fixed the Summary 24h sleep timeline subtotal on 2026-03-25 so the readout counts only the portion of each sleep session that falls after midnight in `src/web/static/app.js`.
+- copied the Summary sleep trend chart to the bottom of the home page on 2026-03-25 by adding a home-page card in `src/web/templates/index.html` and loading a dedicated 8-day sleep trend dataset in `src/web/static/app.js`.
+- fixed the Summary 7-day sleep trend first-day zero bug on 2026-03-25 by fetching the full 8-day chart window and anchoring the chart buckets to the active `summaryDate` in `src/web/static/app.js`.
+- added edit/delete controls for saved weight entries on 2026-03-23 in `src/web/templates/weight.html`, plus backend support for updating `weight_kg` in `src/app/services/entries.py` and `src/app/storage/entries.py`.
+- fixed the weight page inline module import on 2026-03-23 by loading `buildUrl` from `{{ base_path }}/static/app/core/config.js`, so the page script actually runs on `/weight` instead of failing on a bad relative import in `src/web/templates/weight.html`.
+- fixed the weight page save/history flow on 2026-03-23 by posting `timestamp_utc` + `client_event_id` to the user-scoped entries API, filtering history to the active user, and rendering saved weights from `timestamp_utc` in `src/web/templates/weight.html`.
+- added `weight_kg` column to entries table via schema.sql, db.py migration, and storage layer updates in `src/app/storage/entries.py` on 2026-03-23.
+- added weight page link to navigation menus in goals.html, log.html, timeline.html, summary.html, settings.html, index.html, bottles.html, calendar.html (weight page now accessible from all page menus) on 2026-03-23.
+- created `/src/web/templates/weight.html` - a new template with weight input form, goal suggestions display (150x and 200x), "Apply to goals" buttons, and weight history on 2026-03-23.
+- added `weight_kg` validation in `/src/lib/validation.py` on 2026-03-23.
+- added `render_weight_page()` helper and `/weight` route in `/src/app/main.py` on 2026-03-23.
+- added `/<user_slug>/weight` user-scoped route in `/src/app/main.py` on 2026-03-23.
 - changed the Summary sleep trend to show today plus the prior 7 complete days on 2026-03-19, while calculating the average from only those 7 complete days in `src/web/static/app.js` and `src/web/templates/summary.html`.
 - moved the Summary sleep trend average legend fully outside the chart area on 2026-03-19 so it cannot overlap any plotted data in `src/web/templates/summary.html` and `src/web/static/app.js`.
 - moved the Summary sleep trend average label to the top edge of the chart on 2026-03-19 so it stays clear of all data lines in `src/web/static/app.js`.
@@ -67,6 +80,10 @@
 - added integration coverage for timed-event start APIs in `tests/integration/test_feed_log_api.py` (default user slug, user override, and payload fields) on 2026-03-08.
 
 ## NOTES
+- syntax check run on 2026-03-25 after Summary total sleep card alignment: `node --input-type=module --check < src/web/static/app.js`.
+- syntax check run on 2026-03-25 after Summary sleep timeline subtotal fix: `node --input-type=module --check < src/web/static/app.js`.
+- syntax check run on 2026-03-25 after home-page sleep trend addition: `node --input-type=module --check < src/web/static/app.js`.
+- syntax check run on 2026-03-25 after Summary sleep trend window fix: `node --input-type=module --check < src/web/static/app.js`.
 - tests run on 2026-03-19 after Summary 8-day trend / 7-complete-day average update: `./.venv/bin/pytest` -> `103 passed, 6 skipped`.
 - tests run on 2026-03-19 after Summary average legend moved outside chart: `./.venv/bin/pytest` -> `103 passed, 6 skipped`.
 - tests run on 2026-03-19 after Summary average-label top-edge move: `./.venv/bin/pytest` -> `103 passed, 6 skipped`.
