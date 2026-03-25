@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS entries (
     expressed_ml REAL,
     formula_ml REAL,
     feed_duration_min REAL,
+    weight_kg REAL,
     caregiver_id INTEGER,
     created_at_utc TEXT NOT NULL,
     updated_at_utc TEXT NOT NULL,

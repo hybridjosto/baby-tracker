@@ -26,6 +26,7 @@ def init_db(db_path: str) -> None:
         _ensure_user_slug_column(conn)
         _ensure_feed_duration_column(conn)
         _ensure_feed_amount_columns(conn)
+        _ensure_entries_weight_kg_column(conn)
         _ensure_entries_deleted_at_column(conn)
         _ensure_settings_table(conn)
         _ensure_bottles_table(conn)
@@ -123,6 +124,14 @@ def _ensure_feed_amount_columns(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE entries ADD COLUMN expressed_ml REAL")
     if "formula_ml" not in columns:
         conn.execute("ALTER TABLE entries ADD COLUMN formula_ml REAL")
+
+
+def _ensure_entries_weight_kg_column(conn: sqlite3.Connection) -> None:
+    columns = {
+        row["name"] for row in conn.execute("PRAGMA table_info(entries)").fetchall()
+    }
+    if "weight_kg" not in columns:
+        conn.execute("ALTER TABLE entries ADD COLUMN weight_kg REAL")
 
 
 def _ensure_entries_deleted_at_column(conn: sqlite3.Connection) -> None:

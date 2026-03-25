@@ -1,0 +1,530 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Baby Weight</title>
+    <link rel="manifest" href="{{ base_path }}/static/manifest.json">
+    <link rel="apple-touch-icon" href="{{ base_path }}/apple-touch-icon.png">
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    >
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@400;600"
+      rel="stylesheet"
+    >
+    <link rel="stylesheet" href="{{ base_path }}/static/styles.css?v={{ static_version }}">
+    <script>
+      (() => {
+        const stored = localStorage.getItem("baby-tracker-theme");
+        const prefersDark = window.matchMedia
+          && window.matchMedia("(prefers-color-scheme: dark)").matches;
+        const theme = stored || (prefersDark ? "dark" : "light");
+        if (theme === "dark") {
+          document.documentElement.classList.add("dark");
+        }
+      })();
+    </script>
+    <style>
+      .card {
+        max-width: 560px;
+        margin: 0 auto;
+      }
+      h1 {
+        margin: 0;
+        font-size: 24px;
+      }
+      .user-chip {
+        margin: 6px 0 18px;
+      }
+      .field {
+        margin-bottom: 16px;
+      }
+      label {
+        display: block;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: var(--text-secondary);
+        margin-bottom: 6px;
+      }
+      input {
+        width: 100%;
+        border-radius: 10px;
+        border: 1px solid var(--border-light);
+        padding: 10px 12px;
+        font-size: 16px;
+        background: #ffffff;
+        color: var(--text-primary);
+        box-sizing: border-box;
+      }
+      html.dark input {
+        background: rgba(26, 44, 32, 0.9);
+        border-color: var(--border-dark);
+        color: #ffffff;
+      }
+      .add-btn {
+        border-radius: 10px;
+        border: none;
+        padding: 10px 14px;
+        background: var(--primary);
+        color: #0f1a12;
+        font-weight: 700;
+        cursor: pointer;
+        width: 100%;
+      }
+      .hint {
+        font-size: 12px;
+        color: var(--text-secondary);
+        margin-top: 6px;
+      }
+      .section-title {
+        margin: 18px 0 8px;
+        font-size: 14px;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: var(--text-secondary);
+      }
+      .weight-display {
+        padding: 16px;
+        border-radius: 12px;
+        background: var(--surface-soft);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 16px;
+      }
+      html.dark .weight-display {
+        background: rgba(255, 255, 255, 0.08);
+      }
+      .weight-value {
+        font-size: 28px;
+        font-weight: 700;
+      }
+      .weight-date {
+        font-size: 13px;
+        color: var(--text-secondary);
+      }
+      .suggestion-card {
+        padding: 14px;
+        border-radius: 12px;
+        border: 1px solid var(--border-light);
+        background: var(--surface-soft);
+        margin-bottom: 10px;
+      }
+      html.dark .suggestion-card {
+        border-color: var(--border-dark);
+        background: rgba(255, 255, 255, 0.08);
+      }
+      .suggestion-title {
+        font-size: 12px;
+        color: var(--text-secondary);
+        margin-bottom: 6px;
+      }
+      .suggestion-value {
+        font-size: 20px;
+        font-weight: 700;
+      }
+      .suggestion-action {
+        margin-top: 8px;
+      }
+      .apply-goal-btn {
+        border-radius: 8px;
+        border: 1px solid var(--border-light);
+        padding: 6px 10px;
+        font-size: 12px;
+        background: #ffffff;
+        color: var(--text-primary);
+        cursor: pointer;
+      }
+      html.dark .apply-goal-btn {
+        border-color: var(--border-dark);
+        background: rgba(255, 255, 255, 0.1);
+        color: #f3f6f4;
+      }
+      .status {
+        margin-top: 12px;
+        font-size: 12px;
+        color: var(--text-secondary);
+      }
+      .history-list {
+        display: grid;
+        gap: 8px;
+      }
+      .history-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 12px;
+        border-radius: 10px;
+        background: var(--surface-soft);
+      }
+      html.dark .history-item {
+        background: rgba(255, 255, 255, 0.08);
+      }
+      .history-meta {
+        font-size: 12px;
+        color: var(--text-secondary);
+      }
+      .history-weight {
+        font-weight: 700;
+      }
+      .history-main {
+        display: grid;
+        gap: 2px;
+      }
+      .history-actions {
+        display: flex;
+        gap: 8px;
+      }
+      .history-btn {
+        border: 1px solid var(--border-light);
+        border-radius: 8px;
+        padding: 6px 10px;
+        font-size: 12px;
+        background: #ffffff;
+        color: var(--text-primary);
+        cursor: pointer;
+      }
+      .history-btn.is-danger {
+        color: #b91c1c;
+      }
+      html.dark .history-btn {
+        border-color: var(--border-dark);
+        background: rgba(255, 255, 255, 0.1);
+        color: #f3f6f4;
+      }
+      html.dark .history-btn.is-danger {
+        color: #fca5a5;
+      }
+    </style>
+  </head>
+  <body data-page="weight" data-base-path="{{ base_path }}" data-user="{{ user_slug }}" data-user-valid="{{ 'true' if user_valid else 'false' }}">
+    <div class="page">
+      <div class="card">
+        <div class="nav-row">
+          <h1>Baby weight</h1>
+          <div class="nav-actions">
+            <button class="nav-menu-toggle" id="nav-menu-toggle" type="button" aria-label="Open navigation menu" aria-haspopup="true" aria-expanded="false" aria-controls="nav-menu-panel">
+              <span class="material-symbols-outlined" aria-hidden="true">menu</span>
+              <span>Menu</span>
+            </button>
+            <div class="nav-menu-panel" id="nav-menu-panel" role="menu" aria-hidden="true">
+              <a class="nav-menu-item" id="home-link" href="{{ base_path }}/" role="menuitem">
+                <span class="material-symbols-outlined" aria-hidden="true">home</span>
+                <span class="nav-menu-label">Home</span>
+              </a>
+              <a class="nav-menu-item" id="log-link" href="{{ base_path }}/log" role="menuitem">
+                <span class="material-symbols-outlined" aria-hidden="true">list_alt</span>
+                <span class="nav-menu-label">Event log</span>
+              </a>
+              <a class="nav-menu-item" id="timeline-link" href="{{ base_path }}/timeline" role="menuitem">
+                <span class="material-symbols-outlined" aria-hidden="true">history</span>
+                <span class="nav-menu-label">Timeline</span>
+              </a>
+              <a class="nav-menu-item" id="summary-link" href="{{ base_path }}/summary" role="menuitem">
+                <span class="material-symbols-outlined" aria-hidden="true">query_stats</span>
+                <span class="nav-menu-label">Summary</span>
+              </a>
+              <a class="nav-menu-item" href="{{ base_path }}/calendar" role="menuitem">
+                <span class="material-symbols-outlined" aria-hidden="true">calendar_month</span>
+                <span class="nav-menu-label">Calendar</span>
+              </a>
+              <a class="nav-menu-item" href="{{ base_path }}/milk-express" role="menuitem">
+                <span class="material-symbols-outlined" aria-hidden="true">science</span>
+                <span class="nav-menu-label">Milk express</span>
+              </a>
+              <a class="nav-menu-item" id="goals-link" href="{{ base_path }}/goals" role="menuitem">
+                <span class="material-symbols-outlined" aria-hidden="true">track_changes</span>
+                <span class="nav-menu-label">Feeding goals</span>
+              </a>
+              <a class="nav-menu-item" href="{{ base_path }}/bottles" role="menuitem">
+                <span class="material-symbols-outlined" aria-hidden="true">local_drink</span>
+                <span class="nav-menu-label">Bottle library</span>
+              </a>
+              <a class="nav-menu-item" id="weight-link" href="{{ base_path }}/weight" role="menuitem">
+                <span class="material-symbols-outlined" aria-hidden="true">monitor_weight</span>
+                <span class="nav-menu-label">Weight</span>
+              </a>
+              <a class="nav-menu-item" href="{{ base_path }}/settings" role="menuitem">
+                <span class="material-symbols-outlined" aria-hidden="true">settings</span>
+                <span class="nav-menu-label">Settings</span>
+              </a>
+              <button class="nav-menu-item" id="theme-toggle" type="button" role="menuitem" aria-label="Switch to light mode">
+                <span class="material-symbols-outlined" aria-hidden="true">dark_mode</span>
+                <span class="nav-menu-label">Theme</span>
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="user-chip" id="user-message">
+          Log your baby's weight to calculate feeding goals.
+        </div>
+        <div id="current-weight"></div>
+        <form id="weight-form">
+          <div class="field">
+            <label for="weight-kg">Weight (kg)</label>
+            <input
+              id="weight-kg"
+              type="number"
+              name="weight_kg"
+              min="0.1"
+              step="0.01"
+              inputmode="decimal"
+              required
+            >
+            <div class="hint">Enter weight in kilograms</div>
+          </div>
+          <div class="field">
+            <label for="weight-date">Date</label>
+            <input id="weight-date" type="date" name="date">
+          </div>
+          <button class="add-btn" type="submit">Save weight</button>
+        </form>
+        <div class="status" id="status"></div>
+        <div class="section-title">Suggested feeding goals</div>
+        <div id="suggestions"></div>
+        <div class="section-title">Weight history</div>
+        <div class="history-list" id="weight-history"></div>
+      </div>
+    </div>
+    {% include "logging_footer.html" %}
+    <script type="module" src="{{ base_path }}/static/app.js?v={{ static_version }}"></script>
+    <script type="module">
+      import { buildUrl } from "{{ base_path }}/static/app/core/config.js?v={{ static_version }}";
+
+      const statusEl = document.getElementById("status");
+      const weightForm = document.getElementById("weight-form");
+      const weightKgInput = document.getElementById("weight-kg");
+      const weightDateInput = document.getElementById("weight-date");
+      const currentWeightEl = document.getElementById("current-weight");
+      const suggestionsEl = document.getElementById("suggestions");
+      const historyEl = document.getElementById("weight-history");
+      const activeUser = document.body.dataset.user || window.localStorage.getItem("baby-tracker-user") || "";
+
+      function buildEntryId(value) {
+        return Number.parseInt(value, 10);
+      }
+
+      function toDateInputValue(isoStr) {
+        if (!isoStr) return new Date().toISOString().split("T")[0];
+        return new Date(isoStr).toISOString().split("T")[0];
+      }
+
+      function setStatus(msg, isError = false) {
+        statusEl.textContent = msg;
+        statusEl.style.color = isError ? "#dc2626" : "var(--text-secondary)";
+      }
+
+      function formatDate(isoStr) {
+        if (!isoStr) return "Unknown";
+        const d = new Date(isoStr);
+        return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+      }
+
+      async function loadWeights() {
+        try {
+          const resp = await fetch(buildUrl("/api/entries?type=weight&limit=20"));
+          if (!resp.ok) throw new Error("Failed to load weights");
+          const entries = await resp.json();
+          const filteredEntries = activeUser
+            ? entries.filter((entry) => entry.user_slug === activeUser)
+            : entries;
+          renderWeights(filteredEntries);
+        } catch (err) {
+          setStatus("Could not load weight history", true);
+        }
+      }
+
+      function renderWeights(entries) {
+        if (entries.length === 0) {
+          currentWeightEl.innerHTML = '<div class="weight-display"><span style="color: var(--text-secondary)">No weight recorded yet</span></div>';
+          suggestionsEl.innerHTML = '<div class="hint">Enter a weight to see feeding goal suggestions</div>';
+          historyEl.innerHTML = '<div class="hint">No history</div>';
+          return;
+        }
+
+        const latest = entries[0];
+        const weightKg = parseFloat(latest.weight_kg || 0);
+        const goal150 = Math.round(weightKg * 150);
+        const goal200 = Math.round(weightKg * 200);
+
+        currentWeightEl.innerHTML = `
+          <div class="weight-display">
+            <div>
+              <div class="weight-value">${weightKg.toFixed(2)} kg</div>
+              <div class="weight-date">${formatDate(latest.timestamp_utc)}</div>
+            </div>
+          </div>
+        `;
+
+        suggestionsEl.innerHTML = `
+          <div class="suggestion-card">
+            <div class="suggestion-title">150 ml/kg/day</div>
+            <div class="suggestion-value">${goal150} ml / day</div>
+            <div class="suggestion-action">
+              <button class="apply-goal-btn" data-goal="${goal150}">Apply to goals</button>
+            </div>
+          </div>
+          <div class="suggestion-card">
+            <div class="suggestion-title">200 ml/kg/day</div>
+            <div class="suggestion-value">${goal200} ml / day</div>
+            <div class="suggestion-action">
+              <button class="apply-goal-btn" data-goal="${goal200}">Apply to goals</button>
+            </div>
+          </div>
+        `;
+
+        document.querySelectorAll(".apply-goal-btn").forEach(btn => {
+          btn.addEventListener("click", async () => {
+            const goalMl = parseInt(btn.dataset.goal, 10);
+            await applyGoal(goalMl);
+          });
+        });
+
+        historyEl.innerHTML = entries.map(e => `
+          <div class="history-item">
+            <div class="history-main">
+              <div class="history-meta">${formatDate(e.timestamp_utc)}</div>
+              <div class="history-weight">${parseFloat(e.weight_kg || 0).toFixed(2)} kg</div>
+            </div>
+            <div class="history-actions">
+              <button class="history-btn" type="button" data-action="edit" data-entry-id="${e.id}">Edit</button>
+              <button class="history-btn is-danger" type="button" data-action="delete" data-entry-id="${e.id}">Delete</button>
+            </div>
+          </div>
+        `).join("");
+      }
+
+      async function editWeightEntry(entryId) {
+        const resp = await fetch(buildUrl("/api/entries?type=weight&limit=20"));
+        if (!resp.ok) throw new Error("Could not load weight entry");
+        const entries = await resp.json();
+        const entry = entries.find((item) => item.id === entryId && (!activeUser || item.user_slug === activeUser));
+        if (!entry) throw new Error("Weight entry not found");
+
+        const nextWeight = window.prompt("Weight in kg", parseFloat(entry.weight_kg || 0).toFixed(2));
+        if (nextWeight === null) return;
+        const parsedWeight = Number.parseFloat(nextWeight);
+        if (!Number.isFinite(parsedWeight) || parsedWeight <= 0) {
+          setStatus("Please enter a valid weight", true);
+          return;
+        }
+
+        const nextDate = window.prompt("Date (YYYY-MM-DD)", toDateInputValue(entry.timestamp_utc));
+        if (nextDate === null) return;
+        const timestamp = new Date(nextDate + "T12:00:00");
+        if (Number.isNaN(timestamp.getTime())) {
+          setStatus("Please enter a valid date", true);
+          return;
+        }
+
+        const updateResp = await fetch(buildUrl(`/api/entries/${entryId}`), {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            weight_kg: parsedWeight,
+            timestamp_utc: timestamp.toISOString()
+          })
+        });
+        if (!updateResp.ok) {
+          const error = await updateResp.json().catch(() => null);
+          throw new Error((error && error.error) || "Could not update weight");
+        }
+        setStatus("Weight updated!");
+        await loadWeights();
+      }
+
+      async function deleteWeightEntry(entryId) {
+        const confirmed = window.confirm("Delete this weight entry?");
+        if (!confirmed) return;
+        const resp = await fetch(buildUrl(`/api/entries/${entryId}`), {
+          method: "DELETE"
+        });
+        if (!resp.ok) {
+          const error = await resp.json().catch(() => null);
+          throw new Error((error && error.error) || "Could not delete weight");
+        }
+        setStatus("Weight deleted.");
+        await loadWeights();
+      }
+
+      async function applyGoal(goalMl) {
+        try {
+          const startDate = new Date().toISOString().split("T")[0];
+          const resp = await fetch(buildUrl("/api/feeding-goals"), {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ goal_ml: goalMl, start_date: startDate })
+          });
+          if (!resp.ok) throw new Error("Failed to save goal");
+          setStatus(`Goal of ${goalMl} ml/day applied!`);
+          window.location.href = buildUrl("/goals");
+        } catch (err) {
+          setStatus("Could not apply goal", true);
+        }
+      }
+
+      weightForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        if (!activeUser) {
+          setStatus("Choose a user first before saving weight", true);
+          return;
+        }
+        const weightKg = parseFloat(weightKgInput.value);
+        const dateVal = weightDateInput.value || new Date().toISOString().split("T")[0];
+        if (!weightKg || weightKg <= 0) {
+          setStatus("Please enter a valid weight", true);
+          return;
+        }
+        const timestamp = new Date(dateVal + "T12:00:00").toISOString();
+        try {
+          const resp = await fetch(buildUrl(`/api/users/${encodeURIComponent(activeUser)}/entries`), {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              type: "weight",
+              weight_kg: weightKg,
+              timestamp_utc: timestamp,
+              client_event_id: window.crypto && window.crypto.randomUUID
+                ? window.crypto.randomUUID()
+                : `${Date.now()}-${Math.random().toString(16).slice(2)}`
+            })
+          });
+          if (!resp.ok) {
+            const error = await resp.json().catch(() => null);
+            throw new Error((error && error.error) || "Failed to save weight");
+          }
+          setStatus("Weight saved!");
+          weightForm.reset();
+          weightKgInput.value = "";
+          weightDateInput.value = "";
+          loadWeights();
+        } catch (err) {
+          setStatus("Could not save weight", true);
+        }
+      });
+
+      historyEl.addEventListener("click", async (event) => {
+        const button = event.target.closest("button[data-action]");
+        if (!button) return;
+        const entryId = buildEntryId(button.dataset.entryId);
+        if (!Number.isFinite(entryId)) return;
+        try {
+          if (button.dataset.action === "edit") {
+            await editWeightEntry(entryId);
+          } else if (button.dataset.action === "delete") {
+            await deleteWeightEntry(entryId);
+          }
+        } catch (err) {
+          setStatus(err.message || "Could not update weight history", true);
+        }
+      });
+
+      weightDateInput.value = new Date().toISOString().split("T")[0];
+
+      loadWeights();
+    </script>
+  </body>
+</html>

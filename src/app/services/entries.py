@@ -54,7 +54,9 @@ def _parse_csv_timestamp(value: str) -> str:
     return parsed.astimezone(timezone.utc).isoformat()
 
 
-def _normalize_timestamp_utc(value: str | None, *, field_name: str = "timestamp_utc") -> str | None:
+def _normalize_timestamp_utc(
+    value: str | None, *, field_name: str = "timestamp_utc"
+) -> str | None:
     if value is None:
         return None
     if not isinstance(value, str):
@@ -76,7 +78,9 @@ def _normalize_timestamp_utc(value: str | None, *, field_name: str = "timestamp_
 def create_entry(db_path: str, payload: dict) -> dict:
     validated = validate_entry_payload(payload, require_client_event=True)
     validated["user_slug"] = normalize_user_slug(payload.get("user_slug"))
-    timestamp = _normalize_timestamp_utc(validated.get("timestamp_utc")) or _now_utc_iso()
+    timestamp = (
+        _normalize_timestamp_utc(validated.get("timestamp_utc")) or _now_utc_iso()
+    )
     validated["timestamp_utc"] = timestamp
     validated["created_at_utc"] = _now_utc_iso()
     validated["updated_at_utc"] = validated["created_at_utc"]
@@ -439,6 +443,15 @@ def update_entry(db_path: str, entry_id: int, payload: dict) -> dict:
         ):
             raise ValueError("feed_duration_min must be a non-negative number")
         fields["feed_duration_min"] = payload["feed_duration_min"]
+    if "weight_kg" in payload:
+        if payload["weight_kg"] is not None and (
+            not isinstance(payload["weight_kg"], (int, float))
+            or isinstance(payload["weight_kg"], bool)
+            or not math.isfinite(payload["weight_kg"])
+            or payload["weight_kg"] < 0
+        ):
+            raise ValueError("weight_kg must be a non-negative number")
+        fields["weight_kg"] = payload["weight_kg"]
     if "caregiver_id" in payload:
         fields["caregiver_id"] = payload["caregiver_id"]
     fields["updated_at_utc"] = _now_utc_iso()
@@ -507,9 +520,7 @@ def sync_entries(db_path: str, payload: dict) -> dict:
 
         query_cursor = normalized_cursor
         if query_cursor is None:
-            query_cursor = (
-                datetime.now(timezone.utc) - timedelta(days=30)
-            ).isoformat()
+            query_cursor = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
         updated_entries = repo_list_entries_updated_since(conn, query_cursor, limit=500)
 
     next_cursor = cursor

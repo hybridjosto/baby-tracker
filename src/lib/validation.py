@@ -52,6 +52,10 @@ def validate_entry_payload(payload: dict, require_client_event: bool = False) ->
         if not isinstance(payload["notes"], str):
             raise ValueError("notes must be a string")
 
+    if "weight_kg" in payload and payload["weight_kg"] is not None:
+        if not _is_non_negative_number(payload["weight_kg"]):
+            raise ValueError("weight_kg must be a non-negative number")
+
     validated = dict(payload)
     if isinstance(validated.get("type"), str):
         validated["type"] = validated["type"].strip()

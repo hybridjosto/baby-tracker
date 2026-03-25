@@ -17,10 +17,11 @@ def create_entry(conn: sqlite3.Connection | None, payload: dict) -> tuple[dict, 
                 expressed_ml,
                 formula_ml,
                 feed_duration_min,
+                weight_kg,
                 caregiver_id,
                 created_at_utc,
                 updated_at_utc
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 payload["user_slug"],
@@ -32,6 +33,7 @@ def create_entry(conn: sqlite3.Connection | None, payload: dict) -> tuple[dict, 
                 payload.get("expressed_ml"),
                 payload.get("formula_ml"),
                 payload.get("feed_duration_min"),
+                payload.get("weight_kg"),
                 payload.get("caregiver_id"),
                 payload["created_at_utc"],
                 payload["updated_at_utc"],
@@ -77,7 +79,7 @@ def list_entries(
     cursor = conn.execute(
         f"""
         SELECT id, user_slug, type, timestamp_utc, client_event_id, notes, amount_ml,
-               expressed_ml, formula_ml, feed_duration_min, caregiver_id,
+               expressed_ml, formula_ml, feed_duration_min, weight_kg, caregiver_id,
                created_at_utc, updated_at_utc, deleted_at_utc
         FROM entries
         {where}
@@ -116,7 +118,7 @@ def list_entries_for_export(
     cursor = conn.execute(
         f"""
         SELECT id, user_slug, type, timestamp_utc, client_event_id, notes, amount_ml,
-               expressed_ml, formula_ml, feed_duration_min, caregiver_id,
+               expressed_ml, formula_ml, feed_duration_min, weight_kg, caregiver_id,
                created_at_utc, updated_at_utc, deleted_at_utc
         FROM entries
         {where}
@@ -132,7 +134,7 @@ def get_entry(conn: sqlite3.Connection | None, entry_id: int) -> Optional[dict]:
     cursor = conn.execute(
         """
         SELECT id, user_slug, type, timestamp_utc, client_event_id, notes, amount_ml,
-               expressed_ml, formula_ml, feed_duration_min, caregiver_id,
+               expressed_ml, formula_ml, feed_duration_min, weight_kg, caregiver_id,
                created_at_utc, updated_at_utc, deleted_at_utc
         FROM entries
         WHERE id = ?
@@ -150,7 +152,7 @@ def get_entry_by_client_event_id(
     cursor = conn.execute(
         """
         SELECT id, user_slug, type, timestamp_utc, client_event_id, notes, amount_ml,
-               expressed_ml, formula_ml, feed_duration_min, caregiver_id,
+               expressed_ml, formula_ml, feed_duration_min, weight_kg, caregiver_id,
                created_at_utc, updated_at_utc, deleted_at_utc
         FROM entries
         WHERE client_event_id = ?
@@ -161,7 +163,9 @@ def get_entry_by_client_event_id(
     return dict(row) if row else None
 
 
-def update_entry(conn: sqlite3.Connection | None, entry_id: int, fields: dict) -> Optional[dict]:
+def update_entry(
+    conn: sqlite3.Connection | None, entry_id: int, fields: dict
+) -> Optional[dict]:
     assert conn is not None
     assignments: list[str] = []
     values: list[object] = []
@@ -173,6 +177,7 @@ def update_entry(conn: sqlite3.Connection | None, entry_id: int, fields: dict) -
         "expressed_ml",
         "formula_ml",
         "feed_duration_min",
+        "weight_kg",
         "caregiver_id",
         "updated_at_utc",
         "deleted_at_utc",
@@ -194,7 +199,10 @@ def update_entry(conn: sqlite3.Connection | None, entry_id: int, fields: dict) -
 
 
 def delete_entry(
-    conn: sqlite3.Connection | None, entry_id: int, deleted_at_utc: str, updated_at_utc: str
+    conn: sqlite3.Connection | None,
+    entry_id: int,
+    deleted_at_utc: str,
+    updated_at_utc: str,
 ) -> bool:
     assert conn is not None
     cursor = conn.execute(
@@ -222,7 +230,7 @@ def list_entries_updated_since(
     cursor = conn.execute(
         f"""
         SELECT id, user_slug, type, timestamp_utc, client_event_id, notes, amount_ml,
-               expressed_ml, formula_ml, feed_duration_min, caregiver_id,
+               expressed_ml, formula_ml, feed_duration_min, weight_kg, caregiver_id,
                created_at_utc, updated_at_utc, deleted_at_utc
         FROM entries
         {where}
@@ -234,7 +242,9 @@ def list_entries_updated_since(
     return [dict(row) for row in cursor.fetchall()]
 
 
-def upsert_entry_by_client_event_id(conn: sqlite3.Connection | None, payload: dict) -> dict:
+def upsert_entry_by_client_event_id(
+    conn: sqlite3.Connection | None, payload: dict
+) -> dict:
     existing = get_entry_by_client_event_id(conn, payload["client_event_id"])
     if not existing:
         entry, _ = create_entry(conn, payload)
@@ -247,6 +257,7 @@ def upsert_entry_by_client_event_id(conn: sqlite3.Connection | None, payload: di
         "expressed_ml": payload.get("expressed_ml"),
         "formula_ml": payload.get("formula_ml"),
         "feed_duration_min": payload.get("feed_duration_min"),
+        "weight_kg": payload.get("weight_kg"),
         "caregiver_id": payload.get("caregiver_id"),
         "updated_at_utc": payload["updated_at_utc"],
         "deleted_at_utc": payload.get("deleted_at_utc"),

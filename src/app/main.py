@@ -275,6 +275,24 @@ def create_app() -> Flask:
             status_code,
         )
 
+    def render_weight_page(
+        user_slug: str,
+        user_valid: bool,
+        user_message: str,
+        status_code: int = 200,
+    ):
+        return (
+            render_template(
+                "weight.html",
+                user_slug=user_slug,
+                user_valid=user_valid,
+                user_message=user_message,
+                page="weight",
+                base_path=config.base_path,
+            ),
+            status_code,
+        )
+
     @app.get(f"{config.base_path}/summary")
     def summary():
         return render_summary_page(
@@ -330,6 +348,14 @@ def create_app() -> Flask:
             user_slug="",
             user_valid=False,
             user_message="Shared bottle library",
+        )
+
+    @app.get(f"{config.base_path}/weight")
+    def weight():
+        return render_weight_page(
+            user_slug="",
+            user_valid=False,
+            user_message="Track baby's weight and get feeding goal suggestions.",
         )
 
     @app.get(f"{config.base_path}/<user_slug>")
@@ -423,6 +449,23 @@ def create_app() -> Flask:
             user_slug=normalized,
             user_valid=False,
             user_message="Shared bottle library",
+        )
+
+    @app.get(f"{config.base_path}/<user_slug>/weight")
+    def user_weight(user_slug: str):
+        try:
+            normalized = normalize_user_slug(user_slug)
+        except ValueError as exc:
+            return render_weight_page(
+                user_slug="",
+                user_valid=False,
+                user_message=str(exc),
+                status_code=400,
+            )
+        return render_weight_page(
+            user_slug=normalized,
+            user_valid=True,
+            user_message=f"Logging as {normalized}",
         )
 
     @app.get(f"{config.base_path}/<user_slug>/log")
