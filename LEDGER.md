@@ -7,11 +7,15 @@
 - add a baby weight (kg) to goal ml function. *needs planning
 - add a more in depth feeding plan. *needs planning
 - align the milk express ledger page format (menu + general look and feel) to the rest of the app.
-- remove breastfeed from the feed quick-log popup.
 - reorganise the Summary page layout and information hierarchy.
 - gradual frontend refactor of `src/web/static/app.js` into modules. *plan in `docs/plans/2026-03-18-app-js-refactor-plan.md`
 
 ## DONE
+- made the shared active timer banners sticky on 2026-03-31 in `src/web/static/styles.css`, so the sleep/timed-event stop control stays pinned near the top while scrolling long pages.
+- made active sleep/timed-event timers reachable from every page on 2026-03-31 by extracting shared top-of-page timer banners into `src/web/templates/active_timer_banners.html`, including them across the app templates, and moving the shared banner styles into `src/web/static/styles.css` so an in-progress timer can be stopped without scrolling back to the footer menu.
+- allowed emoji in custom event labels on 2026-03-29 by relaxing frontend/backend custom-type validation plus generic entry-type validation, so misc events like `🌡 temp` can be saved from Settings and logged normally in `src/web/static/app.js`, `src/web/static/app/core/config.js`, `src/app/services/settings.py`, and `src/lib/validation.py`.
+- changed overdue native push reminders on 2026-03-27 to repeat once per configured feed interval in `src/app/services/feed_due.py`, so a still-overdue feed can notify again after the prior reminder ages out instead of only ever sending once per logged feed.
+- fixed overdue native push reminders on 2026-03-27 by wiring the scheduler runtime to include `BASE_PATH` and `VAPID_CONFIG` in `src/app/scheduler.py`, so background feed-due polls can send real notifications instead of exiting early with missing push config.
 - aligned the Summary total sleep card with the 24h sleep timeline on 2026-03-25 by clipping sleep totals to the selected midnight-to-midnight day in `src/web/static/app.js`.
 - fixed the Summary 24h sleep timeline subtotal on 2026-03-25 so the readout counts only the portion of each sleep session that falls after midnight in `src/web/static/app.js`.
 - copied the Summary sleep trend chart to the bottom of the home page on 2026-03-25 by adding a home-page card in `src/web/templates/index.html` and loading a dedicated 8-day sleep trend dataset in `src/web/static/app.js`.
@@ -20,6 +24,7 @@
 - fixed the weight page inline module import on 2026-03-23 by loading `buildUrl` from `{{ base_path }}/static/app/core/config.js`, so the page script actually runs on `/weight` instead of failing on a bad relative import in `src/web/templates/weight.html`.
 - fixed the weight page save/history flow on 2026-03-23 by posting `timestamp_utc` + `client_event_id` to the user-scoped entries API, filtering history to the active user, and rendering saved weights from `timestamp_utc` in `src/web/templates/weight.html`.
 - added `weight_kg` column to entries table via schema.sql, db.py migration, and storage layer updates in `src/app/storage/entries.py` on 2026-03-23.
+- made the quick-log feed amounts follow the Settings page small/big values on 2026-03-29, and removed the quick-log breastfeeding button plus manual expressed-milk input in `src/web/templates/logging_footer.html` and `src/web/static/app.js`.
 - added weight page link to navigation menus in goals.html, log.html, timeline.html, summary.html, settings.html, index.html, bottles.html, calendar.html (weight page now accessible from all page menus) on 2026-03-23.
 - created `/src/web/templates/weight.html` - a new template with weight input form, goal suggestions display (150x and 200x), "Apply to goals" buttons, and weight history on 2026-03-23.
 - added `weight_kg` validation in `/src/lib/validation.py` on 2026-03-23.
@@ -80,6 +85,11 @@
 - added integration coverage for timed-event start APIs in `tests/integration/test_feed_log_api.py` (default user slug, user override, and payload fields) on 2026-03-08.
 
 ## NOTES
+- tests run on 2026-03-31 after shared active timer banners update: `./.venv/bin/pytest tests/integration/test_feed_log_api.py tests/integration/test_diaper_log_api.py` -> `10 passed`.
+- syntax check run on 2026-03-31 after shared active timer banners update: `node --input-type=module --check < src/web/static/app.js`.
+- tests run on 2026-03-29 for emoji custom event support: `./.venv/bin/pytest tests/unit/test_validation.py tests/integration/test_settings_api.py tests/integration/test_entries_api.py` -> `44 passed`.
+- syntax check run on 2026-03-29 after emoji custom event support: `node --input-type=module --check < src/web/static/app.js`.
+- syntax check run on 2026-03-29 after quick-log feed value + hidden input update: `node --input-type=module --check < src/web/static/app.js`.
 - syntax check run on 2026-03-25 after Summary total sleep card alignment: `node --input-type=module --check < src/web/static/app.js`.
 - syntax check run on 2026-03-25 after Summary sleep timeline subtotal fix: `node --input-type=module --check < src/web/static/app.js`.
 - syntax check run on 2026-03-25 after home-page sleep trend addition: `node --input-type=module --check < src/web/static/app.js`.
@@ -91,6 +101,8 @@
 - tests run on 2026-03-19 after Summary average-label left-align/theme update: `./.venv/bin/pytest` -> `103 passed, 6 skipped`.
 - tests run on 2026-03-19 after Summary sleep trend average-label pill update: `./.venv/bin/pytest` -> `103 passed, 6 skipped`.
 - tests run on 2026-03-19 after Summary sleep trend average-line update: `./.venv/bin/pytest` -> `103 passed, 6 skipped`.
+- tests run on 2026-03-27 for overdue reminder repeats: `./.venv/bin/pytest tests/unit/test_feed_due_service.py tests/unit/test_scheduler_runtime_config.py tests/integration/test_pushcut_feed_api.py` -> `23 passed`.
+- tests run on 2026-03-27 for scheduler push wiring: `./.venv/bin/pytest tests/unit/test_scheduler_runtime_config.py tests/unit/test_feed_due_service.py tests/integration/test_pushcut_feed_api.py` -> `22 passed`.
 - tests run on 2026-03-19 after Summary totals fix: `./.venv/bin/pytest` -> `103 passed, 6 skipped`.
 - debug note on 2026-03-19: IndexedDB cache ordering/range checks were comparing timestamp strings lexicographically; after editing an entry locally, mixed `Z` vs `+00:00` timestamp formats could leave the updated entry out of the expected local sort/window even before sync finished.
 - debug note on 2026-03-19: homepage refresh could show stale latest-event/chart data right after an edit because `loadEntriesWithFallback(...)` fetched `/api/entries` in parallel with `syncNow()`, letting pre-sync server data overwrite fresher IndexedDB edits during the same refresh cycle.

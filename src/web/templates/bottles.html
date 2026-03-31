@@ -244,9 +244,10 @@
           </div>
         </div>
         <div class="user-chip" id="user-message">{{ user_message }}</div>
-      </div>
+        </div>
 
-      <div class="bottles-grid">
+        {% include "active_timer_banners.html" %}
+        <div class="bottles-grid">
         <section class="card">
           <div class="section-title">Add a bottle</div>
           <form id="bottle-form">

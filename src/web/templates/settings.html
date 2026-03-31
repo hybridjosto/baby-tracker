@@ -187,6 +187,7 @@
           </div>
         </div>
         <div class="user-chip" id="user-message"></div>
+        {% include "active_timer_banners.html" %}
         <form id="settings-form">
           <div class="field">
             <label for="dob-input">Baby date of birth</label>
@@ -242,7 +243,7 @@
               >
               <button class="add-btn" id="custom-type-add" type="button">Add</button>
             </div>
-            <div class="hint" id="custom-type-hint">Use letters, numbers, spaces, / or -.</div>
+            <div class="hint" id="custom-type-hint">Use letters, numbers, spaces, /, -, or emoji.</div>
             <ul class="pill-list" id="custom-type-list"></ul>
             <div class="hint" id="custom-type-empty">No custom types yet.</div>
           </div>
