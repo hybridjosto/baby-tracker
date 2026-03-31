@@ -1,8 +1,17 @@
 import math
 import re
+import unicodedata
 
 USER_SLUG_RE = re.compile(r"^[a-z0-9-]{1,24}$")
-ENTRY_TYPE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 /-]{0,31}$")
+
+
+def _is_allowed_entry_type_char(char: str) -> bool:
+    if char in {" ", "/", "-", "\u200d", "\ufe0f"}:
+        return True
+    category = unicodedata.category(char)
+    if category[0] in {"L", "N"}:
+        return True
+    return category in {"So", "Sk"}
 
 
 def _is_non_negative_number(value: object) -> bool:
@@ -20,8 +29,10 @@ def validate_entry_type(value: str) -> None:
     trimmed = value.strip()
     if not trimmed:
         raise ValueError("type must be a non-empty string")
-    if not ENTRY_TYPE_RE.match(trimmed):
-        raise ValueError("type must use letters, numbers, spaces, / or -")
+    if len(trimmed) > 32 or not all(
+        _is_allowed_entry_type_char(char) for char in trimmed
+    ):
+        raise ValueError("type must use letters, numbers, spaces, /, -, or emoji")
 
 
 def validate_entry_payload(payload: dict, require_client_event: bool = False) -> dict:

@@ -1,13 +1,16 @@
 from datetime import date, datetime, timezone
 import json
-import re
+import unicodedata
 from urllib.parse import urlparse
 
 from src.app.storage.db import get_connection
 from src.lib.validation import normalize_user_slug
 from src.app.storage.settings import get_settings as repo_get_settings
 from src.app.storage.settings import update_settings as repo_update_settings
-from src.app.storage.settings import DEFAULT_FEED_SIZE_BIG_ML, DEFAULT_FEED_SIZE_SMALL_ML
+from src.app.storage.settings import (
+    DEFAULT_FEED_SIZE_BIG_ML,
+    DEFAULT_FEED_SIZE_SMALL_ML,
+)
 
 
 def _now_utc_iso() -> str:
@@ -39,8 +42,22 @@ def _normalize_feed_interval(value: object) -> int | None:
     return value
 
 
-_CUSTOM_TYPE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 /-]{0,31}$")
 _BEHIND_TARGET_MODES = {"increase_next", "add_feed"}
+
+
+def _is_allowed_custom_type_char(char: str) -> bool:
+    if char in {" ", "/", "-", "\u200d", "\ufe0f"}:
+        return True
+    category = unicodedata.category(char)
+    if category[0] in {"L", "N"}:
+        return True
+    return category in {"So", "Sk"}
+
+
+def _is_valid_custom_type(value: str) -> bool:
+    return 0 < len(value) <= 32 and all(
+        _is_allowed_custom_type_char(char) for char in value
+    )
 
 
 def _normalize_custom_event_types(value: object) -> str:
@@ -54,8 +71,10 @@ def _normalize_custom_event_types(value: object) -> str:
         if not isinstance(raw, str):
             raise ValueError("custom_event_types must be a list of names")
         trimmed = raw.strip()
-        if not trimmed or not _CUSTOM_TYPE_RE.match(trimmed):
-            raise ValueError("custom_event_types must use letters, numbers, spaces, / or -")
+        if not _is_valid_custom_type(trimmed):
+            raise ValueError(
+                "custom_event_types must use letters, numbers, spaces, /, -, or emoji"
+            )
         key = trimmed.lower()
         if key in seen:
             continue
@@ -234,7 +253,9 @@ def update_settings(db_path: str, payload: dict) -> dict:
             "overnight_gap_max_hours", current.get("overnight_gap_max_hours")
         )
         if gap_min is not None and gap_max is not None and gap_min > gap_max:
-            raise ValueError("overnight_gap_min_hours must be <= overnight_gap_max_hours")
+            raise ValueError(
+                "overnight_gap_min_hours must be <= overnight_gap_max_hours"
+            )
 
         next_small = fields.get("feed_size_small_ml", current.get("feed_size_small_ml"))
         next_big = fields.get("feed_size_big_ml", current.get("feed_size_big_ml"))

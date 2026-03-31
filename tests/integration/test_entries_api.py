@@ -14,6 +14,17 @@ def test_create_user_entry_allows_wee(client):
     assert payload["user_slug"] == "suz"
 
 
+def test_create_user_entry_allows_emoji_type(client):
+    response = client.post(
+        "/api/users/suz/entries",
+        json={"type": "🌡 temp", "client_event_id": "evt-emoji-1"},
+    )
+    assert response.status_code == 201
+    payload = response.get_json()
+    assert payload["type"] == "🌡 temp"
+    assert payload["user_slug"] == "suz"
+
+
 def test_create_user_entry_rejects_invalid_type(client):
     response = client.post(
         "/api/users/suz/entries",
@@ -21,7 +32,7 @@ def test_create_user_entry_rejects_invalid_type(client):
     )
     assert response.status_code == 400
     payload = response.get_json()
-    assert payload["error"] == "type must use letters, numbers, spaces, / or -"
+    assert payload["error"] == "type must use letters, numbers, spaces, /, -, or emoji"
 
 
 def test_create_user_entry_rejects_invalid_timestamp(client):
@@ -543,7 +554,9 @@ def test_import_csv_rejects_missing_headers(client):
     )
     assert response.status_code == 400
     payload = response.get_json()
-    assert payload["error"] == "CSV must have headings: timestamp, type, duration, comment"
+    assert (
+        payload["error"] == "CSV must have headings: timestamp, type, duration, comment"
+    )
 
 
 def test_export_entries_csv_includes_feed_amounts(client):

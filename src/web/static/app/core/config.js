@@ -38,7 +38,7 @@ const RESERVED_USER_SLUGS = new Set([
   "milk-express",
   "bottles",
 ]);
-const CUSTOM_TYPE_RE = /^[A-Za-z0-9][A-Za-z0-9 /-]{0,31}$/;
+const CUSTOM_TYPE_MAX_LENGTH = 32;
 const MILK_EXPRESS_TYPE = "milk express";
 const SLEEP_GANTT_DEFAULT_OVERLAYS = new Set(["feed", "cry", "wee", "poo"]);
 const SLEEP_GANTT_TYPE_COLORS = {
@@ -76,7 +76,7 @@ export {
   buildUrl,
   CHART_CONFIG,
   CHART_EVENT_TYPES,
-  CUSTOM_TYPE_RE,
+  CUSTOM_TYPE_MAX_LENGTH,
   DB_NAME,
   DB_VERSION,
   INDEX_ENTRIES_TS,

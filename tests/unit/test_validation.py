@@ -5,7 +5,7 @@ from src.lib.validation import validate_entry_type
 
 @pytest.mark.parametrize(
     "entry_type",
-    ["feed", "poo", "wee", "sleep", "cry", "room/body temp"],
+    ["feed", "poo", "wee", "sleep", "cry", "room/body temp", "🌡 temp"],
 )
 def test_validate_entry_type_accepts_known_types(entry_type):
     validate_entry_type(entry_type)
@@ -17,5 +17,7 @@ def test_validate_entry_type_rejects_empty():
 
 
 def test_validate_entry_type_rejects_invalid_chars():
-    with pytest.raises(ValueError, match="type must use letters, numbers, spaces, / or -"):
+    with pytest.raises(
+        ValueError, match="type must use letters, numbers, spaces, /, -, or emoji"
+    ):
         validate_entry_type("temp!*")

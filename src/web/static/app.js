@@ -6,7 +6,7 @@ import {
   buildUrl,
   CHART_CONFIG,
   CHART_EVENT_TYPES,
-  CUSTOM_TYPE_RE,
+  CUSTOM_TYPE_MAX_LENGTH,
   DB_NAME,
   DB_VERSION,
   INDEX_ENTRIES_TS,
@@ -1117,7 +1117,16 @@ function normalizeCustomTypeInput(value) {
     return null;
   }
   const trimmed = value.trim();
-  if (!trimmed || !CUSTOM_TYPE_RE.test(trimmed)) {
+  if (!trimmed || Array.from(trimmed).length > CUSTOM_TYPE_MAX_LENGTH) {
+    return null;
+  }
+  const isAllowedChar = (char) => {
+    if (char === " " || char === "/" || char === "-" || char === "\u200D" || char === "\uFE0F") {
+      return true;
+    }
+    return /[\p{L}\p{N}\p{Extended_Pictographic}\p{Emoji_Presentation}\p{Sk}]/u.test(char);
+  };
+  if (!Array.from(trimmed).every(isAllowedChar)) {
     return null;
   }
   return trimmed;
@@ -1733,7 +1742,7 @@ function initSettingsHandlers() {
     const handleAdd = () => {
       const normalized = normalizeCustomTypeInput(customTypeInputEl.value);
       if (!normalized) {
-        setCustomTypeHint("Use letters, numbers, spaces, / or - (max 32 chars).");
+        setCustomTypeHint("Use letters, numbers, spaces, /, -, or emoji (max 32 chars).");
         customTypeInputEl.focus();
         return;
       }
