@@ -100,7 +100,7 @@ const timedEventBannerMetaEl = document.getElementById("timed-event-banner-meta"
 const timedEventBannerActionEl = document.getElementById("timed-event-banner-action");
 const feedToggleFormulaBtn = document.getElementById("feed-toggle-formula");
 const feedToggleExpressedBtn = document.getElementById("feed-toggle-expressed");
-const feedQuickBtns = document.querySelectorAll("[data-quick-ml]");
+const feedQuickBtns = document.querySelectorAll("[data-quick-size], [data-quick-ml]");
 const feedManualToggleBtn = document.getElementById("feed-manual-toggle");
 const feedManualWrap = document.getElementById("feed-manual");
 const manualFeedBtn = document.getElementById("log-feed-manual");
@@ -1450,6 +1450,7 @@ function initQuickLogHandlers() {
   }
   if (feedToggleExpressedBtn) {
     feedToggleExpressedBtn.addEventListener("click", () => {
+      setManualVisible(false);
       setQuickFeedKind("expressed");
     });
   }
@@ -1470,6 +1471,7 @@ function initQuickLogHandlers() {
       if (!feedManualWrap) {
         return;
       }
+      setQuickFeedKind("formula");
       setManualVisible(feedManualWrap.hidden);
     });
   }
@@ -2310,9 +2312,33 @@ function setManualVisible(visible) {
     return;
   }
   feedManualWrap.hidden = !visible;
-  if (visible && expressedInput) {
-    expressedInput.focus();
+  if (visible) {
+    if (formulaInput) {
+      formulaInput.focus();
+    } else if (expressedInput) {
+      expressedInput.focus();
+    }
   }
+}
+
+function syncQuickFeedButtons() {
+  if (!feedQuickBtns.length) {
+    return;
+  }
+  const quickFeedValues = {
+    small: state.feedSizeSmallMl,
+    big: state.feedSizeBigMl,
+  };
+  feedQuickBtns.forEach((btn) => {
+    const size = btn.dataset.quickSize;
+    if (!size || !Object.hasOwn(quickFeedValues, size)) {
+      return;
+    }
+    const amount = quickFeedValues[size];
+    btn.dataset.quickMl = String(amount);
+    btn.textContent = `${size === "small" ? "Small" : "Big"} ${formatMl(amount)}`;
+    btn.setAttribute("aria-label", `${size} quick feed ${formatMl(amount)}`);
+  });
 }
 
 function closeFeedMenu() {
@@ -2360,6 +2386,9 @@ function setQuickFeedKind(kind) {
       "is-active",
       quickFeedKind === "expressed",
     );
+  }
+  if (quickFeedKind === "expressed") {
+    setManualVisible(false);
   }
 }
 
@@ -8247,6 +8276,7 @@ async function loadBabySettings() {
     if (feedSizeBigInputEl) {
       feedSizeBigInputEl.value = String(state.feedSizeBigMl);
     }
+    syncQuickFeedButtons();
     applyCustomEventTypes();
     updateAgeDisplay();
     updateNextFeed();
@@ -8297,6 +8327,7 @@ async function saveBabySettings(patch) {
     if (feedSizeBigInputEl) {
       feedSizeBigInputEl.value = String(state.feedSizeBigMl);
     }
+    syncQuickFeedButtons();
     applyCustomEventTypes();
     updateAgeDisplay();
     updateNextFeed();
@@ -8310,6 +8341,7 @@ async function saveBabySettings(patch) {
 
 applyTheme(getPreferredTheme());
 initNavMenuHandlers();
+syncQuickFeedButtons();
 if (themeToggleBtn) {
   themeToggleBtn.addEventListener("click", toggleTheme);
 }
