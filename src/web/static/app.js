@@ -221,8 +221,10 @@ const rulerEmptyEl = document.getElementById("ruler-empty");
 const rulerSnapToggleEl = document.getElementById("ruler-snap-toggle");
 const rulerNowBtnEl = document.getElementById("ruler-now-btn");
 
-const chartSvg = document.getElementById("history-chart");
+const chartPanelsEl = document.getElementById("history-chart-panels");
 const chartEmptyEl = document.getElementById("chart-empty");
+const HOME_CHART_TOTAL_HOURS = 24;
+const HOME_CHART_CHUNK_HOURS = 6;
 const logListEl = document.getElementById("log-entries");
 const logEmptyEl = document.getElementById("log-empty");
 const editEntryBackdropEl = document.getElementById("edit-entry-backdrop");
@@ -3359,6 +3361,47 @@ function computeWindow(hours) {
   };
 }
 
+function createWindow(since, until) {
+  return {
+    since,
+    until,
+    sinceIso: since.toISOString(),
+    untilIso: until.toISOString(),
+  };
+}
+
+function buildChartWindows(totalHours, chunkHours, until = new Date()) {
+  const windows = [];
+  const totalChunks = Math.ceil(totalHours / chunkHours);
+  for (let index = totalChunks; index > 0; index -= 1) {
+    const chunkUntil = new Date(until.getTime() - (index - 1) * chunkHours * 60 * 60 * 1000);
+    const chunkSince = new Date(chunkUntil.getTime() - chunkHours * 60 * 60 * 1000);
+    windows.push({
+      ...createWindow(chunkSince, chunkUntil),
+      startHoursAgo: index * chunkHours,
+      endHoursAgo: (index - 1) * chunkHours,
+    });
+  }
+  return windows;
+}
+
+function formatChartTickTime(date) {
+  const hours = date.getHours();
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  return `${hours}:${minutes}`;
+}
+
+function formatChartPanelLabel(windowBounds) {
+  if (windowBounds.endHoursAgo === 0) {
+    return `Last ${windowBounds.startHoursAgo}h`;
+  }
+  return `${windowBounds.startHoursAgo}-${windowBounds.endHoursAgo}h ago`;
+}
+
+function formatChartPanelTime(windowBounds) {
+  return `${formatChartTickTime(windowBounds.since)}-${formatChartTickTime(windowBounds.until)}`;
+}
+
 function getCssVar(name, fallback) {
   const value = window.getComputedStyle(document.documentElement).getPropertyValue(name);
   if (!value) {
@@ -5404,16 +5447,16 @@ async function loadCurrentGoal() {
   }
 }
 
-function renderChart(entries, windowBounds) {
-  if (!chartSvg || !chartEmptyEl) {
+function renderChartInto(chartSvgEl, chartEmptyStateEl, entries, windowBounds) {
+  if (!chartSvgEl || !chartEmptyStateEl) {
     return;
   }
-  chartSvg.innerHTML = "";
+  chartSvgEl.innerHTML = "";
   if (!entries.length) {
-    chartEmptyEl.style.display = "flex";
+    chartEmptyStateEl.style.display = "flex";
     return;
   }
-  chartEmptyEl.style.display = "none";
+  chartEmptyStateEl.style.display = "none";
 
   const svgNS = "http://www.w3.org/2000/svg";
   const { width, height, paddingX, axisY } = CHART_CONFIG;
@@ -5425,7 +5468,7 @@ function renderChart(entries, windowBounds) {
   axisLine.setAttribute("y2", axisY);
   axisLine.setAttribute("stroke", "#d9d2c7");
   axisLine.setAttribute("stroke-width", "2");
-  chartSvg.appendChild(axisLine);
+  chartSvgEl.appendChild(axisLine);
 
   const hoursSpan = Math.round(
     (windowBounds.until.getTime() - windowBounds.since.getTime()) / 3600000,
@@ -5439,12 +5482,6 @@ function renderChart(entries, windowBounds) {
     return `${label}h`;
   });
 
-  const formatChartTickTime = (date) => {
-    const hours = date.getHours();
-    const minutes = String(date.getMinutes()).padStart(2, "0");
-    return `${hours}:${minutes}`;
-  };
-
   labels.forEach((label, idx) => {
     const x = paddingX + ((width - paddingX * 2) / 4) * idx;
     const tick = document.createElementNS(svgNS, "line");
@@ -5454,7 +5491,7 @@ function renderChart(entries, windowBounds) {
     tick.setAttribute("y2", axisY + 6);
     tick.setAttribute("stroke", "#d9d2c7");
     tick.setAttribute("stroke-width", "1");
-    chartSvg.appendChild(tick);
+    chartSvgEl.appendChild(tick);
 
     const relativeText = document.createElementNS(svgNS, "text");
     relativeText.setAttribute("x", x);
@@ -5463,7 +5500,7 @@ function renderChart(entries, windowBounds) {
     relativeText.setAttribute("font-size", "10");
     relativeText.setAttribute("text-anchor", "middle");
     relativeText.textContent = label;
-    chartSvg.appendChild(relativeText);
+    chartSvgEl.appendChild(relativeText);
 
     const tickTime = new Date(windowBounds.until.getTime() - ticks[idx] * 3600000);
     const absoluteText = document.createElementNS(svgNS, "text");
@@ -5473,7 +5510,7 @@ function renderChart(entries, windowBounds) {
     absoluteText.setAttribute("font-size", "10");
     absoluteText.setAttribute("text-anchor", "middle");
     absoluteText.textContent = formatChartTickTime(tickTime);
-    chartSvg.appendChild(absoluteText);
+    chartSvgEl.appendChild(absoluteText);
   });
 
   const startMs = windowBounds.since.getTime();
@@ -5530,7 +5567,7 @@ function renderChart(entries, windowBounds) {
         durationBar.setAttribute("stroke-width", "7");
         durationBar.setAttribute("stroke-linecap", "round");
         durationBar.setAttribute("opacity", "0.35");
-        chartSvg.appendChild(durationBar);
+        chartSvgEl.appendChild(durationBar);
 
         const durationLabel = document.createElementNS(svgNS, "text");
         durationLabel.setAttribute("x", barEndX);
@@ -5540,7 +5577,7 @@ function renderChart(entries, windowBounds) {
         durationLabel.setAttribute("font-weight", "700");
         durationLabel.setAttribute("text-anchor", "end");
         durationLabel.textContent = formatChartDuration(duration);
-        chartSvg.appendChild(durationLabel);
+        chartSvgEl.appendChild(durationLabel);
       }
     }
 
@@ -5554,7 +5591,7 @@ function renderChart(entries, windowBounds) {
     stem.setAttribute("y2", axisY);
     stem.setAttribute("stroke", "#e1d8cc");
     stem.setAttribute("stroke-width", "1");
-    chartSvg.appendChild(stem);
+    chartSvgEl.appendChild(stem);
 
     const dot = document.createElementNS(svgNS, "circle");
     dot.setAttribute("cx", x);
@@ -5563,8 +5600,66 @@ function renderChart(entries, windowBounds) {
     dot.setAttribute("fill", color);
     dot.setAttribute("stroke", "#ffffff");
     dot.setAttribute("stroke-width", "1");
-    chartSvg.appendChild(dot);
+    chartSvgEl.appendChild(dot);
   });
+}
+
+function renderChart(entries, chartWindows) {
+  if (!chartPanelsEl || !chartEmptyEl) {
+    return;
+  }
+  chartPanelsEl.innerHTML = "";
+  chartEmptyEl.style.display = entries.length ? "none" : "flex";
+  chartWindows.forEach((windowBounds, index) => {
+    const panelEl = document.createElement("section");
+    panelEl.className = "history-chart-panel";
+
+    const panelHeaderEl = document.createElement("div");
+    panelHeaderEl.className = "history-chart-panel-header";
+
+    const panelTitleEl = document.createElement("div");
+    panelTitleEl.className = "history-chart-panel-title";
+    panelTitleEl.textContent = formatChartPanelLabel(windowBounds);
+
+    const panelTimeEl = document.createElement("div");
+    panelTimeEl.className = "history-chart-panel-time";
+    panelTimeEl.textContent = formatChartPanelTime(windowBounds);
+
+    panelHeaderEl.appendChild(panelTitleEl);
+    panelHeaderEl.appendChild(panelTimeEl);
+
+    const panelBodyEl = document.createElement("div");
+    panelBodyEl.className = "history-chart-panel-body";
+
+    const panelSvgEl = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    panelSvgEl.classList.add("history-chart-panel-svg");
+    panelSvgEl.setAttribute("viewBox", `0 0 ${CHART_CONFIG.width} 170`);
+    panelSvgEl.setAttribute("preserveAspectRatio", "none");
+    panelSvgEl.setAttribute(
+      "aria-label",
+      `Baby activity from ${formatChartTickTime(windowBounds.since)} to ${formatChartTickTime(windowBounds.until)}`,
+    );
+
+    const panelEmptyEl = document.createElement("div");
+    panelEmptyEl.className = "chart-empty";
+    panelEmptyEl.textContent = "No events in this block.";
+
+    panelBodyEl.appendChild(panelSvgEl);
+    panelBodyEl.appendChild(panelEmptyEl);
+    panelEl.appendChild(panelHeaderEl);
+    panelEl.appendChild(panelBodyEl);
+
+    const panelEntries = entries.filter((entry) => entryOverlapsChartWindow(entry, windowBounds));
+    renderChartInto(panelSvgEl, panelEmptyEl, panelEntries, windowBounds);
+    if (index === chartWindows.length - 1) {
+      panelEl.dataset.chartLatest = "true";
+    }
+    chartPanelsEl.appendChild(panelEl);
+  });
+  const latestPanelEl = chartPanelsEl.querySelector('[data-chart-latest="true"]');
+  if (latestPanelEl) {
+    latestPanelEl.scrollIntoView({ behavior: "auto", block: "nearest", inline: "start" });
+  }
 }
 
 function entryOverlapsChartWindow(entry, chartWindow) {
@@ -7847,11 +7942,25 @@ async function loadHomeEntries() {
     homeSleepTrendWindow.since.setDate(homeSleepTrendWindow.since.getDate() - 7);
     homeSleepTrendWindow.sinceIso = homeSleepTrendWindow.since.toISOString();
     homeSleepTrendWindow.untilIso = homeSleepTrendWindow.until.toISOString();
-    const chartWindow = computeWindow(6);
+    const chartUntil = new Date(now);
+    const chartWindow = createWindow(
+      new Date(chartUntil.getTime() - HOME_CHART_TOTAL_HOURS * 60 * 60 * 1000),
+      chartUntil,
+    );
+    const chartWindows = buildChartWindows(HOME_CHART_TOTAL_HOURS, HOME_CHART_CHUNK_HOURS, chartUntil);
+    const chartFetchWindow = createWindow(
+      new Date(chartWindow.since.getTime() - HOME_CHART_CHUNK_HOURS * 60 * 60 * 1000),
+      chartWindow.until,
+    );
     const cachedEntries = await listEntriesLocalSafe({
       limit: 200,
       since: statsWindow.sinceIso,
       until: statsWindow.untilIso,
+    });
+    const cachedChartSourceEntries = await listEntriesLocalSafe({
+      limit: 400,
+      since: chartFetchWindow.sinceIso,
+      until: chartFetchWindow.untilIso,
     });
     const cachedSleepTrendEntries = await listEntriesLocalSafe({
       limit: 500,
@@ -7859,8 +7968,10 @@ async function loadHomeEntries() {
       until: homeSleepTrendWindow.untilIso,
     });
     if (cachedEntries) {
-      const cachedChartEntries = cachedEntries.filter((entry) => entryOverlapsChartWindow(entry, chartWindow));
-      renderChart(cachedChartEntries, chartWindow);
+      const cachedChartEntries = (cachedChartSourceEntries || cachedEntries).filter(
+        (entry) => entryOverlapsChartWindow(entry, chartWindow),
+      );
+      renderChart(cachedChartEntries, chartWindows);
       renderStats(cachedEntries);
       renderGoalComparison();
       renderStatsWindow(todayWindow);
@@ -7869,17 +7980,23 @@ async function loadHomeEntries() {
       renderLatestEntry(cachedEntries[0] || null);
       renderHomeSleepTrendChart(cachedSleepTrendEntries || cachedEntries);
     } else {
+      renderChart([], chartWindows);
       renderLatestEntry(null);
       renderHomeSleepTrendChart(cachedSleepTrendEntries || []);
     }
 
     void syncNow();
 
-    const [entries, currentGoal, sleepTrendEntries] = await Promise.all([
+    const [entries, chartSourceEntries, currentGoal, sleepTrendEntries] = await Promise.all([
       loadEntriesWithFallback({
         limit: 200,
         since: statsWindow.sinceIso,
         until: statsWindow.untilIso,
+      }),
+      loadEntriesWithFallback({
+        limit: 400,
+        since: chartFetchWindow.sinceIso,
+        until: chartFetchWindow.untilIso,
       }),
       loadCurrentGoal(),
       loadEntriesWithFallback({
@@ -7889,8 +8006,8 @@ async function loadHomeEntries() {
       }),
     ]);
     state.activeFeedingGoal = currentGoal;
-    const chartEntries = entries.filter((entry) => entryOverlapsChartWindow(entry, chartWindow));
-    renderChart(chartEntries, chartWindow);
+    const chartEntries = chartSourceEntries.filter((entry) => entryOverlapsChartWindow(entry, chartWindow));
+    renderChart(chartEntries, chartWindows);
     renderStats(entries);
     renderGoalComparison();
     renderStatsWindow(todayWindow);

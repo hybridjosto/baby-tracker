@@ -385,12 +385,58 @@
         border-radius: 14px;
         padding: 10px;
         border: 1px dashed rgba(255, 255, 255, 0.08);
+        overflow-x: auto;
+        overflow-y: hidden;
+        scroll-snap-type: x mandatory;
+        scroll-padding-inline: 20px;
+        -webkit-overflow-scrolling: touch;
+      }
+      .chart-wrap::-webkit-scrollbar {
+        height: 8px;
+      }
+      .chart-wrap::-webkit-scrollbar-thumb {
+        background: rgba(139, 133, 126, 0.35);
+        border-radius: 999px;
       }
       html.dark .chart-wrap {
         background: linear-gradient(180deg, rgba(19, 236, 91, 0.06), transparent);
         border-color: rgba(255, 255, 255, 0.08);
       }
-      #history-chart {
+      .history-chart-panels {
+        display: flex;
+        gap: 10px;
+        min-width: max-content;
+        padding-inline: 20px;
+      }
+      .history-chart-panel {
+        width: min(320px, calc(100vw - 76px));
+        min-width: 260px;
+        display: grid;
+        gap: 8px;
+        scroll-snap-align: start;
+      }
+      .history-chart-panel-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 8px;
+        padding-inline: 20px;
+      }
+      .history-chart-panel-title {
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-secondary);
+      }
+      .history-chart-panel-time {
+        font-size: 11px;
+        color: var(--text-secondary);
+      }
+      .history-chart-panel-body {
+        position: relative;
+      }
+      .history-chart-panel-svg {
         width: 100%;
         height: 170px;
         display: block;
@@ -1333,7 +1379,7 @@
       .is-loading .chart-skeleton {
         display: block;
       }
-      .is-loading #history-chart,
+      .is-loading .history-chart-panels,
       .is-loading #chart-empty {
         opacity: 0;
       }
@@ -1553,7 +1599,7 @@
 
         <section class="chart-card">
           <div class="chart-header">
-            <h3>Last 6 Hours</h3>
+            <h3>Last 24 Hours</h3>
             <div class="chart-links">
               <a class="timeline-link" id="timeline-link" href="#">Timeline</a>
             </div>
@@ -1567,7 +1613,7 @@
           </div>
           <div class="chart-wrap">
             <div class="chart-skeleton skeleton-block" aria-hidden="true"></div>
-            <svg id="history-chart" viewBox="0 0 360 170" preserveAspectRatio="none"></svg>
+            <div class="history-chart-panels" id="history-chart-panels"></div>
             <div class="chart-empty" id="chart-empty">No events in the last 24 hours.</div>
           </div>
           <div class="last-events">

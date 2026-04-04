@@ -11,6 +11,10 @@
 - gradual frontend refactor of `src/web/static/app.js` into modules. *plan in `docs/plans/2026-03-18-app-js-refactor-plan.md`
 
 ## DONE
+- made the swipeable home chart default to the newest 6-hour panel on 2026-04-02 by auto-scrolling the latest chunk into view after render in `src/web/static/app.js`.
+- moved the swipeable home chart panel time labels further inward on 2026-04-02 by adding header inset padding in `src/web/templates/index.html`, so the panel labels sit more centrally within each snapped 6-hour block.
+- inset the swipeable home chart panels on 2026-04-02 by adding horizontal scroll padding in `src/web/templates/index.html`, so the next 6-hour panel does not peek in as much while a panel is snapped into view.
+- made the home activity chart horizontally swipeable on 2026-04-02 by turning `src/web/templates/index.html` into a 4-panel last-24-hours scroller and updating `src/web/static/app.js` to render four 6-hour chart chunks with a slightly wider chart-data fetch window for overlapping sleep/cry events.
 - made the shared active timer banners sticky on 2026-03-31 in `src/web/static/styles.css`, so the sleep/timed-event stop control stays pinned near the top while scrolling long pages.
 - made active sleep/timed-event timers reachable from every page on 2026-03-31 by extracting shared top-of-page timer banners into `src/web/templates/active_timer_banners.html`, including them across the app templates, and moving the shared banner styles into `src/web/static/styles.css` so an in-progress timer can be stopped without scrolling back to the footer menu.
 - allowed emoji in custom event labels on 2026-03-29 by relaxing frontend/backend custom-type validation plus generic entry-type validation, so misc events like `🌡 temp` can be saved from Settings and logged normally in `src/web/static/app.js`, `src/web/static/app/core/config.js`, `src/app/services/settings.py`, and `src/lib/validation.py`.
@@ -85,6 +89,7 @@
 - added integration coverage for timed-event start APIs in `tests/integration/test_feed_log_api.py` (default user slug, user override, and payload fields) on 2026-03-08.
 
 ## NOTES
+- syntax check run on 2026-04-02 after home chart swipe update: `node --input-type=module --check < src/web/static/app.js`.
 - tests run on 2026-03-31 after shared active timer banners update: `./.venv/bin/pytest tests/integration/test_feed_log_api.py tests/integration/test_diaper_log_api.py` -> `10 passed`.
 - syntax check run on 2026-03-31 after shared active timer banners update: `node --input-type=module --check < src/web/static/app.js`.
 - tests run on 2026-03-29 for emoji custom event support: `./.venv/bin/pytest tests/unit/test_validation.py tests/integration/test_settings_api.py tests/integration/test_entries_api.py` -> `44 passed`.
