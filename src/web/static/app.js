@@ -143,6 +143,7 @@ const summaryTotalIntakeEl = document.getElementById("summary-total-intake-amoun
 const summaryTotalIntakeAvgEl = document.getElementById("summary-total-intake-avg");
 const summarySleepDurationEl = document.getElementById("summary-sleep-duration");
 const summarySleepDurationAvgEl = document.getElementById("summary-sleep-duration-avg");
+const summarySleepDayNightEl = document.getElementById("summary-sleep-day-night");
 const milkExpressCountEl = document.getElementById("milk-express-count");
 const milkExpressTotalsEl = document.getElementById("milk-express-totals");
 const milkExpressListEl = document.getElementById("milk-express-list");
@@ -3986,31 +3987,85 @@ function renderLatestEntry(entry) {
   }
 }
 
-function getClippedSleepMinutesForDay(entries, date) {
+function getNextSleepSplitBoundaryMs(currentMs) {
+  const current = new Date(currentMs);
+  const midnight = new Date(
+    current.getFullYear(),
+    current.getMonth(),
+    current.getDate() + 1,
+    0,
+    0,
+    0,
+    0,
+  ).getTime();
+  const morning = new Date(
+    current.getFullYear(),
+    current.getMonth(),
+    current.getDate(),
+    7,
+    0,
+    0,
+    0,
+  ).getTime();
+  const evening = new Date(
+    current.getFullYear(),
+    current.getMonth(),
+    current.getDate(),
+    19,
+    0,
+    0,
+    0,
+  ).getTime();
+  return [morning, evening, midnight].find((boundaryMs) => boundaryMs > currentMs) || midnight;
+}
+
+function isDaySleepMs(valueMs) {
+  const date = new Date(valueMs);
+  const hour = date.getHours();
+  return hour >= 7 && hour < 19;
+}
+
+function getSplitSleepMinutesForDay(entries, date) {
   const dayWindow = getSummaryDayWindow(date || new Date());
   const dayStartMs = dayWindow.since.getTime();
   const dayEndMs = dayWindow.until.getTime();
-  return (entries || []).reduce((total, entry) => {
+  return (entries || []).reduce((totals, entry) => {
     if (!entry || !isSleepType(entry.type) || entry.deleted_at_utc) {
-      return total;
+      return totals;
     }
     const startMs = Date.parse(entry.timestamp_utc || "");
     const durationMin = Number.parseFloat(entry.feed_duration_min);
     if (!Number.isFinite(startMs) || !Number.isFinite(durationMin) || durationMin <= 0) {
-      return total;
+      return totals;
     }
     const endMs = startMs + durationMin * 60000;
-    const clippedStartMs = Math.max(dayStartMs, startMs);
+    let segmentStartMs = Math.max(dayStartMs, startMs);
     const clippedEndMs = Math.min(dayEndMs, endMs);
-    if (clippedEndMs <= clippedStartMs) {
-      return total;
+    if (clippedEndMs <= segmentStartMs) {
+      return totals;
     }
-    return total + ((clippedEndMs - clippedStartMs) / 60000);
-  }, 0);
+    while (segmentStartMs < clippedEndMs) {
+      const nextBoundaryMs = Math.min(
+        clippedEndMs,
+        getNextSleepSplitBoundaryMs(segmentStartMs),
+      );
+      const segmentMinutes = (nextBoundaryMs - segmentStartMs) / 60000;
+      if (isDaySleepMs(segmentStartMs)) {
+        totals.dayMinutes += segmentMinutes;
+      } else {
+        totals.nightMinutes += segmentMinutes;
+      }
+      segmentStartMs = nextBoundaryMs;
+    }
+    return totals;
+  }, {
+    dayMinutes: 0,
+    nightMinutes: 0,
+  });
 }
 
 function renderSummaryStats(entries) {
-  if (!summaryTotalIntakeEl && !summarySleepDurationEl) {
+  if (!summaryTotalIntakeEl && !summarySleepDurationEl && !summarySleepDayNightEl) {
     return;
   }
   let feedCount = 0;
@@ -4060,10 +4115,20 @@ function renderSummaryStats(entries) {
     summaryTotalIntakeEl.textContent = formatMl(totalIntake);
   }
   if (summarySleepDurationEl) {
-    const displayedSleepDuration = pageType === "summary"
-      ? getClippedSleepMinutesForDay(summaryGanttEntries.length ? summaryGanttEntries : entries, summaryDate)
+    const summarySleepSplit = pageType === "summary"
+      ? getSplitSleepMinutesForDay(summaryGanttEntries.length ? summaryGanttEntries : entries, summaryDate)
+      : null;
+    const displayedSleepDuration = summarySleepSplit
+      ? summarySleepSplit.dayMinutes + summarySleepSplit.nightMinutes
       : sleepDurationTotal;
     summarySleepDurationEl.textContent = formatDurationMinutes(displayedSleepDuration);
+    if (summarySleepDayNightEl) {
+      if (summarySleepSplit) {
+        summarySleepDayNightEl.textContent = `Day ${formatDurationMinutes(summarySleepSplit.dayMinutes)} · Night ${formatDurationMinutes(summarySleepSplit.nightMinutes)}`;
+      } else {
+        summarySleepDayNightEl.textContent = "Day -- · Night --";
+      }
+    }
   }
   if (summaryFeedDurationAvgEl) {
     summaryFeedDurationAvgEl.textContent = `Avg / feed: ${formatAverageDuration(

@@ -11,6 +11,9 @@
 - gradual frontend refactor of `src/web/static/app.js` into modules. *plan in `docs/plans/2026-03-18-app-js-refactor-plan.md`
 
 ## DONE
+- added a selected-day day vs night sleep breakdown to the Summary sleep card on 2026-04-07 by splitting clipped sleep intervals at local 7am/7pm boundaries in `src/web/static/app.js` and surfacing the new `Day ... · Night ...` line in `src/web/templates/summary.html`.
+- extended native push confirmations to the shortcut-style external API routes on 2026-04-04 by wiring `src/app/routes/feed.py` to the same `src/app/services/entry_confirmation.py` helper, so `feed/log`, `poo/log`, `wee/log`, `sleep/start`, and `cry/start` now also send subscribed users an `Entry saved` notification.
+- added native push confirmations for direct external entry-create API calls on 2026-04-04 by wiring `src/app/routes/entries.py` to dispatch a new `src/app/services/entry_confirmation.py` helper after successful entry creation, so API-created entries for subscribed users now send an `Entry saved` notification for all entry types without affecting sync/import flows.
 - made the swipeable home chart default to the newest 6-hour panel on 2026-04-02 by auto-scrolling the latest chunk into view after render in `src/web/static/app.js`.
 - moved the swipeable home chart panel time labels further inward on 2026-04-02 by adding header inset padding in `src/web/templates/index.html`, so the panel labels sit more centrally within each snapped 6-hour block.
 - inset the swipeable home chart panels on 2026-04-02 by adding horizontal scroll padding in `src/web/templates/index.html`, so the next 6-hour panel does not peek in as much while a panel is snapped into view.
@@ -89,6 +92,9 @@
 - added integration coverage for timed-event start APIs in `tests/integration/test_feed_log_api.py` (default user slug, user override, and payload fields) on 2026-03-08.
 
 ## NOTES
+- syntax check run on 2026-04-07 after Summary day/night sleep split: `node --input-type=module --check < src/web/static/app.js`.
+- tests run on 2026-04-04 for shortcut API entry confirmation push: `./.venv/bin/pytest tests/integration/test_feed_log_api.py tests/integration/test_entries_api.py tests/integration/test_pushcut_feed_api.py`.
+- tests run on 2026-04-04 for native entry confirmation push: `./.venv/bin/pytest tests/integration/test_entries_api.py tests/integration/test_pushcut_feed_api.py`.
 - syntax check run on 2026-04-02 after home chart swipe update: `node --input-type=module --check < src/web/static/app.js`.
 - tests run on 2026-03-31 after shared active timer banners update: `./.venv/bin/pytest tests/integration/test_feed_log_api.py tests/integration/test_diaper_log_api.py` -> `10 passed`.
 - syntax check run on 2026-03-31 after shared active timer banners update: `node --input-type=module --check < src/web/static/app.js`.
