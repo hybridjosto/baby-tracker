@@ -4,6 +4,9 @@ from datetime import datetime, timezone
 
 DEFAULT_FEED_SIZE_SMALL_ML = 120.0
 DEFAULT_FEED_SIZE_BIG_ML = 150.0
+DEFAULT_OLLAMA_BASE_URL = "http://127.0.0.1:11434"
+DEFAULT_OLLAMA_MODEL = "gemma4"
+DEFAULT_OLLAMA_TIMEOUT_SECONDS = 45
 
 
 SETTINGS_KEYS = (
@@ -21,6 +24,9 @@ SETTINGS_KEYS = (
     "home_kpis_webhook_url",
     "feed_size_small_ml",
     "feed_size_big_ml",
+    "ollama_base_url",
+    "ollama_model",
+    "ollama_timeout_seconds",
 )
 
 
@@ -58,6 +64,24 @@ def _normalize_settings_payload(data: dict | None) -> dict:
         if isinstance(big_value, (int, float))
         else DEFAULT_FEED_SIZE_BIG_ML
     )
+    base_url = raw.get("ollama_base_url")
+    settings["ollama_base_url"] = (
+        base_url.strip()
+        if isinstance(base_url, str) and base_url.strip()
+        else DEFAULT_OLLAMA_BASE_URL
+    )
+    model = raw.get("ollama_model")
+    settings["ollama_model"] = (
+        model.strip()
+        if isinstance(model, str) and model.strip()
+        else DEFAULT_OLLAMA_MODEL
+    )
+    timeout = raw.get("ollama_timeout_seconds")
+    settings["ollama_timeout_seconds"] = (
+        int(timeout)
+        if isinstance(timeout, int) and not isinstance(timeout, bool) and timeout > 0
+        else DEFAULT_OLLAMA_TIMEOUT_SECONDS
+    )
     return settings
 
 
@@ -83,7 +107,8 @@ def get_settings(conn: sqlite3.Connection | None) -> dict:
                overnight_gap_min_hours, overnight_gap_max_hours,
                behind_target_mode, entry_webhook_url,
                default_user_slug, pushcut_feed_due_url,
-               home_kpis_webhook_url, feed_size_small_ml, feed_size_big_ml
+               home_kpis_webhook_url, feed_size_small_ml, feed_size_big_ml,
+               ollama_base_url, ollama_model, ollama_timeout_seconds
         FROM baby_settings
         WHERE id = 1
         """
@@ -112,6 +137,9 @@ def update_settings(conn: sqlite3.Connection | None, fields: dict) -> dict:
         "home_kpis_webhook_url",
         "feed_size_small_ml",
         "feed_size_big_ml",
+        "ollama_base_url",
+        "ollama_model",
+        "ollama_timeout_seconds",
         "updated_at_utc",
     ):
         if key in fields:

@@ -11,6 +11,10 @@
 - gradual frontend refactor of `src/web/static/app.js` into modules. *plan in `docs/plans/2026-03-18-app-js-refactor-plan.md`
 
 ## DONE
+- changed the Summary AI handover request on 2026-04-17 to summarize all selected-day events instead of filtering by the active frontend user, and bumped `BABY_TRACKER_STATIC_VERSION` to force browsers/PWAs to fetch the fixed JavaScript.
+- fixed the Summary AI handover button on 2026-04-17 so it no longer uses possibly stale frontend `summaryEntries` to decide whether the selected day has events before calling the backend.
+- added an on-demand Ollama AI handover summary on 2026-04-17 by adding configurable Ollama settings, a selected-day `POST /api/entries/llm-summary` endpoint, Summary-page AI handover UI, and backend tests for settings/window/prompt behavior.
+- replaced the homepage `Total intake (today)` card with a textual sleep summary card on 2026-04-15 by adding home-page `Total sleep time` markup in `src/web/templates/index.html`, restoring the separate lower sleep trend chart, and wiring today sleep total / average / day-night values in `src/web/static/app.js`.
 - added a selected-day day vs night sleep breakdown to the Summary sleep card on 2026-04-07 by splitting clipped sleep intervals at local 7am/7pm boundaries in `src/web/static/app.js` and surfacing the new `Day ... · Night ...` line in `src/web/templates/summary.html`.
 - extended native push confirmations to the shortcut-style external API routes on 2026-04-04 by wiring `src/app/routes/feed.py` to the same `src/app/services/entry_confirmation.py` helper, so `feed/log`, `poo/log`, `wee/log`, `sleep/start`, and `cry/start` now also send subscribed users an `Entry saved` notification.
 - added native push confirmations for direct external entry-create API calls on 2026-04-04 by wiring `src/app/routes/entries.py` to dispatch a new `src/app/services/entry_confirmation.py` helper after successful entry creation, so API-created entries for subscribed users now send an `Entry saved` notification for all entry types without affecting sync/import flows.
@@ -92,6 +96,10 @@
 - added integration coverage for timed-event start APIs in `tests/integration/test_feed_log_api.py` (default user slug, user override, and payload fields) on 2026-03-08.
 
 ## NOTES
+- tests run on 2026-04-17 after Summary AI handover all-users request update: `node --check src/web/static/app.js` and `./.venv/bin/pytest tests/integration/test_entries_api.py tests/integration/test_settings_api.py tests/unit/test_settings_storage.py`.
+- tests run on 2026-04-17 after AI handover frontend no-events guard fix: `./.venv/bin/pytest tests/integration/test_entries_api.py tests/integration/test_settings_api.py tests/unit/test_settings_storage.py` -> `44 passed`; syntax check `node --check src/web/static/app.js`.
+- tests run on 2026-04-17 after Ollama AI handover summary: `./.venv/bin/pytest` -> `117 passed, 6 skipped`.
+- syntax checks run on 2026-04-17 after Ollama AI handover summary: `PYTHONPYCACHEPREFIX=/tmp/baby-tracker-pycache python3 -m compileall src/app` and `node --check src/web/static/app.js`.
 - syntax check run on 2026-04-07 after Summary day/night sleep split: `node --input-type=module --check < src/web/static/app.js`.
 - tests run on 2026-04-04 for shortcut API entry confirmation push: `./.venv/bin/pytest tests/integration/test_feed_log_api.py tests/integration/test_entries_api.py tests/integration/test_pushcut_feed_api.py`.
 - tests run on 2026-04-04 for native entry confirmation push: `./.venv/bin/pytest tests/integration/test_entries_api.py tests/integration/test_pushcut_feed_api.py`.
@@ -148,3 +156,4 @@
 - tests run on 2026-03-08 after timed-event start API addition: `../.venv/bin/pytest ../tests/integration/test_feed_log_api.py ../tests/integration/test_diaper_log_api.py` -> `10 passed`.
 - lint run on 2026-03-08 after timed-event start API addition: `cd src && ruff check .` -> `All checks passed!`.
 - tests attempted on 2026-03-14: `python3 -m pytest tests/integration/test_feed_log_api.py` could not run because `pytest` is not installed and this environment cannot reach PyPI.
+- verification note on 2026-04-15: no automated tests were run for the homepage sleep-card swap; change touches `src/web/templates/index.html` plus homepage stat rendering in `src/web/static/app.js`.

@@ -1557,13 +1557,14 @@
             </div>
             <div class="stat-flip-hint">Tap to flip 24h</div>
           </div>
-          <div class="stat-card" aria-label="Total intake for today">
+          <div class="stat-card" aria-label="Total sleep time for today">
             <div class="stat-label">
-              <span class="material-symbols-outlined" style="font-size: 18px; color: var(--primary);">local_drink</span>
-              Total intake (today)
+              <span class="material-symbols-outlined" style="font-size: 18px; color: #7c83ff;">bedtime</span>
+              Total sleep time
             </div>
-            <div class="stat-value skeleton-text" id="stat-daily-feed-total">0 ml</div>
-            <div class="stat-sub skeleton-text skeleton-wide" id="stat-daily-feed-sub">Midnight-midnight · Avg / feed: --</div>
+            <div class="stat-value skeleton-text skeleton-mid" id="home-sleep-duration">0 min</div>
+            <div class="stat-sub skeleton-text skeleton-wide" id="home-sleep-duration-avg">Avg / sleep: --</div>
+            <div class="stat-sub skeleton-text skeleton-wide" id="home-sleep-day-night">Day -- · Night --</div>
           </div>
         </section>
         <div class="stats-range skeleton-text skeleton-wide" id="stat-window">Today so far: -- · Tap a card for 24h</div>
@@ -1667,7 +1668,6 @@
             <div class="sleep-trend-labels" id="home-sleep-trend-labels"></div>
           </div>
         </section>
-
         <div class="edit-modal-backdrop" id="edit-entry-backdrop" hidden></div>
         <div class="edit-modal" id="edit-entry-modal" role="dialog" aria-modal="true" aria-hidden="true" hidden>
           <form class="edit-modal-card" id="edit-entry-form" novalidate>

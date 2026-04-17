@@ -129,6 +129,9 @@ const summaryDateInputEl = document.getElementById("summary-date");
 const summaryDateLabelEl = document.getElementById("summary-date-label");
 const summaryPrevBtn = document.getElementById("summary-prev");
 const summaryNextBtn = document.getElementById("summary-next");
+const aiSummaryGenerateBtn = document.getElementById("ai-summary-generate");
+const aiSummaryMetaEl = document.getElementById("ai-summary-meta");
+const aiSummaryOutputEl = document.getElementById("ai-summary-output");
 const sleepGanttTypeOptionsEl = document.getElementById("sleep-gantt-type-options");
 const sleepGanttChartEl = document.getElementById("sleep-gantt-chart");
 const sleepGanttReadoutEl = document.getElementById("sleep-gantt-readout");
@@ -144,6 +147,9 @@ const summaryTotalIntakeAvgEl = document.getElementById("summary-total-intake-av
 const summarySleepDurationEl = document.getElementById("summary-sleep-duration");
 const summarySleepDurationAvgEl = document.getElementById("summary-sleep-duration-avg");
 const summarySleepDayNightEl = document.getElementById("summary-sleep-day-night");
+const homeSleepDurationEl = document.getElementById("home-sleep-duration");
+const homeSleepDurationAvgEl = document.getElementById("home-sleep-duration-avg");
+const homeSleepDayNightEl = document.getElementById("home-sleep-day-night");
 const milkExpressCountEl = document.getElementById("milk-express-count");
 const milkExpressTotalsEl = document.getElementById("milk-express-totals");
 const milkExpressListEl = document.getElementById("milk-express-list");
@@ -304,6 +310,9 @@ const customTypeInputEl = document.getElementById("custom-type-input");
 const entryWebhookInputEl = document.getElementById("entry-webhook-input");
 const homeKpisWebhookInputEl = document.getElementById("home-kpis-webhook-input");
 const defaultUserInputEl = document.getElementById("default-user-input");
+const ollamaBaseUrlInputEl = document.getElementById("ollama-base-url-input");
+const ollamaModelInputEl = document.getElementById("ollama-model-input");
+const ollamaTimeoutInputEl = document.getElementById("ollama-timeout-input");
 const pushReminderUserEl = document.getElementById("push-reminder-user");
 const pushReminderStatusEl = document.getElementById("push-reminder-status");
 const enablePushRemindersBtn = document.getElementById("enable-push-reminders");
@@ -1670,10 +1679,17 @@ function initSummaryHandlers() {
   if (refreshBtn) {
     refreshBtn.addEventListener("click", () => {
       if (state.userValid) {
+        resetAiSummaryPanel();
         void loadSummaryEntries();
         void loadRulerFeeds({ reset: true });
       }
     });
+  }
+  if (aiSummaryGenerateBtn) {
+    aiSummaryGenerateBtn.addEventListener("click", () => {
+      void generateAiSummary();
+    });
+    resetAiSummaryPanel();
   }
   if (milkExpressSparklineToggleEls.length) {
     milkExpressSparklineToggleEls.forEach((btn) => {
@@ -1787,6 +1803,28 @@ function initSettingsHandlers() {
     defaultUserInputEl.addEventListener("change", () => {
       const value = defaultUserInputEl.value;
       void saveBabySettings({ default_user_slug: value || null });
+    });
+  }
+  if (ollamaBaseUrlInputEl) {
+    ollamaBaseUrlInputEl.addEventListener("change", () => {
+      const value = ollamaBaseUrlInputEl.value;
+      void saveBabySettings({ ollama_base_url: value || null });
+    });
+  }
+  if (ollamaModelInputEl) {
+    ollamaModelInputEl.addEventListener("change", () => {
+      const value = ollamaModelInputEl.value;
+      void saveBabySettings({ ollama_model: value || null });
+    });
+  }
+  if (ollamaTimeoutInputEl) {
+    ollamaTimeoutInputEl.addEventListener("change", () => {
+      const nextValue = Number.parseInt(ollamaTimeoutInputEl.value, 10);
+      if (!Number.isInteger(nextValue) || nextValue <= 0) {
+        ollamaTimeoutInputEl.value = "45";
+        return;
+      }
+      void saveBabySettings({ ollama_timeout_seconds: nextValue });
     });
   }
   if (enablePushRemindersBtn) {
@@ -3847,6 +3885,80 @@ function setSummaryDate(date) {
     const candidate = new Date(date);
     candidate.setHours(0, 0, 0, 0);
     summaryNextBtn.disabled = candidate >= today;
+  }
+  resetAiSummaryPanel();
+}
+
+function setAiSummaryLoading(isLoading) {
+  if (!aiSummaryGenerateBtn) {
+    return;
+  }
+  aiSummaryGenerateBtn.disabled = isLoading || !state.userValid;
+  aiSummaryGenerateBtn.textContent = isLoading ? "Generating..." : "Generate handover";
+}
+
+function resetAiSummaryPanel() {
+  if (!aiSummaryGenerateBtn && !aiSummaryMetaEl && !aiSummaryOutputEl) {
+    return;
+  }
+  setAiSummaryLoading(false);
+  if (aiSummaryMetaEl) {
+    aiSummaryMetaEl.textContent = state.userValid
+      ? "Uses notes and events from this date."
+      : "Choose a user to generate a handover.";
+  }
+  if (aiSummaryOutputEl) {
+    aiSummaryOutputEl.textContent = "";
+  }
+}
+
+async function generateAiSummary() {
+  if (!state.userValid) {
+    resetAiSummaryPanel();
+    return;
+  }
+  if (!summaryDate) {
+    setSummaryDate(new Date());
+  }
+  const dayWindow = getSummaryDayWindow(summaryDate || new Date());
+  setAiSummaryLoading(true);
+  if (aiSummaryMetaEl) {
+    aiSummaryMetaEl.textContent = "Generating with Ollama...";
+  }
+  if (aiSummaryOutputEl) {
+    aiSummaryOutputEl.textContent = "";
+  }
+  try {
+    const response = await fetch(buildUrl("/api/entries/llm-summary"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        since_utc: dayWindow.sinceIso,
+        until_utc: dayWindow.untilIso,
+      }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(data.error || "summary failed");
+    }
+    if (!data.event_count) {
+      if (aiSummaryMetaEl) {
+        aiSummaryMetaEl.textContent = "No events found for this date.";
+      }
+      return;
+    }
+    if (aiSummaryOutputEl) {
+      aiSummaryOutputEl.textContent = data.summary || "";
+    }
+    if (aiSummaryMetaEl) {
+      aiSummaryMetaEl.textContent = `${data.event_count} events · ${data.model || "Ollama"}`;
+    }
+  } catch (err) {
+    if (aiSummaryMetaEl) {
+      aiSummaryMetaEl.textContent = `Failed: ${err.message || "unknown error"}`;
+    }
+  } finally {
+    setAiSummaryLoading(false);
   }
 }
 
@@ -6733,10 +6845,13 @@ function renderStats(entries) {
   let todayFormulaTotalMl = 0;
   let todayWeeCount = 0;
   let todayPooCount = 0;
+  let todaySleepCount = 0;
+  let todaySleepDurationTotal = 0;
   const feedVolumeEntries = [];
   const now = new Date();
   const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const dayStartTs = dayStart.getTime();
+  const todaySleepSplit = getSplitSleepMinutesForDay(entries, now);
   entries.forEach((entry) => {
     const timestamp = new Date(entry.timestamp_utc);
     const ts = timestamp.getTime();
@@ -6780,6 +6895,12 @@ function renderStats(entries) {
       if (isToday) {
         todayPooCount += 1;
       }
+    } else if (isSleepType(entry.type)) {
+      const sleepDuration = Number.parseFloat(entry.feed_duration_min);
+      if (isToday && Number.isFinite(sleepDuration) && sleepDuration > 0) {
+        todaySleepCount += 1;
+        todaySleepDurationTotal += sleepDuration;
+      }
     }
   });
   statFeedTodayEl.textContent = String(todayFeedEventCount);
@@ -6803,6 +6924,20 @@ function renderStats(entries) {
   }
   if (statDailyFeedSubEl) {
     statDailyFeedSubEl.textContent = `Midnight-midnight · Avg / feed: ${formatAverageMl(todayFeedTotalMl, todayFeedCount)}`;
+  }
+  if (homeSleepDurationEl) {
+    homeSleepDurationEl.textContent = formatDurationMinutes(
+      todaySleepSplit.dayMinutes + todaySleepSplit.nightMinutes,
+    );
+  }
+  if (homeSleepDurationAvgEl) {
+    homeSleepDurationAvgEl.textContent = `Avg / sleep: ${formatAverageDuration(
+      todaySleepDurationTotal,
+      todaySleepCount,
+    )}`;
+  }
+  if (homeSleepDayNightEl) {
+    homeSleepDayNightEl.textContent = `Day ${formatDurationMinutes(todaySleepSplit.dayMinutes)} · Night ${formatDurationMinutes(todaySleepSplit.nightMinutes)}`;
   }
   recentFeedVolumeEntries = feedVolumeEntries.sort((a, b) => a.ts - b.ts);
   latestFeedTotalsMl = {
@@ -8461,6 +8596,15 @@ async function loadBabySettings() {
     if (defaultUserInputEl) {
       defaultUserInputEl.value = data.default_user_slug || "";
     }
+    if (ollamaBaseUrlInputEl) {
+      ollamaBaseUrlInputEl.value = data.ollama_base_url || "http://127.0.0.1:11434";
+    }
+    if (ollamaModelInputEl) {
+      ollamaModelInputEl.value = data.ollama_model || "gemma4";
+    }
+    if (ollamaTimeoutInputEl) {
+      ollamaTimeoutInputEl.value = String(data.ollama_timeout_seconds || 45);
+    }
     if (feedSizeSmallInputEl) {
       feedSizeSmallInputEl.value = String(state.feedSizeSmallMl);
     }
@@ -8511,6 +8655,15 @@ async function saveBabySettings(patch) {
     }
     if (defaultUserInputEl) {
       defaultUserInputEl.value = data.default_user_slug || "";
+    }
+    if (ollamaBaseUrlInputEl) {
+      ollamaBaseUrlInputEl.value = data.ollama_base_url || "http://127.0.0.1:11434";
+    }
+    if (ollamaModelInputEl) {
+      ollamaModelInputEl.value = data.ollama_model || "gemma4";
+    }
+    if (ollamaTimeoutInputEl) {
+      ollamaTimeoutInputEl.value = String(data.ollama_timeout_seconds || 45);
     }
     if (feedSizeSmallInputEl) {
       feedSizeSmallInputEl.value = String(state.feedSizeSmallMl);

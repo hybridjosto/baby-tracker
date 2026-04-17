@@ -681,6 +681,42 @@
                 font-size: 13px;
                 color: var(--text-secondary);
             }
+            .ai-summary-body {
+                display: grid;
+                gap: 10px;
+            }
+            .ai-summary-actions {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                flex-wrap: wrap;
+            }
+            .ai-summary-btn {
+                border-radius: 10px;
+                border: none;
+                padding: 10px 14px;
+                background: var(--primary);
+                color: #0f1a12;
+                font-weight: 700;
+                cursor: pointer;
+            }
+            .ai-summary-btn:disabled {
+                cursor: wait;
+                opacity: 0.72;
+            }
+            .ai-summary-meta {
+                font-size: 12px;
+                color: var(--text-secondary);
+            }
+            .ai-summary-output {
+                white-space: pre-wrap;
+                line-height: 1.55;
+                font-size: 14px;
+                color: var(--text-primary);
+            }
+            html.dark .ai-summary-output {
+                color: #e6f2ea;
+            }
             .ruler-wrap {
                 position: relative;
                 margin-top: 16px;
@@ -1122,6 +1158,34 @@
                         >
                     </button>
                 </div>
+
+                <section class="summary-panel">
+                    <div class="summary-panel-header">
+                        <h2>AI handover</h2>
+                        <div class="summary-panel-meta">Selected day</div>
+                    </div>
+                    <div class="ai-summary-body">
+                        <div class="ai-summary-actions">
+                            <button
+                                class="ai-summary-btn"
+                                id="ai-summary-generate"
+                                type="button"
+                            >
+                                Generate handover
+                            </button>
+                            <div
+                                class="ai-summary-meta"
+                                id="ai-summary-meta"
+                            >
+                                Uses notes and events from this date.
+                            </div>
+                        </div>
+                        <div
+                            class="ai-summary-output"
+                            id="ai-summary-output"
+                        ></div>
+                    </div>
+                </section>
 
                 <div class="summary-section-title">Feed totals</div>
                 <section class="summary-grid">

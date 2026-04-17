@@ -14,14 +14,24 @@ from src.app.services.entries import (
     sync_entries,
     update_entry,
 )
+from src.app.services.entry_confirmation import dispatch_entry_confirmation_push
 from src.app.services.webhooks import send_entry_webhook
 from src.app.services.home_kpis import dispatch_home_kpis
+from src.app.services.llm_summary import LlmSummaryError, generate_ollama_summary
 
 entries_api = Blueprint("entries_api", __name__, url_prefix="/api")
 
 
 def _db_path() -> str:
     return current_app.config["DB_PATH"]
+
+
+def _base_path() -> str:
+    return current_app.config.get("BASE_PATH", "")
+
+
+def _vapid_config():
+    return current_app.config.get("VAPID_CONFIG")
 
 
 @entries_api.get("/entries")
@@ -101,6 +111,18 @@ def get_entries_summary_route():
         return jsonify({"error": str(exc)}), 400
 
 
+@entries_api.post("/entries/llm-summary")
+def generate_entries_llm_summary_route():
+    payload = request.get_json(silent=True) or {}
+    try:
+        summary = generate_ollama_summary(_db_path(), payload)
+        return jsonify(summary)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except LlmSummaryError as exc:
+        return jsonify({"error": str(exc)}), exc.status_code
+
+
 @entries_api.get("/entries/feed-schedule")
 def get_next_feed_schedule_route():
     user_slug = request.args.get("user_slug")
@@ -117,6 +139,12 @@ def create_entry_route():
     payload = request.get_json(silent=True) or {}
     try:
         entry = create_entry(_db_path(), payload)
+        dispatch_entry_confirmation_push(
+            _db_path(),
+            entry,
+            vapid_config=_vapid_config(),
+            base_path=_base_path(),
+        )
         send_entry_webhook(_db_path(), entry)
         dispatch_home_kpis(_db_path())
         return jsonify(entry), 201
@@ -132,6 +160,12 @@ def create_user_entry_route(user_slug: str):
     payload["user_slug"] = user_slug
     try:
         entry = create_entry(_db_path(), payload)
+        dispatch_entry_confirmation_push(
+            _db_path(),
+            entry,
+            vapid_config=_vapid_config(),
+            base_path=_base_path(),
+        )
         send_entry_webhook(_db_path(), entry)
         dispatch_home_kpis(_db_path())
         return jsonify(entry), 201

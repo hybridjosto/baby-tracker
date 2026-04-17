@@ -10,6 +10,7 @@ from src.app.storage.settings import update_settings as repo_update_settings
 from src.app.storage.settings import (
     DEFAULT_FEED_SIZE_BIG_ML,
     DEFAULT_FEED_SIZE_SMALL_ML,
+    DEFAULT_OLLAMA_TIMEOUT_SECONDS,
 )
 
 
@@ -177,6 +178,43 @@ def _normalize_feed_size_ml(value: object, field: str) -> float:
     return float(value)
 
 
+def _normalize_ollama_base_url(value: object) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError("ollama_base_url must be http(s) URL")
+    trimmed = value.strip().rstrip("/")
+    if not trimmed:
+        return None
+    parsed = urlparse(trimmed)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise ValueError("ollama_base_url must be http(s) URL")
+    return trimmed
+
+
+def _normalize_ollama_model(value: object) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError("ollama_model must be a model name")
+    trimmed = value.strip()
+    if not trimmed:
+        return None
+    if len(trimmed) > 80 or any(char.isspace() for char in trimmed):
+        raise ValueError("ollama_model must be a model name")
+    return trimmed
+
+
+def _normalize_ollama_timeout(value: object) -> int:
+    if value is None:
+        return DEFAULT_OLLAMA_TIMEOUT_SECONDS
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValueError("ollama_timeout_seconds must be a positive integer")
+    if value <= 0 or value > 300:
+        raise ValueError("ollama_timeout_seconds must be between 1 and 300")
+    return value
+
+
 def get_settings(db_path: str) -> dict:
     with get_connection(db_path) as conn:
         return repo_get_settings(conn)
@@ -217,6 +255,16 @@ def update_settings(db_path: str, payload: dict) -> dict:
     if "feed_size_big_ml" in payload:
         fields["feed_size_big_ml"] = _normalize_feed_size_ml(
             payload["feed_size_big_ml"], "feed_size_big_ml"
+        )
+    if "ollama_base_url" in payload:
+        fields["ollama_base_url"] = _normalize_ollama_base_url(
+            payload["ollama_base_url"]
+        )
+    if "ollama_model" in payload:
+        fields["ollama_model"] = _normalize_ollama_model(payload["ollama_model"])
+    if "ollama_timeout_seconds" in payload:
+        fields["ollama_timeout_seconds"] = _normalize_ollama_timeout(
+            payload["ollama_timeout_seconds"]
         )
     with get_connection(db_path) as conn:
         current = repo_get_settings(conn)

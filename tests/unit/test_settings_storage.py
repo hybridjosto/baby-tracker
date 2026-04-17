@@ -11,6 +11,9 @@ def test_settings_defaults_include_feed_size_defaults(tmp_path):
 
     assert settings["feed_size_small_ml"] == 120.0
     assert settings["feed_size_big_ml"] == 150.0
+    assert settings["ollama_base_url"] == "http://127.0.0.1:11434"
+    assert settings["ollama_model"] == "gemma4"
+    assert settings["ollama_timeout_seconds"] == 45
 
 
 def test_settings_migrates_missing_feed_size_columns(tmp_path):
@@ -46,5 +49,11 @@ def test_settings_migrates_missing_feed_size_columns(tmp_path):
 
     assert "feed_size_small_ml" in columns
     assert "feed_size_big_ml" in columns
+    assert "ollama_base_url" in columns
+    assert "ollama_model" in columns
+    assert "ollama_timeout_seconds" in columns
     assert settings["feed_size_small_ml"] == 120.0
     assert settings["feed_size_big_ml"] == 150.0
+    assert settings["ollama_base_url"] == "http://127.0.0.1:11434"
+    assert settings["ollama_model"] == "gemma4"
+    assert settings["ollama_timeout_seconds"] == 45

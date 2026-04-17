@@ -35,6 +35,9 @@ CREATE TABLE IF NOT EXISTS baby_settings (
     home_kpis_webhook_url TEXT,
     feed_size_small_ml REAL,
     feed_size_big_ml REAL,
+    ollama_base_url TEXT,
+    ollama_model TEXT,
+    ollama_timeout_seconds INTEGER,
     feed_due_last_entry_id INTEGER,
     feed_due_last_sent_at_utc TEXT,
     updated_at_utc TEXT NOT NULL DEFAULT (datetime('now'))

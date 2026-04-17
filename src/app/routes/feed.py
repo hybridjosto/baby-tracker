@@ -5,6 +5,7 @@ from flask import Blueprint, current_app, jsonify, request
 import uuid
 
 from src.app.services.entries import create_entry
+from src.app.services.entry_confirmation import dispatch_entry_confirmation_push
 from src.app.services.settings import get_settings
 from src.lib.validation import normalize_user_slug
 
@@ -13,6 +14,14 @@ feed_api = Blueprint("feed_api", __name__, url_prefix="/api")
 
 def _db_path() -> str:
     return current_app.config["DB_PATH"]
+
+
+def _base_path() -> str:
+    return current_app.config.get("BASE_PATH", "")
+
+
+def _vapid_config():
+    return current_app.config.get("VAPID_CONFIG")
 
 
 def _resolve_user_slug(raw: str | None) -> str:
@@ -37,8 +46,9 @@ def log_feed_route():
     payload = request.get_json(silent=True) or {}
     amount = request.args.get("amount", type=float)
     if amount is None:
+        raw_amount = payload.get("amount")
         try:
-            amount = float(payload.get("amount")) if payload.get("amount") is not None else None
+            amount = float(raw_amount) if raw_amount is not None else None
         except (TypeError, ValueError):
             amount = None
     user_slug = _extract_user_slug(payload)
@@ -58,6 +68,12 @@ def log_feed_route():
     }
     try:
         entry = create_entry(_db_path(), payload)
+        dispatch_entry_confirmation_push(
+            _db_path(),
+            entry,
+            vapid_config=_vapid_config(),
+            base_path=_base_path(),
+        )
         return jsonify(entry), 201
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
@@ -83,6 +99,12 @@ def _log_simple_event(event_type: str):
 
     try:
         entry = create_entry(_db_path(), entry_payload)
+        dispatch_entry_confirmation_push(
+            _db_path(),
+            entry,
+            vapid_config=_vapid_config(),
+            base_path=_base_path(),
+        )
         return jsonify(entry), 201
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
@@ -112,6 +134,12 @@ def _start_timed_event(event_type: str):
 
     try:
         entry = create_entry(_db_path(), entry_payload)
+        dispatch_entry_confirmation_push(
+            _db_path(),
+            entry,
+            vapid_config=_vapid_config(),
+            base_path=_base_path(),
+        )
         return jsonify(entry), 201
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400

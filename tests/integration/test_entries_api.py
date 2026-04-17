@@ -122,6 +122,141 @@ def test_create_entry_skips_webhook_without_url(client, monkeypatch):
     assert called["count"] == 0
 
 
+def test_create_user_entry_sends_native_push_confirmation(client, monkeypatch):
+    captured: dict = {}
+
+    def fake_send(subscription, payload, vapid_config):
+        captured["subscription"] = subscription
+        captured["payload"] = payload
+        captured["subject"] = vapid_config.subject
+        return {"sent": True}
+
+    from src.app.routes import entries as entries_module
+
+    monkeypatch.setattr(entries_module, "send_web_push", fake_send, raising=False)
+
+    from src.app.services import entry_confirmation as confirmation_module
+
+    monkeypatch.setattr(confirmation_module, "send_web_push", fake_send)
+
+    subscribe_response = client.post(
+        "/api/push/subscription",
+        json={
+            "user_slug": "suz",
+            "subscription": {
+                "endpoint": "https://push.example.com/device-1",
+                "keys": {"p256dh": "p256dh-1", "auth": "auth-1"},
+            },
+        },
+    )
+    assert subscribe_response.status_code == 200
+
+    response = client.post(
+        "/api/users/suz/entries",
+        json={"type": "feed", "client_event_id": "evt-push-confirm-1"},
+    )
+    assert response.status_code == 201
+    assert captured["subscription"]["endpoint"] == "https://push.example.com/device-1"
+    assert captured["payload"] == {
+        "title": "Entry saved",
+        "body": "Feed logged for suz",
+        "url": "/suz",
+        "tag": "entry-confirmation-suz",
+    }
+    assert captured["subject"] == "mailto:test@example.com"
+
+
+def test_create_entry_skips_native_push_confirmation_without_subscription(
+    client, monkeypatch
+):
+    called = {"count": 0}
+
+    def fake_send(subscription, payload, vapid_config):
+        called["count"] += 1
+        return {"sent": True}
+
+    from src.app.services import entry_confirmation as confirmation_module
+
+    monkeypatch.setattr(confirmation_module, "send_web_push", fake_send)
+
+    response = client.post(
+        "/api/users/suz/entries",
+        json={"type": "wee", "client_event_id": "evt-push-confirm-2"},
+    )
+    assert response.status_code == 201
+    assert called["count"] == 0
+
+
+def test_create_entry_removes_invalid_push_subscription(client, monkeypatch):
+    def fake_send(subscription, payload, vapid_config):
+        return {"sent": False, "reason": "invalid_subscription"}
+
+    from src.app.services import entry_confirmation as confirmation_module
+
+    monkeypatch.setattr(confirmation_module, "send_web_push", fake_send)
+
+    subscribe_response = client.post(
+        "/api/push/subscription",
+        json={
+            "user_slug": "suz",
+            "subscription": {
+                "endpoint": "https://push.example.com/device-1",
+                "keys": {"p256dh": "p256dh-1", "auth": "auth-1"},
+            },
+        },
+    )
+    assert subscribe_response.status_code == 200
+
+    response = client.post(
+        "/api/users/suz/entries",
+        json={"type": "poo", "client_event_id": "evt-push-confirm-3"},
+    )
+    assert response.status_code == 201
+
+    follow_up = client.get("/api/push/subscription?user_slug=suz")
+    assert follow_up.status_code == 200
+    assert follow_up.get_json()["enabled"] is False
+
+
+def test_create_entry_route_sends_confirmation_for_payload_user_slug(
+    client, monkeypatch
+):
+    captured: dict = {}
+
+    def fake_send(subscription, payload, vapid_config):
+        captured["subscription"] = subscription
+        captured["payload"] = payload
+        return {"sent": True}
+
+    from src.app.services import entry_confirmation as confirmation_module
+
+    monkeypatch.setattr(confirmation_module, "send_web_push", fake_send)
+
+    subscribe_response = client.post(
+        "/api/push/subscription",
+        json={
+            "user_slug": "rob",
+            "subscription": {
+                "endpoint": "https://push.example.com/device-2",
+                "keys": {"p256dh": "p256dh-2", "auth": "auth-2"},
+            },
+        },
+    )
+    assert subscribe_response.status_code == 200
+
+    response = client.post(
+        "/api/entries",
+        json={
+            "type": "sleep",
+            "client_event_id": "evt-push-confirm-4",
+            "user_slug": "rob",
+        },
+    )
+    assert response.status_code == 201
+    assert captured["subscription"]["endpoint"] == "https://push.example.com/device-2"
+    assert captured["payload"]["body"] == "Sleep logged for rob"
+
+
 def test_list_entries_returns_all_users(client):
     first = client.post(
         "/api/users/suz/entries",
@@ -295,6 +430,136 @@ def test_entries_summary_returns_latest_entries(client):
             "Last poo: 2024-01-04 00:00 · Next feed: 2024-01-02 03:00"
         ),
     }
+
+
+def test_entries_llm_summary_calls_ollama_with_selected_window(client, monkeypatch):
+    captured: dict = {}
+
+    class DummyResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc_value, traceback):
+            return False
+
+        def read(self):
+            return json.dumps({"response": "- Fed well\n- One wee"}).encode("utf-8")
+
+    def fake_urlopen(req, timeout=0):
+        captured["url"] = req.full_url
+        captured["timeout"] = timeout
+        captured["payload"] = json.loads(req.data.decode("utf-8"))
+        return DummyResponse()
+
+    from src.app.services import llm_summary as llm_summary_module
+
+    monkeypatch.setattr(llm_summary_module.urllib_request, "urlopen", fake_urlopen)
+
+    settings_response = client.patch(
+        "/api/settings",
+        json={
+            "ollama_base_url": "http://ollama.local:11434",
+            "ollama_model": "gemma4:latest",
+            "ollama_timeout_seconds": 60,
+        },
+    )
+    assert settings_response.status_code == 200
+
+    client.post(
+        "/api/users/suz/entries",
+        json={
+            "type": "feed",
+            "client_event_id": "evt-llm-feed",
+            "timestamp_utc": "2024-01-01T08:00:00+00:00",
+            "amount_ml": 90,
+            "notes": "settled afterwards",
+        },
+    )
+    client.post(
+        "/api/users/rob/entries",
+        json={
+            "type": "poo",
+            "client_event_id": "evt-llm-other-user",
+            "timestamp_utc": "2024-01-01T09:00:00+00:00",
+            "notes": "exclude me",
+        },
+    )
+
+    response = client.post(
+        "/api/entries/llm-summary",
+        json={
+            "user_slug": "suz",
+            "since_utc": "2024-01-01T00:00:00+00:00",
+            "until_utc": "2024-01-01T23:59:59+00:00",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["summary"] == "- Fed well\n- One wee"
+    assert payload["event_count"] == 1
+    assert payload["model"] == "gemma4:latest"
+    assert payload["window"] == {
+        "since_utc": "2024-01-01T00:00:00+00:00",
+        "until_utc": "2024-01-01T23:59:59+00:00",
+    }
+    assert captured["url"] == "http://ollama.local:11434/api/generate"
+    assert captured["timeout"] == 60
+    assert captured["payload"]["model"] == "gemma4:latest"
+    assert captured["payload"]["stream"] is False
+    assert "settled afterwards" in captured["payload"]["prompt"]
+    assert "exclude me" not in captured["payload"]["prompt"]
+
+
+def test_entries_llm_summary_skips_ollama_without_events(client, monkeypatch):
+    called = {"count": 0}
+
+    def fake_urlopen(req, timeout=0):
+        called["count"] += 1
+        raise AssertionError("Ollama should not be called without events")
+
+    from src.app.services import llm_summary as llm_summary_module
+
+    monkeypatch.setattr(llm_summary_module.urllib_request, "urlopen", fake_urlopen)
+
+    response = client.post(
+        "/api/entries/llm-summary",
+        json={
+            "since_utc": "2024-01-01T00:00:00+00:00",
+            "until_utc": "2024-01-01T23:59:59+00:00",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["summary"] == ""
+    assert payload["event_count"] == 0
+    assert payload["skipped"] is True
+    assert called["count"] == 0
+
+
+def test_entries_llm_summary_rejects_invalid_window(client):
+    response = client.post(
+        "/api/entries/llm-summary",
+        json={
+            "since_utc": "2024-01-02T00:00:00+00:00",
+            "until_utc": "2024-01-01T00:00:00+00:00",
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.get_json()["error"] == "since_utc must be before until_utc"
+
+    response = client.post(
+        "/api/entries/llm-summary",
+        json={
+            "since_utc": "2024-01-01T00:00:00+00:00",
+            "until_utc": "2024-01-02T02:00:00+00:00",
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.get_json()["error"] == "summary window must be 25 hours or less"
 
 
 def test_feed_schedule_returns_next_six_feeds(client):
