@@ -10,6 +10,7 @@ from src.app.storage.settings import update_settings as repo_update_settings
 from src.app.storage.settings import (
     DEFAULT_FEED_SIZE_BIG_ML,
     DEFAULT_FEED_SIZE_SMALL_ML,
+    DEFAULT_OPENAI_TIMEOUT_SECONDS,
     DEFAULT_OLLAMA_TIMEOUT_SECONDS,
 )
 
@@ -215,6 +216,37 @@ def _normalize_ollama_timeout(value: object) -> int:
     return value
 
 
+def _normalize_ollama_thinking_enabled(value: object) -> int:
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int) and value in {0, 1}:
+        return value
+    raise ValueError("ollama_thinking_enabled must be true or false")
+
+
+def _normalize_openai_model(value: object) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError("openai_model must be a model name")
+    trimmed = value.strip()
+    if not trimmed:
+        return None
+    if len(trimmed) > 80 or any(char.isspace() for char in trimmed):
+        raise ValueError("openai_model must be a model name")
+    return trimmed
+
+
+def _normalize_openai_timeout(value: object) -> int:
+    if value is None:
+        return DEFAULT_OPENAI_TIMEOUT_SECONDS
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValueError("openai_timeout_seconds must be a positive integer")
+    if value <= 0 or value > 300:
+        raise ValueError("openai_timeout_seconds must be between 1 and 300")
+    return value
+
+
 def get_settings(db_path: str) -> dict:
     with get_connection(db_path) as conn:
         return repo_get_settings(conn)
@@ -265,6 +297,16 @@ def update_settings(db_path: str, payload: dict) -> dict:
     if "ollama_timeout_seconds" in payload:
         fields["ollama_timeout_seconds"] = _normalize_ollama_timeout(
             payload["ollama_timeout_seconds"]
+        )
+    if "ollama_thinking_enabled" in payload:
+        fields["ollama_thinking_enabled"] = _normalize_ollama_thinking_enabled(
+            payload["ollama_thinking_enabled"]
+        )
+    if "openai_model" in payload:
+        fields["openai_model"] = _normalize_openai_model(payload["openai_model"])
+    if "openai_timeout_seconds" in payload:
+        fields["openai_timeout_seconds"] = _normalize_openai_timeout(
+            payload["openai_timeout_seconds"]
         )
     with get_connection(db_path) as conn:
         current = repo_get_settings(conn)

@@ -7,6 +7,9 @@ DEFAULT_FEED_SIZE_BIG_ML = 150.0
 DEFAULT_OLLAMA_BASE_URL = "http://127.0.0.1:11434"
 DEFAULT_OLLAMA_MODEL = "gemma4"
 DEFAULT_OLLAMA_TIMEOUT_SECONDS = 45
+DEFAULT_OLLAMA_THINKING_ENABLED = False
+DEFAULT_OPENAI_MODEL = "gpt-4.1-mini"
+DEFAULT_OPENAI_TIMEOUT_SECONDS = 45
 
 
 SETTINGS_KEYS = (
@@ -27,6 +30,9 @@ SETTINGS_KEYS = (
     "ollama_base_url",
     "ollama_model",
     "ollama_timeout_seconds",
+    "ollama_thinking_enabled",
+    "openai_model",
+    "openai_timeout_seconds",
 )
 
 
@@ -82,6 +88,26 @@ def _normalize_settings_payload(data: dict | None) -> dict:
         if isinstance(timeout, int) and not isinstance(timeout, bool) and timeout > 0
         else DEFAULT_OLLAMA_TIMEOUT_SECONDS
     )
+    thinking_enabled = raw.get("ollama_thinking_enabled")
+    settings["ollama_thinking_enabled"] = (
+        bool(thinking_enabled)
+        if isinstance(thinking_enabled, (int, bool))
+        else DEFAULT_OLLAMA_THINKING_ENABLED
+    )
+    openai_model = raw.get("openai_model")
+    settings["openai_model"] = (
+        openai_model.strip()
+        if isinstance(openai_model, str) and openai_model.strip()
+        else DEFAULT_OPENAI_MODEL
+    )
+    openai_timeout = raw.get("openai_timeout_seconds")
+    settings["openai_timeout_seconds"] = (
+        int(openai_timeout)
+        if isinstance(openai_timeout, int)
+        and not isinstance(openai_timeout, bool)
+        and openai_timeout > 0
+        else DEFAULT_OPENAI_TIMEOUT_SECONDS
+    )
     return settings
 
 
@@ -108,7 +134,8 @@ def get_settings(conn: sqlite3.Connection | None) -> dict:
                behind_target_mode, entry_webhook_url,
                default_user_slug, pushcut_feed_due_url,
                home_kpis_webhook_url, feed_size_small_ml, feed_size_big_ml,
-               ollama_base_url, ollama_model, ollama_timeout_seconds
+               ollama_base_url, ollama_model, ollama_timeout_seconds,
+               ollama_thinking_enabled, openai_model, openai_timeout_seconds
         FROM baby_settings
         WHERE id = 1
         """
@@ -140,6 +167,9 @@ def update_settings(conn: sqlite3.Connection | None, fields: dict) -> dict:
         "ollama_base_url",
         "ollama_model",
         "ollama_timeout_seconds",
+        "ollama_thinking_enabled",
+        "openai_model",
+        "openai_timeout_seconds",
         "updated_at_utc",
     ):
         if key in fields:

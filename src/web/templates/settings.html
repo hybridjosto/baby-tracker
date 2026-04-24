@@ -59,6 +59,26 @@
         color: var(--text-primary);
         box-sizing: border-box;
       }
+      input[type="checkbox"] {
+        width: 20px;
+        height: 20px;
+        padding: 0;
+        accent-color: var(--primary);
+      }
+      .toggle-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        border: 1px solid var(--border-light);
+        border-radius: 10px;
+        padding: 10px 12px;
+        background: var(--surface-soft);
+      }
+      .toggle-row span {
+        font-size: 14px;
+        color: var(--text-primary);
+      }
       .inline-row {
         display: flex;
         gap: 8px;
@@ -80,6 +100,13 @@
       html.dark input {
         background: rgba(26, 44, 32, 0.9);
         border-color: var(--border-dark);
+        color: #ffffff;
+      }
+      html.dark .toggle-row {
+        border-color: var(--border-dark);
+        background: rgba(255, 255, 255, 0.08);
+      }
+      html.dark .toggle-row span {
         color: #ffffff;
       }
       .hint {
@@ -278,35 +305,27 @@
             <div class="hint">Used when logging via Pushcut without a user.</div>
           </div>
           <div class="field">
-            <label for="ollama-base-url-input">Ollama URL</label>
+            <label for="openai-model-input">OpenAI model</label>
             <input
-              id="ollama-base-url-input"
-              type="url"
-              name="ollama_base_url"
-              placeholder="http://127.0.0.1:11434"
+              id="openai-model-input"
+              type="text"
+              name="openai_model"
+              placeholder="gpt-4.1-mini"
             >
             <div class="hint">Used for on-demand AI handover summaries.</div>
           </div>
           <div class="field">
-            <label for="ollama-model-input">Ollama model</label>
+            <label for="openai-timeout-input">OpenAI timeout (seconds)</label>
             <input
-              id="ollama-model-input"
-              type="text"
-              name="ollama_model"
-              placeholder="gemma4"
-            >
-          </div>
-          <div class="field">
-            <label for="ollama-timeout-input">Ollama timeout (seconds)</label>
-            <input
-              id="ollama-timeout-input"
+              id="openai-timeout-input"
               type="number"
-              name="ollama_timeout_seconds"
+              name="openai_timeout_seconds"
               min="1"
               max="300"
               step="1"
               inputmode="numeric"
             >
+            <div class="hint">Server API key comes from <code>BABY_TRACKER_OPENAI_API_KEY</code> or <code>OPENAI_API_KEY</code>.</div>
           </div>
           <div class="field">
             <label>Feed reminders on this device</label>

@@ -4,7 +4,11 @@ from flask import Blueprint, current_app, jsonify, request
 
 import uuid
 
-from src.app.services.entries import create_entry
+from src.app.services.entries import (
+    EntryNotFoundError,
+    create_entry,
+    stop_active_timed_event,
+)
 from src.app.services.entry_confirmation import dispatch_entry_confirmation_push
 from src.app.services.settings import get_settings
 from src.lib.validation import normalize_user_slug
@@ -145,6 +149,31 @@ def _start_timed_event(event_type: str):
         return jsonify({"error": str(exc)}), 400
 
 
+def _stop_timed_event(event_type: str):
+    payload = request.get_json(silent=True) or {}
+    user_slug = _extract_user_slug(payload)
+    end_timestamp_utc = (
+        request.args.get("end_timestamp_utc")
+        or request.args.get("timestamp_utc")
+        or payload.get("end_timestamp_utc")
+        or payload.get("timestamp_utc")
+    )
+
+    try:
+        resolved_slug = _resolve_user_slug(user_slug)
+        entry = stop_active_timed_event(
+            _db_path(),
+            event_type,
+            user_slug=resolved_slug,
+            end_timestamp_utc=end_timestamp_utc,
+        )
+        return jsonify(entry)
+    except EntryNotFoundError:
+        return jsonify({"error": "not_found"}), 404
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+
 @feed_api.post("/poo/log")
 def log_poo_route():
     return _log_simple_event("poo")
@@ -158,6 +187,11 @@ def log_wee_route():
 @feed_api.post("/sleep/start")
 def start_sleep_route():
     return _start_timed_event("sleep")
+
+
+@feed_api.post("/sleep/stop")
+def stop_sleep_route():
+    return _stop_timed_event("sleep")
 
 
 @feed_api.post("/cry/start")

@@ -19,6 +19,9 @@ def test_get_settings_defaults(client):
     assert payload["ollama_base_url"] == "http://127.0.0.1:11434"
     assert payload["ollama_model"] == "gemma4"
     assert payload["ollama_timeout_seconds"] == 45
+    assert payload["ollama_thinking_enabled"] is False
+    assert payload["openai_model"] == "gpt-4.1-mini"
+    assert payload["openai_timeout_seconds"] == 45
 
 
 def test_patch_settings_updates_values(client):
@@ -37,6 +40,9 @@ def test_patch_settings_updates_values(client):
             "ollama_base_url": "http://ollama.local:11434/",
             "ollama_model": "gemma4:latest",
             "ollama_timeout_seconds": 60,
+            "ollama_thinking_enabled": True,
+            "openai_model": "gpt-4.1-mini",
+            "openai_timeout_seconds": 75,
         },
     )
     assert response.status_code == 200
@@ -53,6 +59,9 @@ def test_patch_settings_updates_values(client):
     assert payload["ollama_base_url"] == "http://ollama.local:11434"
     assert payload["ollama_model"] == "gemma4:latest"
     assert payload["ollama_timeout_seconds"] == 60
+    assert payload["ollama_thinking_enabled"] is True
+    assert payload["openai_model"] == "gpt-4.1-mini"
+    assert payload["openai_timeout_seconds"] == 75
 
     follow_up = client.get("/api/settings")
     payload = follow_up.get_json()
@@ -68,6 +77,9 @@ def test_patch_settings_updates_values(client):
     assert payload["ollama_base_url"] == "http://ollama.local:11434"
     assert payload["ollama_model"] == "gemma4:latest"
     assert payload["ollama_timeout_seconds"] == 60
+    assert payload["ollama_thinking_enabled"] is True
+    assert payload["openai_model"] == "gpt-4.1-mini"
+    assert payload["openai_timeout_seconds"] == 75
 
 
 def test_patch_settings_rejects_invalid_values(client):
@@ -116,6 +128,15 @@ def test_patch_settings_rejects_invalid_values(client):
     assert response.status_code == 400
 
     response = client.patch("/api/settings", json={"ollama_timeout_seconds": 0})
+    assert response.status_code == 400
+
+    response = client.patch("/api/settings", json={"ollama_thinking_enabled": "yes"})
+    assert response.status_code == 400
+
+    response = client.patch("/api/settings", json={"openai_model": "bad model"})
+    assert response.status_code == 400
+
+    response = client.patch("/api/settings", json={"openai_timeout_seconds": 0})
     assert response.status_code == 400
 
 

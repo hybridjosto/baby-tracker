@@ -14,7 +14,7 @@ def list_push_subscriptions(conn: sqlite3.Connection | None) -> list[dict]:
         """
         SELECT id, user_slug, endpoint, p256dh, auth, user_agent,
                created_at_utc, updated_at_utc,
-               last_notified_entry_id, last_sent_at_utc
+               last_notified_entry_id, last_notified_due_at_utc, last_sent_at_utc
         FROM push_subscriptions
         ORDER BY user_slug ASC
         """
@@ -30,7 +30,7 @@ def get_push_subscription(
         """
         SELECT id, user_slug, endpoint, p256dh, auth, user_agent,
                created_at_utc, updated_at_utc,
-               last_notified_entry_id, last_sent_at_utc
+               last_notified_entry_id, last_notified_due_at_utc, last_sent_at_utc
         FROM push_subscriptions
         WHERE user_slug = ?
         """,
@@ -59,6 +59,9 @@ def upsert_push_subscription(
     )
     created_at = existing["created_at_utc"] if existing else now
     last_notified_entry_id = existing["last_notified_entry_id"] if existing else None
+    last_notified_due_at_utc = (
+        existing["last_notified_due_at_utc"] if existing else None
+    )
     last_sent_at_utc = existing["last_sent_at_utc"] if existing else None
     conn.execute(
         """
@@ -71,9 +74,10 @@ def upsert_push_subscription(
             created_at_utc,
             updated_at_utc,
             last_notified_entry_id,
+            last_notified_due_at_utc,
             last_sent_at_utc
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             user_slug,
@@ -84,6 +88,7 @@ def upsert_push_subscription(
             created_at,
             now,
             last_notified_entry_id,
+            last_notified_due_at_utc,
             last_sent_at_utc,
         ),
     )
@@ -106,6 +111,7 @@ def update_push_subscription_delivery_state(
     *,
     user_slug: str,
     last_notified_entry_id: int | None,
+    last_notified_due_at_utc: str | None,
     last_sent_at_utc: str | None,
 ) -> dict | None:
     assert conn is not None
@@ -114,11 +120,18 @@ def update_push_subscription_delivery_state(
         """
         UPDATE push_subscriptions
         SET last_notified_entry_id = ?,
+            last_notified_due_at_utc = ?,
             last_sent_at_utc = ?,
             updated_at_utc = ?
         WHERE user_slug = ?
         """,
-        (last_notified_entry_id, last_sent_at_utc, now, user_slug),
+        (
+            last_notified_entry_id,
+            last_notified_due_at_utc,
+            last_sent_at_utc,
+            now,
+            user_slug,
+        ),
     )
     conn.commit()
     return get_push_subscription(conn, user_slug)

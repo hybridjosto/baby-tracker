@@ -709,10 +709,46 @@
                 color: var(--text-secondary);
             }
             .ai-summary-output {
-                white-space: pre-wrap;
                 line-height: 1.55;
                 font-size: 14px;
                 color: var(--text-primary);
+            }
+            .ai-summary-output > :first-child {
+                margin-top: 0;
+            }
+            .ai-summary-output > :last-child {
+                margin-bottom: 0;
+            }
+            .ai-summary-output ul,
+            .ai-summary-output ol {
+                margin: 8px 0 8px 18px;
+                padding: 0;
+            }
+            .ai-summary-output li {
+                margin: 4px 0;
+            }
+            .ai-summary-output code {
+                border-radius: 6px;
+                padding: 1px 5px;
+                background: var(--surface-muted);
+                font-size: 0.92em;
+            }
+            .ai-summary-output a {
+                color: inherit;
+                text-decoration: underline;
+                text-underline-offset: 2px;
+            }
+            .ai-summary-thinking {
+                margin-top: 10px;
+                font-size: 12px;
+                color: var(--text-secondary);
+            }
+            .ai-summary-thinking summary {
+                cursor: pointer;
+                font-weight: 700;
+            }
+            .ai-summary-thinking-body {
+                margin-top: 8px;
             }
             html.dark .ai-summary-output {
                 color: #e6f2ea;
@@ -1041,15 +1077,15 @@
                                 href="{{ base_path }}/goals"
                                 role="menuitem"
                             >
-                            <span
-                                class="material-symbols-outlined"
-                                aria-hidden="true"
-                                >track_changes</span
-                            >
-                            <span class="nav-menu-label"
-                                >Feeding goals</span
-                            >
-                        </a>
+                                <span
+                                    class="material-symbols-outlined"
+                                    aria-hidden="true"
+                                    >track_changes</span
+                                >
+                                <span class="nav-menu-label"
+                                    >Feeding goals</span
+                                >
+                            </a>
                             <a
                                 class="nav-menu-item"
                                 id="weight-link"
@@ -1061,9 +1097,7 @@
                                     aria-hidden="true"
                                     >monitor_weight</span
                                 >
-                                <span class="nav-menu-label"
-                                    >Weight</span
-                                >
+                                <span class="nav-menu-label">Weight</span>
                             </a>
                             <a
                                 class="nav-menu-item"
@@ -1161,7 +1195,7 @@
 
                 <section class="summary-panel">
                     <div class="summary-panel-header">
-                        <h2>AI handover</h2>
+                        <h2>Summary</h2>
                         <div class="summary-panel-meta">Selected day</div>
                     </div>
                     <div class="ai-summary-body">
@@ -1171,12 +1205,9 @@
                                 id="ai-summary-generate"
                                 type="button"
                             >
-                                Generate handover
+                                Generate summary
                             </button>
-                            <div
-                                class="ai-summary-meta"
-                                id="ai-summary-meta"
-                            >
+                            <div class="ai-summary-meta" id="ai-summary-meta">
                                 Uses notes and events from this date.
                             </div>
                         </div>
@@ -1295,14 +1326,27 @@
                 <section class="summary-panel">
                     <div class="summary-panel-header">
                         <h2>Sleep trend</h2>
-                        <div class="summary-panel-meta">Today + last 7 complete days</div>
+                        <div class="summary-panel-meta">
+                            Today + last 7 complete days
+                        </div>
                     </div>
                     <div class="sleep-trend-chart-wrap">
                         <div class="sleep-trend-meta">
-                            <div class="sleep-trend-average-chip" id="sleep-trend-average-chip"></div>
+                            <div
+                                class="sleep-trend-average-chip"
+                                id="sleep-trend-average-chip"
+                            ></div>
                         </div>
-                        <svg id="sleep-trend-chart" viewBox="0 0 320 80" role="img" aria-label="Daily sleep trend for today plus the last 7 complete days"></svg>
-                        <div class="sleep-trend-labels" id="sleep-trend-labels"></div>
+                        <svg
+                            id="sleep-trend-chart"
+                            viewBox="0 0 320 80"
+                            role="img"
+                            aria-label="Daily sleep trend for today plus the last 7 complete days"
+                        ></svg>
+                        <div
+                            class="sleep-trend-labels"
+                            id="sleep-trend-labels"
+                        ></div>
                     </div>
                 </section>
 
@@ -1438,6 +1482,9 @@
             </div>
         </div>
         {% include "logging_footer.html" %}
-        <script type="module" src="{{ base_path }}/static/app.js?v={{ static_version }}"></script>
+        <script
+            type="module"
+            src="{{ base_path }}/static/app.js?v={{ static_version }}"
+        ></script>
     </body>
 </html>

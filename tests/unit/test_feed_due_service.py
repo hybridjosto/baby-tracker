@@ -47,7 +47,7 @@ def _setup_feed(db_path: str, *, user_slug: str = "suz") -> None:
     )
 
 
-def test_dispatch_feed_due_waits_until_repeat_window(tmp_path):
+def test_dispatch_feed_due_only_sends_once_per_due_time(tmp_path):
     db_path = str(tmp_path / "test.sqlite")
     _setup_feed(db_path)
 
@@ -71,7 +71,7 @@ def test_dispatch_feed_due_waits_until_repeat_window(tmp_path):
     repeat = dispatch_feed_due(
         db_path,
         vapid_config=VAPID_CONFIG,
-        now_utc=now,
+        now_utc=datetime(2026, 1, 1, 3, 30, tzinfo=timezone.utc),
         send_fn=sender,
     )
     assert repeat["sent"] is False
@@ -79,7 +79,7 @@ def test_dispatch_feed_due_waits_until_repeat_window(tmp_path):
     assert len(calls) == 1
 
 
-def test_dispatch_feed_due_repeats_after_feed_interval(tmp_path):
+def test_dispatch_feed_due_sends_again_when_due_time_changes(tmp_path):
     db_path = str(tmp_path / "test.sqlite")
     _setup_feed(db_path)
 
@@ -89,23 +89,21 @@ def test_dispatch_feed_due_repeats_after_feed_interval(tmp_path):
         calls.append((subscription["user_slug"], payload["tag"], vapid_config.subject))
         return {"sent": True}
 
-    first_due = datetime(2026, 1, 1, 1, 1, tzinfo=timezone.utc)
     first = dispatch_feed_due(
         db_path,
         vapid_config=VAPID_CONFIG,
-        now_utc=first_due,
+        now_utc=datetime(2026, 1, 1, 1, 1, tzinfo=timezone.utc),
         send_fn=sender,
     )
     assert first["sent"] is True
 
-    still_waiting = dispatch_feed_due(
+    update_settings(
         db_path,
-        vapid_config=VAPID_CONFIG,
-        now_utc=datetime(2026, 1, 1, 1, 30, tzinfo=timezone.utc),
-        send_fn=sender,
+        {
+            "feed_interval_min": 120,
+            "default_user_slug": "suz",
+        },
     )
-    assert still_waiting["sent"] is False
-    assert still_waiting["reason"] == "already_sent"
 
     second = dispatch_feed_due(
         db_path,

@@ -38,6 +38,9 @@ CREATE TABLE IF NOT EXISTS baby_settings (
     ollama_base_url TEXT,
     ollama_model TEXT,
     ollama_timeout_seconds INTEGER,
+    ollama_thinking_enabled INTEGER,
+    openai_model TEXT,
+    openai_timeout_seconds INTEGER,
     feed_due_last_entry_id INTEGER,
     feed_due_last_sent_at_utc TEXT,
     updated_at_utc TEXT NOT NULL DEFAULT (datetime('now'))
@@ -151,3 +154,23 @@ SELECT
     datetime('now'),
     datetime('now')
 WHERE (SELECT COUNT(*) FROM reminders) = 1;
+
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_slug TEXT NOT NULL UNIQUE,
+    endpoint TEXT NOT NULL UNIQUE,
+    p256dh TEXT NOT NULL,
+    auth TEXT NOT NULL,
+    user_agent TEXT,
+    created_at_utc TEXT NOT NULL,
+    updated_at_utc TEXT NOT NULL,
+    last_notified_entry_id INTEGER,
+    last_notified_due_at_utc TEXT,
+    last_sent_at_utc TEXT
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_push_subscriptions_user_slug
+    ON push_subscriptions (user_slug);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_push_subscriptions_endpoint
+    ON push_subscriptions (endpoint);

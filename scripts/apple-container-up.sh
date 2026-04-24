@@ -102,6 +102,8 @@ container run --detach \
   --env BABY_TRACKER_STATIC_VERSION="${BABY_TRACKER_STATIC_VERSION:-dev}" \
   --env BABY_TRACKER_STORAGE_BACKEND="${STORAGE_BACKEND}" \
   --env BABY_TRACKER_BASE_PATH="${BASE_PATH}" \
+  --env BABY_TRACKER_OPENAI_API_KEY="${BABY_TRACKER_OPENAI_API_KEY:-}" \
+  --env OPENAI_API_KEY="${OPENAI_API_KEY:-}" \
   "${IMAGE}" >/dev/null
 
 container run --detach \
@@ -111,6 +113,8 @@ container run --detach \
   --env BABY_TRACKER_ENABLE_SCHEDULERS=1 \
   --env BABY_TRACKER_STORAGE_BACKEND="${STORAGE_BACKEND}" \
   --env BABY_TRACKER_BASE_PATH="${BASE_PATH}" \
+  --env BABY_TRACKER_OPENAI_API_KEY="${BABY_TRACKER_OPENAI_API_KEY:-}" \
+  --env OPENAI_API_KEY="${OPENAI_API_KEY:-}" \
   "${IMAGE}" \
   uv run python -m src.app.scheduler >/dev/null
 

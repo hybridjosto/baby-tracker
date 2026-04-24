@@ -49,6 +49,8 @@ Environment variables:
 - `BABY_TRACKER_HOME_KPIS_POLL_SECONDS`: home KPI scheduler interval (default: `900`, set `0` to disable)
 - `BABY_TRACKER_ENABLE_SCHEDULERS`: enable in-process schedulers (`0`/`1`, default: `0`)
 - `BABY_TRACKER_VAPID_PUBLIC_KEY`, `BABY_TRACKER_VAPID_PRIVATE_KEY`, `BABY_TRACKER_VAPID_SUBJECT`: Web Push VAPID settings for native browser feed reminders
+- `BABY_TRACKER_OPENAI_API_KEY` or `OPENAI_API_KEY`: API key for on-demand AI handover summaries
+- `BABY_TRACKER_LLM_SUMMARY_PROMPT_PATH`: optional file override for the AI handover prompt template
 - `BABY_TRACKER_TLS_CERT_PATH`, `BABY_TRACKER_TLS_KEY_PATH`: TLS files (only used by the Flask dev
   server entrypoint, not gunicorn)
 - `BABY_TRACKER_DISCORD_WEBHOOK_URL`: webhook for reminders (see reminders API)
@@ -169,6 +171,14 @@ Home KPIs API:
 
 Troubleshooting:
 - If you recently deployed frontend auth changes, bump `BABY_TRACKER_STATIC_VERSION` and hard-refresh/clear PWA cache to avoid stale assets.
+
+## AI Handover Summary
+- Configure `openai_model` and `openai_timeout_seconds` in Settings.
+- The server reads the OpenAI API key from `BABY_TRACKER_OPENAI_API_KEY` or `OPENAI_API_KEY`.
+- The default prompt template lives at `src/app/prompts/llm_summary_prompt.txt`.
+- Set `BABY_TRACKER_LLM_SUMMARY_PROMPT_PATH` to use a different prompt file at runtime.
+- The Summary page sends the selected day plus the prior 7 comparable day windows so the model can compare the chosen day against recent patterns.
+- After adding the key, restart the running web process or container. A `.env` file only helps if your launcher passes it through to the process environment.
 
 ## Backfill expressed/formula amounts
 If you previously logged expressed/formula amounts in notes, run the one-off script to

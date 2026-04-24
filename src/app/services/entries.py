@@ -9,6 +9,7 @@ from src.app.storage.entries import (
     create_entry as repo_create_entry,
     delete_entry as repo_delete_entry,
     get_entry_by_client_event_id as repo_get_entry_by_client_event_id,
+    get_latest_active_timed_entry as repo_get_latest_active_timed_entry,
     list_entries as repo_list_entries,
     list_entries_for_export as repo_list_entries_for_export,
     list_entries_updated_since as repo_list_entries_updated_since,
@@ -75,6 +76,16 @@ def _normalize_timestamp_utc(
     return parsed.astimezone(timezone.utc).isoformat()
 
 
+def _parse_utc_iso(value: str, *, field_name: str = "timestamp_utc") -> datetime:
+    normalized = _normalize_timestamp_utc(value, field_name=field_name)
+    if normalized is None:
+        raise ValueError(f"{field_name} must be ISO-8601")
+    parsed = datetime.fromisoformat(normalized)
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
 def create_entry(db_path: str, payload: dict) -> dict:
     validated = validate_entry_payload(payload, require_client_event=True)
     validated["user_slug"] = normalize_user_slug(payload.get("user_slug"))
@@ -90,6 +101,47 @@ def create_entry(db_path: str, payload: dict) -> dict:
     if duplicate:
         raise DuplicateEntryError(entry)
     return entry
+
+
+def stop_active_timed_event(
+    db_path: str,
+    entry_type: str,
+    user_slug: str | None = None,
+    end_timestamp_utc: str | None = None,
+) -> dict:
+    validate_entry_type(entry_type)
+    normalized_slug = normalize_user_slug(user_slug) if user_slug else None
+    end_timestamp = (
+        _normalize_timestamp_utc(end_timestamp_utc, field_name="end_timestamp_utc")
+        or _now_utc_iso()
+    )
+    end_dt = _parse_utc_iso(end_timestamp, field_name="end_timestamp_utc")
+
+    with get_connection(db_path) as conn:
+        entry = repo_get_latest_active_timed_entry(
+            conn,
+            entry_type,
+            user_slug=normalized_slug,
+        )
+        if not entry:
+            raise EntryNotFoundError()
+
+        start_dt = _parse_utc_iso(entry["timestamp_utc"])
+        duration_min = max(
+            0,
+            math.floor(((end_dt - start_dt).total_seconds() / 60) + 0.5),
+        )
+        updated = repo_update_entry(
+            conn,
+            entry["id"],
+            {
+                "feed_duration_min": duration_min,
+                "updated_at_utc": _now_utc_iso(),
+            },
+        )
+    if not updated:
+        raise EntryNotFoundError()
+    return updated
 
 
 def _normalize_filter_ts(value: str | None) -> str | None:

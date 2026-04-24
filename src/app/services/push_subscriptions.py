@@ -103,6 +103,7 @@ def mark_push_subscription_notified(
     *,
     user_slug: str,
     last_notified_entry_id: int | None,
+    last_notified_due_at_utc: str | None,
     last_sent_at_utc: str | None,
 ) -> dict | None:
     normalized = normalize_user_slug(user_slug)
@@ -111,6 +112,7 @@ def mark_push_subscription_notified(
             conn,
             user_slug=normalized,
             last_notified_entry_id=last_notified_entry_id,
+            last_notified_due_at_utc=last_notified_due_at_utc,
             last_sent_at_utc=last_sent_at_utc,
         )
 

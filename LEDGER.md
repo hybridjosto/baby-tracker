@@ -11,6 +11,16 @@
 - gradual frontend refactor of `src/web/static/app.js` into modules. *plan in `docs/plans/2026-03-18-app-js-refactor-plan.md`
 
 ## DONE
+- moved the OpenAI handover prompt into a file-backed template on 2026-04-24 by adding `src/app/prompts/llm_summary_prompt.txt`, loading it fresh on each summary request, supporting `BABY_TRACKER_LLM_SUMMARY_PROMPT_PATH` overrides, and returning clear errors for unreadable prompt files or invalid placeholders.
+- limited native feed-due push reminders to one notification per subscriber per due time on 2026-04-24 by storing `last_notified_due_at_utc` on each push subscription, suppressing scheduler repeats for the same overdue due timestamp, and preserving that delivery state when a browser subscription is replaced.
+- fixed Summary AI handover event scope and intake totals on 2026-04-23 by making the AI request use the same all-users selected-day dataset as the Summary page, restoring missing visible events in the prompt, and by including `amount_ml` in the Summary page `Total intake` calculation so the UI no longer undercounts bottle/feed volume.
+- fixed OpenAI key env propagation for container launch paths on 2026-04-23 by passing `BABY_TRACKER_OPENAI_API_KEY` / `OPENAI_API_KEY` through `docker-compose.yml`, Apple container scripts, and systemd example units so the running server can actually see keys provided via `.env`.
+- switched AI handover summaries from Ollama to OpenAI on 2026-04-23 by adding `openai_model` / `openai_timeout_seconds` settings, moving the backend summary call to the OpenAI chat completions API, and updating the Settings page plus README to use server-side OpenAI API key configuration.
+- standardized the Summary AI handover output on 2026-04-23 by making the model return strict JSON sections and rendering that into consistent Markdown headings for selected-day facts, 7-day comparisons, and handover follow-up.
+- added prior-7-day context to the Summary AI handover request on 2026-04-23 so the backend now sends the selected day plus the previous 7 comparable day windows for the active user, enabling direct day-vs-recent-pattern comparisons.
+- added `POST /api/sleep/stop` on 2026-04-19 to stop the latest active sleep entry for the default or supplied user by setting `feed_duration_min` from an optional end timestamp, with 404 handling when no active sleep is found.
+- fixed the home page total sleep card on 2026-04-17 so it uses the wider sleep dataset already loaded for the trend chart, matching the Summary page's clipped midnight-to-midnight sleep total for overnight sessions.
+- added an Ollama thinking yes/no setting and Markdown-rendered AI handover output on 2026-04-17 by storing `ollama_thinking_enabled`, sending Ollama's `think` option, returning optional thinking text, and rendering generated summaries through a safe frontend Markdown subset.
 - changed the Summary AI handover request on 2026-04-17 to summarize all selected-day events instead of filtering by the active frontend user, and bumped `BABY_TRACKER_STATIC_VERSION` to force browsers/PWAs to fetch the fixed JavaScript.
 - fixed the Summary AI handover button on 2026-04-17 so it no longer uses possibly stale frontend `summaryEntries` to decide whether the selected day has events before calling the backend.
 - added an on-demand Ollama AI handover summary on 2026-04-17 by adding configurable Ollama settings, a selected-day `POST /api/entries/llm-summary` endpoint, Summary-page AI handover UI, and backend tests for settings/window/prompt behavior.
@@ -96,6 +106,14 @@
 - added integration coverage for timed-event start APIs in `tests/integration/test_feed_log_api.py` (default user slug, user override, and payload fields) on 2026-03-08.
 
 ## NOTES
+- tests run on 2026-04-24 after file-backed AI prompt implementation: `./.venv/bin/pytest tests/integration/test_entries_api.py tests/integration/test_settings_api.py tests/unit/test_settings_storage.py tests/unit/test_llm_summary_service.py`.
+- tests run on 2026-04-23 after Summary AI data-alignment fix: `node --check src/web/static/app.js`; `./.venv/bin/pytest tests/integration/test_entries_api.py tests/integration/test_settings_api.py tests/unit/test_settings_storage.py` -> `46 passed`.
+- tests run on 2026-04-23 after OpenAI env propagation fix: `./.venv/bin/pytest tests/integration/test_entries_api.py tests/integration/test_settings_api.py tests/unit/test_settings_storage.py` -> `45 passed`.
+- tests run on 2026-04-23 after OpenAI AI handover migration: `PYTHONPYCACHEPREFIX=/tmp/baby-tracker-pycache python3 -m compileall src/app`; `node --check src/web/static/app.js`; `./.venv/bin/pytest tests/integration/test_entries_api.py tests/integration/test_settings_api.py tests/unit/test_settings_storage.py` -> `45 passed`.
+- operational note on 2026-04-23: the OpenAI handover summary now requires `BABY_TRACKER_OPENAI_API_KEY` or `OPENAI_API_KEY` in the server environment; the endpoint returns HTTP 503 when no key is configured.
+- tests run on 2026-04-19 after sleep stop API addition: `./.venv/bin/pytest tests/integration/test_feed_log_api.py` -> `13 passed`; `ruff check src tests/integration/test_feed_log_api.py` -> `All checks passed!`.
+- syntax check run on 2026-04-17 after home/Summary sleep total alignment: `node --check src/web/static/app.js`.
+- tests run on 2026-04-17 after Ollama thinking setting and Markdown summary rendering: `node --check src/web/static/app.js`; `./.venv/bin/pytest tests/integration/test_entries_api.py tests/integration/test_settings_api.py tests/unit/test_settings_storage.py` -> `44 passed`; `./.venv/bin/pytest` -> `117 passed, 6 skipped`.
 - tests run on 2026-04-17 after Summary AI handover all-users request update: `node --check src/web/static/app.js` and `./.venv/bin/pytest tests/integration/test_entries_api.py tests/integration/test_settings_api.py tests/unit/test_settings_storage.py`.
 - tests run on 2026-04-17 after AI handover frontend no-events guard fix: `./.venv/bin/pytest tests/integration/test_entries_api.py tests/integration/test_settings_api.py tests/unit/test_settings_storage.py` -> `44 passed`; syntax check `node --check src/web/static/app.js`.
 - tests run on 2026-04-17 after Ollama AI handover summary: `./.venv/bin/pytest` -> `117 passed, 6 skipped`.
@@ -121,6 +139,7 @@
 - tests run on 2026-03-19 after Summary sleep trend average-label pill update: `./.venv/bin/pytest` -> `103 passed, 6 skipped`.
 - tests run on 2026-03-19 after Summary sleep trend average-line update: `./.venv/bin/pytest` -> `103 passed, 6 skipped`.
 - tests run on 2026-03-27 for overdue reminder repeats: `./.venv/bin/pytest tests/unit/test_feed_due_service.py tests/unit/test_scheduler_runtime_config.py tests/integration/test_pushcut_feed_api.py` -> `23 passed`.
+- tests run on 2026-04-24 for feed-due dedupe by due time: `./.venv/bin/pytest tests/unit/test_feed_due_service.py tests/unit/test_push_subscription_storage.py tests/integration/test_pushcut_feed_api.py` -> `17 passed`.
 - tests run on 2026-03-27 for scheduler push wiring: `./.venv/bin/pytest tests/unit/test_scheduler_runtime_config.py tests/unit/test_feed_due_service.py tests/integration/test_pushcut_feed_api.py` -> `22 passed`.
 - tests run on 2026-03-19 after Summary totals fix: `./.venv/bin/pytest` -> `103 passed, 6 skipped`.
 - debug note on 2026-03-19: IndexedDB cache ordering/range checks were comparing timestamp strings lexicographically; after editing an entry locally, mixed `Z` vs `+00:00` timestamp formats could leave the updated entry out of the expected local sort/window even before sync finished.

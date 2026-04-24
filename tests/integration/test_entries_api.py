@@ -432,7 +432,9 @@ def test_entries_summary_returns_latest_entries(client):
     }
 
 
-def test_entries_llm_summary_calls_ollama_with_selected_window(client, monkeypatch):
+def test_entries_llm_summary_calls_openai_with_selected_window_and_context(
+    client, monkeypatch
+):
     captured: dict = {}
 
     class DummyResponse:
@@ -443,7 +445,31 @@ def test_entries_llm_summary_calls_ollama_with_selected_window(client, monkeypat
             return False
 
         def read(self):
-            return json.dumps({"response": "- Fed well\n- One wee"}).encode("utf-8")
+            return json.dumps(
+                {
+                    "choices": [
+                        {
+                            "message": {
+                                "content": json.dumps(
+                                    {
+                                        "headline": "Selected day handover",
+                                        "selected_day": [
+                                            "Feeds were lighter than usual with one 90 ml feed logged at 08:00 UTC.",
+                                            "The only note says the baby settled afterwards.",
+                                        ],
+                                        "comparison_to_previous_7_days": [
+                                            "This day had fewer logged events than the previous 7 daily windows.",
+                                        ],
+                                        "follow_up": [
+                                            "Double-check whether any nappies or sleep were missed from the selected day.",
+                                        ],
+                                    }
+                                )
+                            }
+                        }
+                    ]
+                }
+            ).encode("utf-8")
 
     def fake_urlopen(req, timeout=0):
         captured["url"] = req.full_url
@@ -454,13 +480,13 @@ def test_entries_llm_summary_calls_ollama_with_selected_window(client, monkeypat
     from src.app.services import llm_summary as llm_summary_module
 
     monkeypatch.setattr(llm_summary_module.urllib_request, "urlopen", fake_urlopen)
+    monkeypatch.setenv("BABY_TRACKER_OPENAI_API_KEY", "test-openai-key")
 
     settings_response = client.patch(
         "/api/settings",
         json={
-            "ollama_base_url": "http://ollama.local:11434",
-            "ollama_model": "gemma4:latest",
-            "ollama_timeout_seconds": 60,
+            "openai_model": "gpt-4.1-mini",
+            "openai_timeout_seconds": 60,
         },
     )
     assert settings_response.status_code == 200
@@ -484,6 +510,15 @@ def test_entries_llm_summary_calls_ollama_with_selected_window(client, monkeypat
             "notes": "exclude me",
         },
     )
+    client.post(
+        "/api/users/suz/entries",
+        json={
+            "type": "wee",
+            "client_event_id": "evt-llm-previous-day",
+            "timestamp_utc": "2023-12-31T09:00:00+00:00",
+            "notes": "previous day context",
+        },
+    )
 
     response = client.post(
         "/api/entries/llm-summary",
@@ -496,27 +531,232 @@ def test_entries_llm_summary_calls_ollama_with_selected_window(client, monkeypat
 
     assert response.status_code == 200
     payload = response.get_json()
-    assert payload["summary"] == "- Fed well\n- One wee"
+    assert payload["summary"] == (
+        "## Selected day handover\n\n"
+        "### Selected day\n"
+        "- Feeds were lighter than usual with one 90 ml feed logged at 08:00 UTC.\n"
+        "- The only note says the baby settled afterwards.\n\n"
+        "### Compared with previous 7 days\n"
+        "- This day had fewer logged events than the previous 7 daily windows.\n\n"
+        "### Handover follow-up\n"
+        "- Double-check whether any nappies or sleep were missed from the selected day."
+    )
     assert payload["event_count"] == 1
-    assert payload["model"] == "gemma4:latest"
+    assert payload["context_event_count"] == 2
+    assert payload["model"] == "gpt-4.1-mini"
+    assert payload["provider"] == "openai"
     assert payload["window"] == {
         "since_utc": "2024-01-01T00:00:00+00:00",
         "until_utc": "2024-01-01T23:59:59+00:00",
     }
-    assert captured["url"] == "http://ollama.local:11434/api/generate"
+    assert payload["comparison_window"] == {
+        "since_utc": "2023-12-25T00:00:00+00:00",
+        "until_utc": "2024-01-01T00:00:00+00:00",
+        "days": 7,
+    }
+    assert captured["url"] == "https://api.openai.com/v1/chat/completions"
     assert captured["timeout"] == 60
-    assert captured["payload"]["model"] == "gemma4:latest"
-    assert captured["payload"]["stream"] is False
-    assert "settled afterwards" in captured["payload"]["prompt"]
-    assert "exclude me" not in captured["payload"]["prompt"]
+    assert captured["payload"]["model"] == "gpt-4.1-mini"
+    assert captured["payload"]["response_format"] == {"type": "json_object"}
+    assert captured["payload"]["messages"][0]["role"] == "system"
+    prompt = captured["payload"]["messages"][1]["content"]
+    assert "settled afterwards" in prompt
+    assert "previous day context" in prompt
+    assert "comparison_to_previous_7_days" in prompt
+    assert "exclude me" not in prompt
 
 
-def test_entries_llm_summary_skips_ollama_without_events(client, monkeypatch):
+def test_entries_llm_summary_uses_prompt_file_override(client, monkeypatch, tmp_path):
+    captured: dict = {}
+    prompt_path = tmp_path / "llm_prompt.txt"
+    prompt_path.write_text(
+        (
+            "Prompt override\n"
+            "Window $selected_day_since_utc -> $selected_day_until_utc\n"
+            "Stats $selected_day_stats_json\n"
+            "Events $selected_day_events_json\n"
+            "Compare $comparison_days_json\n"
+        ),
+        encoding="utf-8",
+    )
+
+    class DummyResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc_value, traceback):
+            return False
+
+        def read(self):
+            return json.dumps(
+                {
+                    "choices": [
+                        {
+                            "message": {
+                                "content": json.dumps(
+                                    {
+                                        "headline": "Prompt override works",
+                                        "selected_day": ["Selected."],
+                                        "comparison_to_previous_7_days": ["Compared."],
+                                        "follow_up": ["Follow up."],
+                                    }
+                                )
+                            }
+                        }
+                    ]
+                }
+            ).encode("utf-8")
+
+    def fake_urlopen(req, timeout=0):
+        captured["payload"] = json.loads(req.data.decode("utf-8"))
+        return DummyResponse()
+
+    from src.app.services import llm_summary as llm_summary_module
+
+    monkeypatch.setattr(llm_summary_module.urllib_request, "urlopen", fake_urlopen)
+    monkeypatch.setenv("BABY_TRACKER_OPENAI_API_KEY", "test-openai-key")
+    monkeypatch.setenv("BABY_TRACKER_LLM_SUMMARY_PROMPT_PATH", str(prompt_path))
+
+    client.post(
+        "/api/users/suz/entries",
+        json={
+            "type": "feed",
+            "client_event_id": "evt-llm-prompt-file-1",
+            "timestamp_utc": "2024-01-01T08:00:00+00:00",
+            "amount_ml": 90,
+            "notes": "settled afterwards",
+        },
+    )
+
+    response = client.post(
+        "/api/entries/llm-summary",
+        json={
+            "since_utc": "2024-01-01T00:00:00+00:00",
+            "until_utc": "2024-01-01T23:59:59+00:00",
+        },
+    )
+
+    assert response.status_code == 200
+    prompt = captured["payload"]["messages"][1]["content"]
+    assert "Prompt override" in prompt
+    assert "Window 2024-01-01T00:00:00+00:00 -> 2024-01-01T23:59:59+00:00" in prompt
+    assert '"total_feed_ml": 90.0' in prompt
+    assert '"amount_ml": 90' in prompt
+
+
+def test_entries_llm_summary_returns_clear_error_for_missing_prompt_file(
+    client, monkeypatch, tmp_path
+):
+    missing_path = tmp_path / "missing-prompt.txt"
+    monkeypatch.setenv("BABY_TRACKER_OPENAI_API_KEY", "test-openai-key")
+    monkeypatch.setenv("BABY_TRACKER_LLM_SUMMARY_PROMPT_PATH", str(missing_path))
+
+    client.post(
+        "/api/users/suz/entries",
+        json={
+            "type": "feed",
+            "client_event_id": "evt-llm-prompt-missing",
+            "timestamp_utc": "2024-01-01T08:00:00+00:00",
+            "amount_ml": 90,
+        },
+    )
+
+    response = client.post(
+        "/api/entries/llm-summary",
+        json={
+            "since_utc": "2024-01-01T00:00:00+00:00",
+            "until_utc": "2024-01-01T23:59:59+00:00",
+        },
+    )
+
+    assert response.status_code == 500
+    assert response.get_json()["error"] == f"Unable to read AI summary prompt file: {missing_path}"
+
+
+def test_entries_llm_summary_without_user_slug_includes_all_visible_day_events(
+    client, monkeypatch
+):
+    captured: dict = {}
+
+    class DummyResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc_value, traceback):
+            return False
+
+        def read(self):
+            return json.dumps(
+                {
+                    "choices": [
+                        {
+                            "message": {
+                                "content": json.dumps(
+                                    {
+                                        "headline": "All events",
+                                        "selected_day": ["Combined view."],
+                                        "comparison_to_previous_7_days": ["Compared."],
+                                        "follow_up": ["Done."],
+                                    }
+                                )
+                            }
+                        }
+                    ]
+                }
+            ).encode("utf-8")
+
+    def fake_urlopen(req, timeout=0):
+        captured["payload"] = json.loads(req.data.decode("utf-8"))
+        return DummyResponse()
+
+    from src.app.services import llm_summary as llm_summary_module
+
+    monkeypatch.setattr(llm_summary_module.urllib_request, "urlopen", fake_urlopen)
+    monkeypatch.setenv("BABY_TRACKER_OPENAI_API_KEY", "test-openai-key")
+
+    client.post(
+        "/api/users/suz/entries",
+        json={
+            "type": "feed",
+            "client_event_id": "evt-llm-all-users-1",
+            "timestamp_utc": "2024-01-01T08:00:00+00:00",
+            "amount_ml": 90,
+        },
+    )
+    client.post(
+        "/api/users/rob/entries",
+        json={
+            "type": "feed",
+            "client_event_id": "evt-llm-all-users-2",
+            "timestamp_utc": "2024-01-01T09:00:00+00:00",
+            "formula_ml": 60,
+        },
+    )
+
+    response = client.post(
+        "/api/entries/llm-summary",
+        json={
+            "since_utc": "2024-01-01T00:00:00+00:00",
+            "until_utc": "2024-01-01T23:59:59+00:00",
+        },
+    )
+
+    assert response.status_code == 200
+    prompt = captured["payload"]["messages"][1]["content"]
+    assert '"event_count": 2' in prompt
+    assert '"total_feed_ml": 150.0' in prompt
+    assert '"amount_total_ml": 90.0' in prompt
+    assert '"formula_total_ml": 60.0' in prompt
+    assert '"user_slug": "suz"' in prompt
+    assert '"user_slug": "rob"' in prompt
+
+
+def test_entries_llm_summary_skips_openai_without_selected_day_events(client, monkeypatch):
     called = {"count": 0}
 
     def fake_urlopen(req, timeout=0):
         called["count"] += 1
-        raise AssertionError("Ollama should not be called without events")
+        raise AssertionError("OpenAI should not be called without selected-day events")
 
     from src.app.services import llm_summary as llm_summary_module
 
@@ -536,6 +776,40 @@ def test_entries_llm_summary_skips_ollama_without_events(client, monkeypatch):
     assert payload["event_count"] == 0
     assert payload["skipped"] is True
     assert called["count"] == 0
+
+
+def test_entries_llm_summary_requires_openai_api_key(client, monkeypatch):
+    from src.app.services import llm_summary as llm_summary_module
+
+    monkeypatch.delenv("BABY_TRACKER_OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setattr(
+        llm_summary_module.urllib_request,
+        "urlopen",
+        lambda req, timeout=0: (_ for _ in ()).throw(AssertionError("should not call")),
+    )
+
+    client.post(
+        "/api/users/suz/entries",
+        json={
+            "type": "feed",
+            "client_event_id": "evt-llm-no-key",
+            "timestamp_utc": "2024-01-01T08:00:00+00:00",
+            "amount_ml": 90,
+        },
+    )
+
+    response = client.post(
+        "/api/entries/llm-summary",
+        json={
+            "user_slug": "suz",
+            "since_utc": "2024-01-01T00:00:00+00:00",
+            "until_utc": "2024-01-01T23:59:59+00:00",
+        },
+    )
+
+    assert response.status_code == 503
+    assert response.get_json()["error"] == "OpenAI API key is not configured"
 
 
 def test_entries_llm_summary_rejects_invalid_window(client):

@@ -310,9 +310,8 @@ const customTypeInputEl = document.getElementById("custom-type-input");
 const entryWebhookInputEl = document.getElementById("entry-webhook-input");
 const homeKpisWebhookInputEl = document.getElementById("home-kpis-webhook-input");
 const defaultUserInputEl = document.getElementById("default-user-input");
-const ollamaBaseUrlInputEl = document.getElementById("ollama-base-url-input");
-const ollamaModelInputEl = document.getElementById("ollama-model-input");
-const ollamaTimeoutInputEl = document.getElementById("ollama-timeout-input");
+const openaiModelInputEl = document.getElementById("openai-model-input");
+const openaiTimeoutInputEl = document.getElementById("openai-timeout-input");
 const pushReminderUserEl = document.getElementById("push-reminder-user");
 const pushReminderStatusEl = document.getElementById("push-reminder-status");
 const enablePushRemindersBtn = document.getElementById("enable-push-reminders");
@@ -1805,26 +1804,20 @@ function initSettingsHandlers() {
       void saveBabySettings({ default_user_slug: value || null });
     });
   }
-  if (ollamaBaseUrlInputEl) {
-    ollamaBaseUrlInputEl.addEventListener("change", () => {
-      const value = ollamaBaseUrlInputEl.value;
-      void saveBabySettings({ ollama_base_url: value || null });
+  if (openaiModelInputEl) {
+    openaiModelInputEl.addEventListener("change", () => {
+      const value = openaiModelInputEl.value;
+      void saveBabySettings({ openai_model: value || null });
     });
   }
-  if (ollamaModelInputEl) {
-    ollamaModelInputEl.addEventListener("change", () => {
-      const value = ollamaModelInputEl.value;
-      void saveBabySettings({ ollama_model: value || null });
-    });
-  }
-  if (ollamaTimeoutInputEl) {
-    ollamaTimeoutInputEl.addEventListener("change", () => {
-      const nextValue = Number.parseInt(ollamaTimeoutInputEl.value, 10);
+  if (openaiTimeoutInputEl) {
+    openaiTimeoutInputEl.addEventListener("change", () => {
+      const nextValue = Number.parseInt(openaiTimeoutInputEl.value, 10);
       if (!Number.isInteger(nextValue) || nextValue <= 0) {
-        ollamaTimeoutInputEl.value = "45";
+        openaiTimeoutInputEl.value = "45";
         return;
       }
-      void saveBabySettings({ ollama_timeout_seconds: nextValue });
+      void saveBabySettings({ openai_timeout_seconds: nextValue });
     });
   }
   if (enablePushRemindersBtn) {
@@ -3908,7 +3901,126 @@ function resetAiSummaryPanel() {
       : "Choose a user to generate a handover.";
   }
   if (aiSummaryOutputEl) {
-    aiSummaryOutputEl.textContent = "";
+    aiSummaryOutputEl.replaceChildren();
+  }
+}
+
+function appendInlineMarkdown(parent, text) {
+  const pattern = /(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`|\[[^\]]+\]\(https?:\/\/[^)\s]+\))/g;
+  let lastIndex = 0;
+  for (const match of text.matchAll(pattern)) {
+    if (match.index > lastIndex) {
+      parent.appendChild(document.createTextNode(text.slice(lastIndex, match.index)));
+    }
+    const token = match[0];
+    if (token.startsWith("**")) {
+      const strong = document.createElement("strong");
+      strong.textContent = token.slice(2, -2);
+      parent.appendChild(strong);
+    } else if (token.startsWith("*")) {
+      const em = document.createElement("em");
+      em.textContent = token.slice(1, -1);
+      parent.appendChild(em);
+    } else if (token.startsWith("`")) {
+      const code = document.createElement("code");
+      code.textContent = token.slice(1, -1);
+      parent.appendChild(code);
+    } else {
+      const linkMatch = token.match(/^\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)$/);
+      if (linkMatch) {
+        const anchor = document.createElement("a");
+        anchor.textContent = linkMatch[1];
+        anchor.href = linkMatch[2];
+        anchor.target = "_blank";
+        anchor.rel = "noopener noreferrer";
+        parent.appendChild(anchor);
+      } else {
+        parent.appendChild(document.createTextNode(token));
+      }
+    }
+    lastIndex = match.index + token.length;
+  }
+  if (lastIndex < text.length) {
+    parent.appendChild(document.createTextNode(text.slice(lastIndex)));
+  }
+}
+
+function makeMarkdownParagraph(text) {
+  const paragraph = document.createElement("p");
+  appendInlineMarkdown(paragraph, text);
+  return paragraph;
+}
+
+function makeMarkdownHeading(text, level) {
+  const heading = document.createElement(`h${level}`);
+  appendInlineMarkdown(heading, text);
+  return heading;
+}
+
+function renderMarkdownInto(target, markdown) {
+  target.replaceChildren();
+  const lines = String(markdown || "").replace(/\r\n/g, "\n").split("\n");
+  let paragraphLines = [];
+  let listEl = null;
+
+  const flushParagraph = () => {
+    if (!paragraphLines.length) {
+      return;
+    }
+    target.appendChild(makeMarkdownParagraph(paragraphLines.join(" ")));
+    paragraphLines = [];
+  };
+  const closeList = () => {
+    listEl = null;
+  };
+
+  lines.forEach((rawLine) => {
+    const line = rawLine.trim();
+    if (!line) {
+      flushParagraph();
+      closeList();
+      return;
+    }
+    const headingMatch = line.match(/^(#{1,3})\s+(.+)$/);
+    if (headingMatch) {
+      flushParagraph();
+      closeList();
+      target.appendChild(makeMarkdownHeading(headingMatch[2], headingMatch[1].length));
+      return;
+    }
+    const listMatch = line.match(/^[-*]\s+(.+)$/);
+    if (listMatch) {
+      flushParagraph();
+      if (!listEl) {
+        listEl = document.createElement("ul");
+        target.appendChild(listEl);
+      }
+      const item = document.createElement("li");
+      appendInlineMarkdown(item, listMatch[1]);
+      listEl.appendChild(item);
+      return;
+    }
+    closeList();
+    paragraphLines.push(line);
+  });
+  flushParagraph();
+}
+
+function renderAiSummary(summary, thinking) {
+  if (!aiSummaryOutputEl) {
+    return;
+  }
+  renderMarkdownInto(aiSummaryOutputEl, summary || "");
+  if (thinking) {
+    const details = document.createElement("details");
+    details.className = "ai-summary-thinking";
+    const summaryEl = document.createElement("summary");
+    summaryEl.textContent = "Thinking";
+    const body = document.createElement("div");
+    body.className = "ai-summary-thinking-body";
+    renderMarkdownInto(body, thinking);
+    details.append(summaryEl, body);
+    aiSummaryOutputEl.appendChild(details);
   }
 }
 
@@ -3923,10 +4035,10 @@ async function generateAiSummary() {
   const dayWindow = getSummaryDayWindow(summaryDate || new Date());
   setAiSummaryLoading(true);
   if (aiSummaryMetaEl) {
-    aiSummaryMetaEl.textContent = "Generating with Ollama...";
+    aiSummaryMetaEl.textContent = "Generating with OpenAI...";
   }
   if (aiSummaryOutputEl) {
-    aiSummaryOutputEl.textContent = "";
+    aiSummaryOutputEl.replaceChildren();
   }
   try {
     const response = await fetch(buildUrl("/api/entries/llm-summary"), {
@@ -3948,10 +4060,14 @@ async function generateAiSummary() {
       return;
     }
     if (aiSummaryOutputEl) {
-      aiSummaryOutputEl.textContent = data.summary || "";
+      renderAiSummary(data.summary || "", data.thinking || "");
     }
     if (aiSummaryMetaEl) {
-      aiSummaryMetaEl.textContent = `${data.event_count} events · ${data.model || "Ollama"}`;
+      const provider = data.provider || "openai";
+      const contextLabel = Number.isInteger(data.context_event_count)
+        ? ` · ${data.context_event_count} events incl. 7-day context`
+        : "";
+      aiSummaryMetaEl.textContent = `${data.event_count} selected-day events${contextLabel} · ${data.model || provider}`;
     }
   } catch (err) {
     if (aiSummaryMetaEl) {
@@ -4182,6 +4298,7 @@ function renderSummaryStats(entries) {
   }
   let feedCount = 0;
   let durationTotal = 0;
+  let amountTotal = 0;
   let expressedTotal = 0;
   let formulaTotal = 0;
   let sleepCount = 0;
@@ -4195,6 +4312,10 @@ function renderSummaryStats(entries) {
       const duration = Number.parseFloat(entry.feed_duration_min);
       if (Number.isFinite(duration)) {
         durationTotal += duration;
+      }
+      const amount = Number.parseFloat(entry.amount_ml);
+      if (Number.isFinite(amount)) {
+        amountTotal += amount;
       }
       const expressed = Number.parseFloat(entry.expressed_ml);
       if (Number.isFinite(expressed)) {
@@ -4213,7 +4334,7 @@ function renderSummaryStats(entries) {
       }
     }
   });
-  const totalIntake = expressedTotal + formulaTotal;
+  const totalIntake = amountTotal + expressedTotal + formulaTotal;
   if (summaryFeedDurationEl) {
     summaryFeedDurationEl.textContent = formatDurationMinutes(durationTotal);
   }
@@ -6828,10 +6949,11 @@ function initMilkExpressLedgerHandlers() {
   }
 }
 
-function renderStats(entries) {
+function renderStats(entries, options = {}) {
   if (!statFeedTodayEl) {
     return;
   }
+  const sleepEntries = Array.isArray(options.sleepEntries) ? options.sleepEntries : entries;
   let feedCount24h = 0;
   let weeCount24h = 0;
   let pooCount24h = 0;
@@ -6851,7 +6973,7 @@ function renderStats(entries) {
   const now = new Date();
   const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const dayStartTs = dayStart.getTime();
-  const todaySleepSplit = getSplitSleepMinutesForDay(entries, now);
+  const todaySleepSplit = getSplitSleepMinutesForDay(sleepEntries, now);
   entries.forEach((entry) => {
     const timestamp = new Date(entry.timestamp_utc);
     const ts = timestamp.getTime();
@@ -8172,7 +8294,7 @@ async function loadHomeEntries() {
         (entry) => entryOverlapsChartWindow(entry, chartWindow),
       );
       renderChart(cachedChartEntries, chartWindows);
-      renderStats(cachedEntries);
+      renderStats(cachedEntries, { sleepEntries: cachedSleepTrendEntries || cachedEntries });
       renderGoalComparison();
       renderStatsWindow(todayWindow);
       renderLastActivity(cachedEntries);
@@ -8208,7 +8330,7 @@ async function loadHomeEntries() {
     state.activeFeedingGoal = currentGoal;
     const chartEntries = chartSourceEntries.filter((entry) => entryOverlapsChartWindow(entry, chartWindow));
     renderChart(chartEntries, chartWindows);
-    renderStats(entries);
+    renderStats(entries, { sleepEntries: sleepTrendEntries });
     renderGoalComparison();
     renderStatsWindow(todayWindow);
     renderLastActivity(entries);
@@ -8596,14 +8718,11 @@ async function loadBabySettings() {
     if (defaultUserInputEl) {
       defaultUserInputEl.value = data.default_user_slug || "";
     }
-    if (ollamaBaseUrlInputEl) {
-      ollamaBaseUrlInputEl.value = data.ollama_base_url || "http://127.0.0.1:11434";
+    if (openaiModelInputEl) {
+      openaiModelInputEl.value = data.openai_model || "gpt-4.1-mini";
     }
-    if (ollamaModelInputEl) {
-      ollamaModelInputEl.value = data.ollama_model || "gemma4";
-    }
-    if (ollamaTimeoutInputEl) {
-      ollamaTimeoutInputEl.value = String(data.ollama_timeout_seconds || 45);
+    if (openaiTimeoutInputEl) {
+      openaiTimeoutInputEl.value = String(data.openai_timeout_seconds || 45);
     }
     if (feedSizeSmallInputEl) {
       feedSizeSmallInputEl.value = String(state.feedSizeSmallMl);
@@ -8656,14 +8775,11 @@ async function saveBabySettings(patch) {
     if (defaultUserInputEl) {
       defaultUserInputEl.value = data.default_user_slug || "";
     }
-    if (ollamaBaseUrlInputEl) {
-      ollamaBaseUrlInputEl.value = data.ollama_base_url || "http://127.0.0.1:11434";
+    if (openaiModelInputEl) {
+      openaiModelInputEl.value = data.openai_model || "gpt-4.1-mini";
     }
-    if (ollamaModelInputEl) {
-      ollamaModelInputEl.value = data.ollama_model || "gemma4";
-    }
-    if (ollamaTimeoutInputEl) {
-      ollamaTimeoutInputEl.value = String(data.ollama_timeout_seconds || 45);
+    if (openaiTimeoutInputEl) {
+      openaiTimeoutInputEl.value = String(data.openai_timeout_seconds || 45);
     }
     if (feedSizeSmallInputEl) {
       feedSizeSmallInputEl.value = String(state.feedSizeSmallMl);

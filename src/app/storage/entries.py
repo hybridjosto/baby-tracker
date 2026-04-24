@@ -163,6 +163,35 @@ def get_entry_by_client_event_id(
     return dict(row) if row else None
 
 
+def get_latest_active_timed_entry(
+    conn: sqlite3.Connection | None, entry_type: str, user_slug: str | None = None
+) -> Optional[dict]:
+    assert conn is not None
+    clauses = [
+        "type = ?",
+        "feed_duration_min IS NULL",
+        "deleted_at_utc IS NULL",
+    ]
+    params: list[object] = [entry_type]
+    if user_slug:
+        clauses.append("user_slug = ?")
+        params.append(user_slug)
+    cursor = conn.execute(
+        f"""
+        SELECT id, user_slug, type, timestamp_utc, client_event_id, notes, amount_ml,
+               expressed_ml, formula_ml, feed_duration_min, weight_kg, caregiver_id,
+               created_at_utc, updated_at_utc, deleted_at_utc
+        FROM entries
+        WHERE {' AND '.join(clauses)}
+        ORDER BY timestamp_utc DESC
+        LIMIT 1
+        """,
+        params,
+    )
+    row = cursor.fetchone()
+    return dict(row) if row else None
+
+
 def update_entry(
     conn: sqlite3.Connection | None, entry_id: int, fields: dict
 ) -> Optional[dict]:

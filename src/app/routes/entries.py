@@ -17,7 +17,7 @@ from src.app.services.entries import (
 from src.app.services.entry_confirmation import dispatch_entry_confirmation_push
 from src.app.services.webhooks import send_entry_webhook
 from src.app.services.home_kpis import dispatch_home_kpis
-from src.app.services.llm_summary import LlmSummaryError, generate_ollama_summary
+from src.app.services.llm_summary import LlmSummaryError, generate_llm_summary
 
 entries_api = Blueprint("entries_api", __name__, url_prefix="/api")
 
@@ -115,7 +115,7 @@ def get_entries_summary_route():
 def generate_entries_llm_summary_route():
     payload = request.get_json(silent=True) or {}
     try:
-        summary = generate_ollama_summary(_db_path(), payload)
+        summary = generate_llm_summary(_db_path(), payload)
         return jsonify(summary)
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400

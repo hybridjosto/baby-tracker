@@ -71,6 +71,74 @@ def test_sleep_start_accepts_notes_and_timestamp_payload(client):
     assert entry["feed_duration_min"] is None
 
 
+def test_sleep_stop_ends_active_sleep_for_default_user(client):
+    client.patch("/api/settings", json={"default_user_slug": "suz"})
+    start_response = client.post(
+        "/api/sleep/start",
+        json={"timestamp_utc": "2026-03-07T09:30:00Z"},
+    )
+    assert start_response.status_code == 201
+
+    response = client.post(
+        "/api/sleep/stop",
+        json={"end_timestamp_utc": "2026-03-07T10:45:00Z"},
+    )
+
+    assert response.status_code == 200
+    entry = response.get_json()
+    assert entry["type"] == "sleep"
+    assert entry["user_slug"] == "suz"
+    assert entry["timestamp_utc"] == "2026-03-07T09:30:00+00:00"
+    assert entry["feed_duration_min"] == 75
+
+
+def test_sleep_stop_uses_user_slug_override(client):
+    client.post(
+        "/api/sleep/start",
+        json={"user_slug": "suz", "timestamp_utc": "2026-03-07T09:00:00Z"},
+    )
+    rob_start = client.post(
+        "/api/sleep/start",
+        json={"user_slug": "rob", "timestamp_utc": "2026-03-07T09:15:00Z"},
+    ).get_json()
+
+    response = client.post(
+        "/api/sleep/stop?user_slug=rob",
+        json={"end_timestamp_utc": "2026-03-07T09:45:00Z"},
+    )
+
+    assert response.status_code == 200
+    entry = response.get_json()
+    assert entry["id"] == rob_start["id"]
+    assert entry["user_slug"] == "rob"
+    assert entry["feed_duration_min"] == 30
+
+    suz_entries = client.get("/api/entries?type=sleep").get_json()
+    active_suz = [item for item in suz_entries if item["user_slug"] == "suz"]
+    assert active_suz[0]["feed_duration_min"] is None
+
+
+def test_sleep_stop_returns_404_without_active_sleep(client):
+    response = client.post("/api/sleep/stop?user_slug=suz")
+    assert response.status_code == 404
+    assert response.get_json()["error"] == "not_found"
+
+
+def test_sleep_stop_rejects_invalid_end_timestamp(client):
+    client.post(
+        "/api/sleep/start",
+        json={"user_slug": "suz", "timestamp_utc": "2026-03-07T09:30:00Z"},
+    )
+
+    response = client.post(
+        "/api/sleep/stop",
+        json={"user_slug": "suz", "end_timestamp_utc": "not-a-time"},
+    )
+
+    assert response.status_code == 400
+    assert response.get_json()["error"] == "end_timestamp_utc must be ISO-8601"
+
+
 def test_feed_log_sends_native_push_confirmation(client, monkeypatch):
     captured: dict = {}
 

@@ -6,6 +6,7 @@ Wants=network-online.target
 [Service]
 Type=simple
 WorkingDirectory=/home/josh/baby-tracker
+EnvironmentFile=-/home/josh/baby-tracker/.env
 Environment=PYTHONUNBUFFERED=1
 Environment=BABY_TRACKER_ENABLE_SCHEDULERS=0
 Environment=BABY_TRACKER_HOST=0.0.0.0

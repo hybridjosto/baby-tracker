@@ -8,7 +8,6 @@ import threading
 from flask import Flask
 
 from src.app.services.entries import get_next_feed_time
-from src.app.services.settings import get_settings
 from src.app.services.push_subscriptions import (
     SendPushFn,
     VapidConfig,
@@ -56,11 +55,6 @@ def dispatch_feed_due(
         return {"sent": False, "reason": "missing_subscription"}
 
     sender = send_fn or send_web_push
-    settings = get_settings(db_path)
-    feed_interval_min = settings.get("feed_interval_min")
-    repeat_after_seconds = (
-        max(feed_interval_min, 1) * 60 if isinstance(feed_interval_min, int) else None
-    )
     sent_users: list[str] = []
     invalid_users: list[str] = []
     due_users: list[str] = []
@@ -78,14 +72,11 @@ def dispatch_feed_due(
         if not due_at or now < due_at:
             continue
         due_users.append(user_slug)
-        if subscription.get("last_notified_entry_id") == source_entry_id:
-            last_sent_at = _parse_utc(subscription.get("last_sent_at_utc"))
-            if (
-                repeat_after_seconds is None
-                or last_sent_at is not None
-                and (now - last_sent_at).total_seconds() < repeat_after_seconds
-            ):
-                continue
+        if (
+            subscription.get("last_notified_entry_id") == source_entry_id
+            and subscription.get("last_notified_due_at_utc") == next_timestamp
+        ):
+            continue
         payload = build_push_payload(
             title="Feed due",
             body="Time for a feed.",
@@ -98,6 +89,7 @@ def dispatch_feed_due(
                 db_path,
                 user_slug=user_slug,
                 last_notified_entry_id=source_entry_id,
+                last_notified_due_at_utc=next_timestamp,
                 last_sent_at_utc=now.isoformat(),
             )
             sent_users.append(user_slug)

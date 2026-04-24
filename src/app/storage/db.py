@@ -197,6 +197,16 @@ def _ensure_settings_table(conn: sqlite3.Connection) -> None:
         conn.execute(
             "ALTER TABLE baby_settings ADD COLUMN ollama_timeout_seconds INTEGER"
         )
+    if "ollama_thinking_enabled" not in columns:
+        conn.execute(
+            "ALTER TABLE baby_settings ADD COLUMN ollama_thinking_enabled INTEGER"
+        )
+    if "openai_model" not in columns:
+        conn.execute("ALTER TABLE baby_settings ADD COLUMN openai_model TEXT")
+    if "openai_timeout_seconds" not in columns:
+        conn.execute(
+            "ALTER TABLE baby_settings ADD COLUMN openai_timeout_seconds INTEGER"
+        )
     if "feed_due_last_entry_id" not in columns:
         conn.execute(
             "ALTER TABLE baby_settings ADD COLUMN feed_due_last_entry_id INTEGER"
@@ -218,9 +228,11 @@ def _ensure_settings_table(conn: sqlite3.Connection) -> None:
                  pushcut_feed_due_url, home_kpis_webhook_url,
                  feed_size_small_ml, feed_size_big_ml,
                  ollama_base_url, ollama_model, ollama_timeout_seconds,
+                 ollama_thinking_enabled,
+                 openai_model, openai_timeout_seconds,
                  feed_due_last_entry_id, feed_due_last_sent_at_utc,
                  updated_at_utc)
-            VALUES (1, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, ?)
+            VALUES (1, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, ?)
             """,
             (now,),
         )
@@ -326,6 +338,7 @@ def _ensure_push_subscriptions_table(conn: sqlite3.Connection) -> None:
             created_at_utc TEXT NOT NULL,
             updated_at_utc TEXT NOT NULL,
             last_notified_entry_id INTEGER,
+            last_notified_due_at_utc TEXT,
             last_sent_at_utc TEXT
         )
         """
@@ -337,6 +350,10 @@ def _ensure_push_subscriptions_table(conn: sqlite3.Connection) -> None:
     if "last_notified_entry_id" not in columns:
         conn.execute(
             "ALTER TABLE push_subscriptions ADD COLUMN last_notified_entry_id INTEGER"
+        )
+    if "last_notified_due_at_utc" not in columns:
+        conn.execute(
+            "ALTER TABLE push_subscriptions ADD COLUMN last_notified_due_at_utc TEXT"
         )
     if "last_sent_at_utc" not in columns:
         conn.execute("ALTER TABLE push_subscriptions ADD COLUMN last_sent_at_utc TEXT")
