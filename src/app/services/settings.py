@@ -1,5 +1,6 @@
 from datetime import date, datetime, timezone
 import json
+from string import Template
 import unicodedata
 from urllib.parse import urlparse
 
@@ -45,6 +46,13 @@ def _normalize_feed_interval(value: object) -> int | None:
 
 
 _BEHIND_TARGET_MODES = {"increase_next", "add_feed"}
+_OPENAI_PROMPT_TEMPLATE_KEYS = {
+    "selected_day_since_utc",
+    "selected_day_until_utc",
+    "selected_day_stats_json",
+    "selected_day_events_json",
+    "comparison_days_json",
+}
 
 
 def _is_allowed_custom_type_char(char: str) -> bool:
@@ -247,6 +255,34 @@ def _normalize_openai_timeout(value: object) -> int:
     return value
 
 
+def _normalize_openai_prompt_template(value: object) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError("openai_prompt_template must be text")
+    trimmed = value.strip()
+    if not trimmed:
+        return None
+    if len(trimmed) > 40000:
+        raise ValueError("openai_prompt_template must be 40000 characters or fewer")
+
+    placeholders: set[str] = set()
+    for match in Template.pattern.finditer(trimmed):
+        named = match.group("named") or match.group("braced")
+        if named:
+            placeholders.add(named)
+            continue
+        if match.group("invalid") is not None:
+            raise ValueError("openai_prompt_template has invalid placeholder syntax")
+    unknown = sorted(placeholders - _OPENAI_PROMPT_TEMPLATE_KEYS)
+    if unknown:
+        raise ValueError(
+            "openai_prompt_template contains unsupported placeholders: "
+            + ", ".join(unknown)
+        )
+    return trimmed
+
+
 def get_settings(db_path: str) -> dict:
     with get_connection(db_path) as conn:
         return repo_get_settings(conn)
@@ -307,6 +343,10 @@ def update_settings(db_path: str, payload: dict) -> dict:
     if "openai_timeout_seconds" in payload:
         fields["openai_timeout_seconds"] = _normalize_openai_timeout(
             payload["openai_timeout_seconds"]
+        )
+    if "openai_prompt_template" in payload:
+        fields["openai_prompt_template"] = _normalize_openai_prompt_template(
+            payload["openai_prompt_template"]
         )
     with get_connection(db_path) as conn:
         current = repo_get_settings(conn)

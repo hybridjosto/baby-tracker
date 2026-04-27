@@ -22,6 +22,7 @@ def test_get_settings_defaults(client):
     assert payload["ollama_thinking_enabled"] is False
     assert payload["openai_model"] == "gpt-4.1-mini"
     assert payload["openai_timeout_seconds"] == 45
+    assert payload["openai_prompt_template"] is None
 
 
 def test_patch_settings_updates_values(client):
@@ -43,6 +44,7 @@ def test_patch_settings_updates_values(client):
             "ollama_thinking_enabled": True,
             "openai_model": "gpt-4.1-mini",
             "openai_timeout_seconds": 75,
+            "openai_prompt_template": "Window $selected_day_since_utc -> $selected_day_until_utc",
         },
     )
     assert response.status_code == 200
@@ -62,6 +64,10 @@ def test_patch_settings_updates_values(client):
     assert payload["ollama_thinking_enabled"] is True
     assert payload["openai_model"] == "gpt-4.1-mini"
     assert payload["openai_timeout_seconds"] == 75
+    assert (
+        payload["openai_prompt_template"]
+        == "Window $selected_day_since_utc -> $selected_day_until_utc"
+    )
 
     follow_up = client.get("/api/settings")
     payload = follow_up.get_json()
@@ -80,6 +86,10 @@ def test_patch_settings_updates_values(client):
     assert payload["ollama_thinking_enabled"] is True
     assert payload["openai_model"] == "gpt-4.1-mini"
     assert payload["openai_timeout_seconds"] == 75
+    assert (
+        payload["openai_prompt_template"]
+        == "Window $selected_day_since_utc -> $selected_day_until_utc"
+    )
 
 
 def test_patch_settings_rejects_invalid_values(client):
@@ -137,6 +147,21 @@ def test_patch_settings_rejects_invalid_values(client):
     assert response.status_code == 400
 
     response = client.patch("/api/settings", json={"openai_timeout_seconds": 0})
+    assert response.status_code == 400
+
+    response = client.patch("/api/settings", json={"openai_prompt_template": 123})
+    assert response.status_code == 400
+
+    response = client.patch(
+        "/api/settings",
+        json={"openai_prompt_template": "Hello $unknown_placeholder"},
+    )
+    assert response.status_code == 400
+
+    response = client.patch(
+        "/api/settings",
+        json={"openai_prompt_template": "Hello ${"},
+    )
     assert response.status_code == 400
 
 

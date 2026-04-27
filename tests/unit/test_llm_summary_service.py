@@ -29,6 +29,16 @@ def test_load_prompt_template_honors_env_override(tmp_path, monkeypatch):
     assert _get_prompt_path() == prompt_path
 
 
+def test_load_prompt_template_prefers_stored_template_over_file(monkeypatch, tmp_path):
+    prompt_path = tmp_path / "custom_prompt.txt"
+    prompt_path.write_text("File template", encoding="utf-8")
+    monkeypatch.setenv("BABY_TRACKER_LLM_SUMMARY_PROMPT_PATH", str(prompt_path))
+
+    template = _load_prompt_template("Stored $selected_day_since_utc")
+
+    assert template == "Stored $selected_day_since_utc"
+
+
 def test_load_prompt_template_raises_clear_error_for_missing_file(monkeypatch, tmp_path):
     missing_path = tmp_path / "missing_prompt.txt"
     monkeypatch.setenv("BABY_TRACKER_LLM_SUMMARY_PROMPT_PATH", str(missing_path))
@@ -52,6 +62,21 @@ def test_render_prompt_template_raises_clear_error_for_unknown_placeholder(
     assert (
         str(exc_info.value)
         == f"Invalid AI summary prompt placeholder 'unknown_placeholder' in {prompt_path}"
+    )
+    assert exc_info.value.status_code == 500
+
+
+def test_render_prompt_template_reports_stored_settings_source_for_unknown_placeholder():
+    with pytest.raises(LlmSummaryError) as exc_info:
+        _render_prompt_template(
+            "Hello $unknown_placeholder",
+            {"selected_day_since_utc": "x"},
+            "stored settings prompt",
+        )
+
+    assert (
+        str(exc_info.value)
+        == "Invalid AI summary prompt placeholder 'unknown_placeholder' in stored settings prompt"
     )
     assert exc_info.value.status_code == 500
 
@@ -98,3 +123,35 @@ def test_build_prompt_renders_from_override_file(tmp_path, monkeypatch):
     assert '"total_feed_ml": 90.0' in prompt
     assert '"amount_ml": 90' in prompt
     assert "Compare [" in prompt
+
+
+def test_build_prompt_renders_from_stored_template():
+    since_utc = datetime(2024, 1, 1, tzinfo=timezone.utc)
+    until_utc = datetime(2024, 1, 1, 23, 59, 59, tzinfo=timezone.utc)
+
+    prompt = _build_prompt(
+        all_entries=[
+            {
+                "type": "feed",
+                "timestamp_utc": "2024-01-01T08:00:00+00:00",
+                "user_slug": "suz",
+                "amount_ml": 90,
+                "notes": "settled afterwards",
+            }
+        ],
+        selected_entries=[
+            {
+                "type": "feed",
+                "timestamp_utc": "2024-01-01T08:00:00+00:00",
+                "user_slug": "suz",
+                "amount_ml": 90,
+                "notes": "settled afterwards",
+            }
+        ],
+        since_utc=since_utc,
+        until_utc=until_utc,
+        prompt_template="Stored $selected_day_since_utc :: $selected_day_events_json",
+    )
+
+    assert "Stored 2024-01-01T00:00:00+00:00 ::" in prompt
+    assert '"amount_ml": 90' in prompt

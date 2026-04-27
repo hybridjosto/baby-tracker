@@ -487,6 +487,12 @@ def test_entries_llm_summary_calls_openai_with_selected_window_and_context(
         json={
             "openai_model": "gpt-4.1-mini",
             "openai_timeout_seconds": 60,
+            "openai_prompt_template": (
+                "Stored prompt\n"
+                "Window $selected_day_since_utc -> $selected_day_until_utc\n"
+                "Events $selected_day_events_json\n"
+                "Compare $comparison_days_json\n"
+            ),
         },
     )
     assert settings_response.status_code == 200
@@ -560,9 +566,10 @@ def test_entries_llm_summary_calls_openai_with_selected_window_and_context(
     assert captured["payload"]["response_format"] == {"type": "json_object"}
     assert captured["payload"]["messages"][0]["role"] == "system"
     prompt = captured["payload"]["messages"][1]["content"]
+    assert "Stored prompt" in prompt
     assert "settled afterwards" in prompt
     assert "previous day context" in prompt
-    assert "comparison_to_previous_7_days" in prompt
+    assert '"sample_notes": [' in prompt
     assert "exclude me" not in prompt
 
 

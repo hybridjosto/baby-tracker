@@ -80,7 +80,13 @@ def generate_llm_summary(
             "skipped": True,
         }
 
-    prompt = _build_prompt(ordered_entries, selected_entries, since_utc, until_utc)
+    prompt = _build_prompt(
+        ordered_entries,
+        selected_entries,
+        since_utc,
+        until_utc,
+        prompt_template=settings.get("openai_prompt_template"),
+    )
     response = _call_openai(
         model=model,
         prompt=prompt,
@@ -130,6 +136,7 @@ def _build_prompt(
     selected_entries: list[dict],
     since_utc: datetime,
     until_utc: datetime,
+    prompt_template: str | None = None,
 ) -> str:
     comparison_days = _build_comparison_days(all_entries, since_utc, until_utc)
     selected_day_stats = _build_day_stats(selected_entries)
@@ -139,7 +146,7 @@ def _build_prompt(
         indent=2,
     )
     comparison_lines = json.dumps(comparison_days, ensure_ascii=False, indent=2)
-    template = _load_prompt_template()
+    template = _load_prompt_template(prompt_template)
     return _render_prompt_template(
         template,
         {
@@ -152,6 +159,7 @@ def _build_prompt(
             "selected_day_events_json": selected_lines,
             "comparison_days_json": comparison_lines,
         },
+        "stored settings prompt" if prompt_template else str(_get_prompt_path()),
     )
 
 
@@ -162,7 +170,9 @@ def _get_prompt_path() -> Path:
     return DEFAULT_PROMPT_PATH
 
 
-def _load_prompt_template() -> str:
+def _load_prompt_template(stored_template: str | None = None) -> str:
+    if isinstance(stored_template, str) and stored_template.strip():
+        return stored_template
     prompt_path = _get_prompt_path()
     try:
         return prompt_path.read_text(encoding="utf-8")
@@ -173,19 +183,24 @@ def _load_prompt_template() -> str:
         ) from exc
 
 
-def _render_prompt_template(template_text: str, values: dict[str, str]) -> str:
-    prompt_path = _get_prompt_path()
+def _render_prompt_template(
+    template_text: str,
+    values: dict[str, str],
+    prompt_source: str | None = None,
+) -> str:
     try:
         return Template(template_text).substitute(values)
     except KeyError as exc:
         missing_key = exc.args[0]
+        prompt_location = prompt_source or str(_get_prompt_path())
         raise LlmSummaryError(
-            f"Invalid AI summary prompt placeholder '{missing_key}' in {prompt_path}",
+            f"Invalid AI summary prompt placeholder '{missing_key}' in {prompt_location}",
             500,
         ) from exc
     except ValueError as exc:
+        prompt_location = prompt_source or str(_get_prompt_path())
         raise LlmSummaryError(
-            f"Invalid AI summary prompt template in {prompt_path}: {exc}",
+            f"Invalid AI summary prompt template in {prompt_location}: {exc}",
             500,
         ) from exc
 

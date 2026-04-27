@@ -207,6 +207,8 @@ def _ensure_settings_table(conn: sqlite3.Connection) -> None:
         conn.execute(
             "ALTER TABLE baby_settings ADD COLUMN openai_timeout_seconds INTEGER"
         )
+    if "openai_prompt_template" not in columns:
+        conn.execute("ALTER TABLE baby_settings ADD COLUMN openai_prompt_template TEXT")
     if "feed_due_last_entry_id" not in columns:
         conn.execute(
             "ALTER TABLE baby_settings ADD COLUMN feed_due_last_entry_id INTEGER"
@@ -229,10 +231,10 @@ def _ensure_settings_table(conn: sqlite3.Connection) -> None:
                  feed_size_small_ml, feed_size_big_ml,
                  ollama_base_url, ollama_model, ollama_timeout_seconds,
                  ollama_thinking_enabled,
-                 openai_model, openai_timeout_seconds,
+                 openai_model, openai_timeout_seconds, openai_prompt_template,
                  feed_due_last_entry_id, feed_due_last_sent_at_utc,
                  updated_at_utc)
-            VALUES (1, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, ?)
+            VALUES (1, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, ?)
             """,
             (now,),
         )

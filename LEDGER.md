@@ -11,6 +11,10 @@
 - gradual frontend refactor of `src/web/static/app.js` into modules. *plan in `docs/plans/2026-03-18-app-js-refactor-plan.md`
 
 ## DONE
+- revised the AI handover prompt again on 2026-04-25 by updating `src/app/prompts/llm_summary_prompt.txt` to favor short narrative-style summary items over clipped bullets, allow fact-grounded opinion, and make the 7-day comparison assess whether the day was broadly on track for a realistic age-appropriate 24-hour routine using sleep, feeds, feed goal, and events.
+- softened the AI handover prompt tone on 2026-04-25 by updating `src/app/prompts/llm_summary_prompt.txt` to sound less clinical and to prioritize sleep analysis, daily rhythm, and routine-level insights while keeping the existing JSON schema unchanged.
+- made the OpenAI handover prompt editable from Settings on 2026-04-24 by storing `openai_prompt_template` in `baby_settings`, validating allowed template placeholders on save, adding a prompt textarea to `src/web/templates/settings.html`, wiring it through `src/web/static/app.js`, and making `src/app/services/llm_summary.py` prefer the saved template over the file-backed default.
+- moved ongoing work off the GitButler workspace branch on 2026-04-24 by creating and switching to the standard Git branch `standard-git-work`, keeping the full dirty worktree intact so future work can continue with normal Git commands.
 - moved the OpenAI handover prompt into a file-backed template on 2026-04-24 by adding `src/app/prompts/llm_summary_prompt.txt`, loading it fresh on each summary request, supporting `BABY_TRACKER_LLM_SUMMARY_PROMPT_PATH` overrides, and returning clear errors for unreadable prompt files or invalid placeholders.
 - limited native feed-due push reminders to one notification per subscriber per due time on 2026-04-24 by storing `last_notified_due_at_utc` on each push subscription, suppressing scheduler repeats for the same overdue due timestamp, and preserving that delivery state when a browser subscription is replaced.
 - fixed Summary AI handover event scope and intake totals on 2026-04-23 by making the AI request use the same all-users selected-day dataset as the Summary page, restoring missing visible events in the prompt, and by including `amount_ml` in the Summary page `Total intake` calculation so the UI no longer undercounts bottle/feed volume.
@@ -140,6 +144,7 @@
 - tests run on 2026-03-19 after Summary sleep trend average-line update: `./.venv/bin/pytest` -> `103 passed, 6 skipped`.
 - tests run on 2026-03-27 for overdue reminder repeats: `./.venv/bin/pytest tests/unit/test_feed_due_service.py tests/unit/test_scheduler_runtime_config.py tests/integration/test_pushcut_feed_api.py` -> `23 passed`.
 - tests run on 2026-04-24 for feed-due dedupe by due time: `./.venv/bin/pytest tests/unit/test_feed_due_service.py tests/unit/test_push_subscription_storage.py tests/integration/test_pushcut_feed_api.py` -> `17 passed`.
+- tests run on 2026-04-24 for editable OpenAI handover prompt: `./.venv/bin/pytest tests/unit/test_settings_storage.py tests/unit/test_llm_summary_service.py tests/integration/test_settings_api.py tests/integration/test_entries_api.py` -> `56 passed`.
 - tests run on 2026-03-27 for scheduler push wiring: `./.venv/bin/pytest tests/unit/test_scheduler_runtime_config.py tests/unit/test_feed_due_service.py tests/integration/test_pushcut_feed_api.py` -> `22 passed`.
 - tests run on 2026-03-19 after Summary totals fix: `./.venv/bin/pytest` -> `103 passed, 6 skipped`.
 - debug note on 2026-03-19: IndexedDB cache ordering/range checks were comparing timestamp strings lexicographically; after editing an entry locally, mixed `Z` vs `+00:00` timestamp formats could leave the updated entry out of the expected local sort/window even before sync finished.
@@ -164,6 +169,7 @@
 - lint attempted on 2026-03-14 after future-feed suggestion sizing: `./.venv/bin/python -m ruff check src tests/integration/test_settings_api.py tests/unit/test_settings_storage.py` could not run because `ruff` is not installed in `.venv`.
 - tests run on 2026-03-14 after summary API addition: `./.venv/bin/pytest tests/integration/test_entries_api.py` -> `29 passed`.
 - lint attempted on 2026-03-14 after summary API addition: `./.venv/bin/python -m ruff check src` could not run because `ruff` is not installed in `.venv`.
+- lint attempted on 2026-04-24 for editable OpenAI handover prompt: `./.venv/bin/python -m ruff check src tests/unit/test_settings_storage.py tests/unit/test_llm_summary_service.py tests/integration/test_settings_api.py tests/integration/test_entries_api.py` could not run because `ruff` is not installed in `.venv`.
 - tests after SQLite-only security refactor: `87 passed, 1 skipped` on 2026-03-05.
 - `uv.lock` changed as part of dependency surface changes (Firestore dependency removed from `pyproject.toml`).
 - removed `docs/systemd/baby-tracker.service.d/20-firebase.conf.example`; if needed later, replace with a SQLite-focused drop-in instead of Firebase env vars.
@@ -176,3 +182,4 @@
 - lint run on 2026-03-08 after timed-event start API addition: `cd src && ruff check .` -> `All checks passed!`.
 - tests attempted on 2026-03-14: `python3 -m pytest tests/integration/test_feed_log_api.py` could not run because `pytest` is not installed and this environment cannot reach PyPI.
 - verification note on 2026-04-15: no automated tests were run for the homepage sleep-card swap; change touches `src/web/templates/index.html` plus homepage stat rendering in `src/web/static/app.js`.
+- verification note on 2026-04-25: no automated tests were run for the AI handover prompt wording update; change only touches `src/app/prompts/llm_summary_prompt.txt`.

@@ -312,6 +312,7 @@ const homeKpisWebhookInputEl = document.getElementById("home-kpis-webhook-input"
 const defaultUserInputEl = document.getElementById("default-user-input");
 const openaiModelInputEl = document.getElementById("openai-model-input");
 const openaiTimeoutInputEl = document.getElementById("openai-timeout-input");
+const openaiPromptInputEl = document.getElementById("openai-prompt-input");
 const pushReminderUserEl = document.getElementById("push-reminder-user");
 const pushReminderStatusEl = document.getElementById("push-reminder-status");
 const enablePushRemindersBtn = document.getElementById("enable-push-reminders");
@@ -1818,6 +1819,11 @@ function initSettingsHandlers() {
         return;
       }
       void saveBabySettings({ openai_timeout_seconds: nextValue });
+    });
+  }
+  if (openaiPromptInputEl) {
+    openaiPromptInputEl.addEventListener("change", () => {
+      void saveBabySettings({ openai_prompt_template: openaiPromptInputEl.value || null });
     });
   }
   if (enablePushRemindersBtn) {
@@ -8724,6 +8730,9 @@ async function loadBabySettings() {
     if (openaiTimeoutInputEl) {
       openaiTimeoutInputEl.value = String(data.openai_timeout_seconds || 45);
     }
+    if (openaiPromptInputEl) {
+      openaiPromptInputEl.value = data.openai_prompt_template || "";
+    }
     if (feedSizeSmallInputEl) {
       feedSizeSmallInputEl.value = String(state.feedSizeSmallMl);
     }
@@ -8780,6 +8789,9 @@ async function saveBabySettings(patch) {
     }
     if (openaiTimeoutInputEl) {
       openaiTimeoutInputEl.value = String(data.openai_timeout_seconds || 45);
+    }
+    if (openaiPromptInputEl) {
+      openaiPromptInputEl.value = data.openai_prompt_template || "";
     }
     if (feedSizeSmallInputEl) {
       feedSizeSmallInputEl.value = String(state.feedSizeSmallMl);

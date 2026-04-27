@@ -33,6 +33,7 @@ SETTINGS_KEYS = (
     "ollama_thinking_enabled",
     "openai_model",
     "openai_timeout_seconds",
+    "openai_prompt_template",
 )
 
 
@@ -108,6 +109,12 @@ def _normalize_settings_payload(data: dict | None) -> dict:
         and openai_timeout > 0
         else DEFAULT_OPENAI_TIMEOUT_SECONDS
     )
+    prompt_template = raw.get("openai_prompt_template")
+    settings["openai_prompt_template"] = (
+        prompt_template
+        if isinstance(prompt_template, str) and prompt_template.strip()
+        else None
+    )
     return settings
 
 
@@ -135,7 +142,8 @@ def get_settings(conn: sqlite3.Connection | None) -> dict:
                default_user_slug, pushcut_feed_due_url,
                home_kpis_webhook_url, feed_size_small_ml, feed_size_big_ml,
                ollama_base_url, ollama_model, ollama_timeout_seconds,
-               ollama_thinking_enabled, openai_model, openai_timeout_seconds
+               ollama_thinking_enabled, openai_model, openai_timeout_seconds,
+               openai_prompt_template
         FROM baby_settings
         WHERE id = 1
         """
@@ -170,6 +178,7 @@ def update_settings(conn: sqlite3.Connection | None, fields: dict) -> dict:
         "ollama_thinking_enabled",
         "openai_model",
         "openai_timeout_seconds",
+        "openai_prompt_template",
         "updated_at_utc",
     ):
         if key in fields:
