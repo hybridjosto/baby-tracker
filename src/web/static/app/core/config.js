@@ -40,30 +40,33 @@ const RESERVED_USER_SLUGS = new Set([
 ]);
 const CUSTOM_TYPE_MAX_LENGTH = 32;
 const MILK_EXPRESS_TYPE = "milk express";
-const SLEEP_GANTT_DEFAULT_OVERLAYS = new Set(["feed", "cry", "wee", "poo"]);
+const SLEEP_GANTT_DEFAULT_OVERLAYS = new Set(["feed", "cry", "sick", "wee", "poo"]);
 const SLEEP_GANTT_TYPE_COLORS = {
   sleep: "#7c83ff",
   feed: "#13ec5b",
   cry: "#fb7185",
+  sick: "#f97316",
   wee: "#7dd3fc",
   poo: "#fbbf24",
 };
 const CHART_CONFIG = {
   width: 360,
-  height: 150,
+  height: 164,
   paddingX: 16,
-  axisY: 122,
-  sleepY: 22,
-  weeY: 42,
-  feedY: 62,
-  cryY: 82,
-  pooY: 102,
+  axisY: 136,
+  sleepY: 20,
+  feedY: 40,
+  sickY: 62,
+  cryY: 84,
+  weeY: 106,
+  pooY: 122,
 };
 const CHART_EVENT_TYPES = {
   sleep: { y: CHART_CONFIG.sleepY, color: "#7c83ff" },
-  wee: { y: CHART_CONFIG.weeY, color: "#7dd3fc" },
   feed: { y: CHART_CONFIG.feedY, color: "#13ec5b" },
+  sick: { y: CHART_CONFIG.sickY, color: "#f97316" },
   cry: { y: CHART_CONFIG.cryY, color: "#fb7185" },
+  wee: { y: CHART_CONFIG.weeY, color: "#7dd3fc" },
   poo: { y: CHART_CONFIG.pooY, color: "#fbbf24" },
 };
 

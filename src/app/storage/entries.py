@@ -91,6 +91,36 @@ def list_entries(
     return [dict(row) for row in cursor.fetchall()]
 
 
+def get_latest_entry_by_types(
+    conn: sqlite3.Connection | None,
+    entry_types: list[str],
+    user_slug: str | None = None,
+) -> Optional[dict]:
+    assert conn is not None
+    if not entry_types:
+        return None
+    placeholders = ", ".join("?" for _ in entry_types)
+    clauses = [f"type IN ({placeholders})", "deleted_at_utc IS NULL"]
+    params: list[object] = [*entry_types]
+    if user_slug:
+        clauses.append("user_slug = ?")
+        params.append(user_slug)
+    cursor = conn.execute(
+        f"""
+        SELECT id, user_slug, type, timestamp_utc, client_event_id, notes, amount_ml,
+               expressed_ml, formula_ml, feed_duration_min, weight_kg, caregiver_id,
+               created_at_utc, updated_at_utc, deleted_at_utc
+        FROM entries
+        WHERE {' AND '.join(clauses)}
+        ORDER BY datetime(timestamp_utc) DESC, id DESC
+        LIMIT 1
+        """,
+        params,
+    )
+    row = cursor.fetchone()
+    return dict(row) if row else None
+
+
 def list_entries_for_export(
     conn: sqlite3.Connection | None,
     user_slug: str | None = None,

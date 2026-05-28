@@ -1,7 +1,7 @@
 # Local-only API via Caddy + Tailscale
 
 This setup keeps the Flask app bound to localhost while Caddy serves only the `/api`
-endpoints over your tailnet.
+endpoints and the `/healthz` reliability probe over your tailnet.
 
 ## Prereqs
 - Tailscale installed on the host running the app and Caddy
@@ -24,10 +24,11 @@ Use the provided `Caddyfile.tailscale` (already set to `100.113.227.1`).
 caddy run --config Caddyfile.tailscale
 ```
 
-The API will be reachable from your tailnet at:
+The API and health probe will be reachable from your tailnet at:
 
 ```text
 http://100.113.227.1:8443/api/entries
+http://100.113.227.1:8443/healthz
 ```
 
 ## 3) Optional: expose the full UI
@@ -42,5 +43,5 @@ If you want the UI too, change the Caddyfile to proxy all paths:
 ```
 
 ## Notes
-- This config intentionally returns 404 for non-`/api` paths.
+- This config intentionally returns 404 for paths other than `/api*` and `/healthz`.
 - If you already use a different port, update `reverse_proxy` and the app's port.

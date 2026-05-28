@@ -132,6 +132,12 @@ const summaryNextBtn = document.getElementById("summary-next");
 const aiSummaryGenerateBtn = document.getElementById("ai-summary-generate");
 const aiSummaryMetaEl = document.getElementById("ai-summary-meta");
 const aiSummaryOutputEl = document.getElementById("ai-summary-output");
+const aiChatFormEl = document.getElementById("ai-chat-form");
+const aiChatInputEl = document.getElementById("ai-chat-question");
+const aiChatSubmitBtn = document.getElementById("ai-chat-submit");
+const aiChatMetaEl = document.getElementById("ai-chat-meta");
+const aiChatOutputEl = document.getElementById("ai-chat-output");
+const aiChatPromptBtns = document.querySelectorAll("[data-ai-chat-question]");
 const sleepGanttTypeOptionsEl = document.getElementById("sleep-gantt-type-options");
 const sleepGanttChartEl = document.getElementById("sleep-gantt-chart");
 const sleepGanttReadoutEl = document.getElementById("sleep-gantt-readout");
@@ -1680,6 +1686,7 @@ function initSummaryHandlers() {
     refreshBtn.addEventListener("click", () => {
       if (state.userValid) {
         resetAiSummaryPanel();
+        resetAiChatPanel();
         void loadSummaryEntries();
         void loadRulerFeeds({ reset: true });
       }
@@ -1690,6 +1697,25 @@ function initSummaryHandlers() {
       void generateAiSummary();
     });
     resetAiSummaryPanel();
+  }
+  if (aiChatFormEl) {
+    aiChatFormEl.addEventListener("submit", (event) => {
+      event.preventDefault();
+      void sendAiChatQuestion();
+    });
+    resetAiChatPanel();
+  }
+  if (aiChatPromptBtns.length) {
+    aiChatPromptBtns.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const question = btn.dataset.aiChatQuestion || "";
+        const presetWindow = btn.dataset.aiChatPreset || "";
+        if (aiChatInputEl) {
+          aiChatInputEl.value = question;
+        }
+        void sendAiChatQuestion(question, presetWindow);
+      });
+    });
   }
   if (milkExpressSparklineToggleEls.length) {
     milkExpressSparklineToggleEls.forEach((btn) => {
@@ -3911,6 +3937,31 @@ function resetAiSummaryPanel() {
   }
 }
 
+function setAiChatLoading(isLoading) {
+  if (aiChatSubmitBtn) {
+    aiChatSubmitBtn.disabled = isLoading || !state.userValid;
+    aiChatSubmitBtn.textContent = isLoading ? "Asking..." : "Ask";
+  }
+  aiChatPromptBtns.forEach((btn) => {
+    btn.disabled = isLoading || !state.userValid;
+  });
+}
+
+function resetAiChatPanel() {
+  if (!aiChatFormEl && !aiChatMetaEl && !aiChatOutputEl) {
+    return;
+  }
+  setAiChatLoading(false);
+  if (aiChatMetaEl) {
+    aiChatMetaEl.textContent = state.userValid
+      ? "Ask about the selected day or use a suggested question."
+      : "Choose a user to ask about tracker data.";
+  }
+  if (aiChatOutputEl) {
+    aiChatOutputEl.replaceChildren();
+  }
+}
+
 function appendInlineMarkdown(parent, text) {
   const pattern = /(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`|\[[^\]]+\]\(https?:\/\/[^)\s]+\))/g;
   let lastIndex = 0;
@@ -4081,6 +4132,66 @@ async function generateAiSummary() {
     }
   } finally {
     setAiSummaryLoading(false);
+  }
+}
+
+async function sendAiChatQuestion(questionOverride, presetWindowOverride) {
+  if (!state.userValid) {
+    resetAiChatPanel();
+    return;
+  }
+  if (!summaryDate) {
+    setSummaryDate(new Date());
+  }
+  const question = String(
+    questionOverride || (aiChatInputEl ? aiChatInputEl.value : ""),
+  ).trim();
+  if (!question) {
+    if (aiChatMetaEl) {
+      aiChatMetaEl.textContent = "Type a question first.";
+    }
+    return;
+  }
+  const presetWindow = String(presetWindowOverride || "").trim();
+  const dayWindow = getSummaryDayWindow(summaryDate || new Date());
+  const body = presetWindow
+    ? { question, preset_window: presetWindow }
+    : {
+        question,
+        since_utc: dayWindow.sinceIso,
+        until_utc: dayWindow.untilIso,
+      };
+  setAiChatLoading(true);
+  if (aiChatMetaEl) {
+    aiChatMetaEl.textContent = "Asking OpenAI with tracker data...";
+  }
+  if (aiChatOutputEl) {
+    aiChatOutputEl.replaceChildren();
+  }
+  try {
+    const response = await fetch(buildUrl("/api/entries/llm-chat"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(data.error || "chat failed");
+    }
+    if (aiChatOutputEl) {
+      renderMarkdownInto(aiChatOutputEl, data.answer || "");
+    }
+    if (aiChatMetaEl) {
+      const windowLabel = data.window && data.window.label ? data.window.label : "selected window";
+      const provider = data.provider || "openai";
+      aiChatMetaEl.textContent = `${data.event_count || 0} events from ${windowLabel} · ${data.model || provider}`;
+    }
+  } catch (err) {
+    if (aiChatMetaEl) {
+      aiChatMetaEl.textContent = `Failed: ${err.message || "unknown error"}`;
+    }
+  } finally {
+    setAiChatLoading(false);
   }
 }
 
@@ -5175,7 +5286,7 @@ function getSleepGanttOverlayTypeOptions(entries) {
     options.push(normalized);
   };
 
-  ["feed", "cry", "wee", "poo"].forEach(pushType);
+  ["feed", "cry", "sick", "wee", "poo"].forEach(pushType);
   TIMED_EVENT_TYPES.forEach(pushType);
   state.customEventTypes.forEach(pushType);
   (entries || []).forEach((entry) => pushType(entry.type));

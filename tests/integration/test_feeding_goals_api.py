@@ -26,7 +26,7 @@ def test_current_goal_selects_latest_by_create_time(client):
     assert response.status_code == 200
     assert response.get_json() is None
 
-    first = client.post(
+    client.post(
         "/api/feeding-goals",
         json={"goal_ml": 500, "start_date": "2024-01-01"},
     ).get_json()

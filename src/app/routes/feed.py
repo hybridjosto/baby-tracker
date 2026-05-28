@@ -49,6 +49,7 @@ def _extract_user_slug(payload: dict) -> str | None:
 def log_feed_route():
     payload = request.get_json(silent=True) or {}
     amount = request.args.get("amount", type=float)
+    timestamp_utc = payload.get("timestamp_utc")
     if amount is None:
         raw_amount = payload.get("amount")
         try:
@@ -70,6 +71,8 @@ def log_feed_route():
         "user_slug": resolved_slug,
         "formula_ml": amount,
     }
+    if timestamp_utc is not None:
+        payload["timestamp_utc"] = timestamp_utc
     try:
         entry = create_entry(_db_path(), payload)
         dispatch_entry_confirmation_push(
@@ -87,6 +90,7 @@ def _log_simple_event(event_type: str):
     payload = request.get_json(silent=True) or {}
     user_slug = _extract_user_slug(payload)
     notes = payload.get("notes")
+    timestamp_utc = payload.get("timestamp_utc")
 
     try:
         resolved_slug = _resolve_user_slug(user_slug)
@@ -100,6 +104,8 @@ def _log_simple_event(event_type: str):
     }
     if notes is not None:
         entry_payload["notes"] = notes
+    if timestamp_utc is not None:
+        entry_payload["timestamp_utc"] = timestamp_utc
 
     try:
         entry = create_entry(_db_path(), entry_payload)
@@ -166,6 +172,12 @@ def _stop_timed_event(event_type: str):
             event_type,
             user_slug=resolved_slug,
             end_timestamp_utc=end_timestamp_utc,
+        )
+        dispatch_entry_confirmation_push(
+            _db_path(),
+            entry,
+            vapid_config=_vapid_config(),
+            base_path=_base_path(),
         )
         return jsonify(entry)
     except EntryNotFoundError:

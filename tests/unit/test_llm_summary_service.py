@@ -4,6 +4,8 @@ import pytest
 
 from src.app.services.llm_summary import (
     LlmSummaryError,
+    _build_day_stats,
+    _build_feed_trend_from_day_stats,
     _build_prompt,
     _get_prompt_path,
     _load_prompt_template,
@@ -15,6 +17,8 @@ def test_load_prompt_template_uses_default_file():
     template = _load_prompt_template()
 
     assert "Selected day UTC window: $selected_day_since_utc to $selected_day_until_utc." in template
+    assert "Always report sleep durations in hours, not minutes." in template
+    assert "Do not include generic parenting tips" in template
     assert _get_prompt_path().name == "llm_summary_prompt.txt"
 
 
@@ -155,3 +159,66 @@ def test_build_prompt_renders_from_stored_template():
 
     assert "Stored 2024-01-01T00:00:00+00:00 ::" in prompt
     assert '"amount_ml": 90' in prompt
+
+
+def test_build_day_stats_reports_sleep_in_hours_and_many_wakes():
+    stats = _build_day_stats(
+        [
+            {
+                "type": "sleep",
+                "timestamp_utc": "2026-05-13T19:00:00+00:00",
+                "feed_duration_min": 90,
+            },
+            {
+                "type": "sleep",
+                "timestamp_utc": "2026-05-13T22:00:00+00:00",
+                "feed_duration_min": 120,
+            },
+            {
+                "type": "feed",
+                "timestamp_utc": "2026-05-14T00:30:00+00:00",
+                "formula_ml": 90,
+            },
+            {
+                "type": "wee",
+                "timestamp_utc": "2026-05-14T02:00:00+00:00",
+            },
+            {
+                "type": "cry",
+                "timestamp_utc": "2026-05-14T04:00:00+00:00",
+                "feed_duration_min": 5,
+            },
+        ]
+    )
+
+    assert stats["sleep_total_hours"] == 3.5
+    assert stats["sleep_longest_stretch_hours"] == 2.0
+    assert stats["overnight_wake_count"] == 3
+    assert stats["many_overnight_wakes"] is True
+    assert len(stats["sleep_explanation_signals"]) == 3
+
+
+@pytest.mark.parametrize(
+    ("current_ml", "comparison_ml", "expected_direction"),
+    [
+        (660, 500, "increased"),
+        (520, 500, "similar"),
+        (420, 500, "decreased"),
+        (500, None, "unknown"),
+    ],
+)
+def test_build_feed_trend_from_day_stats(
+    current_ml,
+    comparison_ml,
+    expected_direction,
+):
+    comparison_stats = []
+    if comparison_ml is not None:
+        comparison_stats = [{"feed_count": 1, "total_feed_ml": comparison_ml}]
+
+    trend = _build_feed_trend_from_day_stats(
+        {"total_feed_ml": current_ml},
+        comparison_stats,
+    )
+
+    assert trend["direction"] == expected_direction

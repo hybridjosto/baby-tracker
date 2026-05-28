@@ -7,6 +7,8 @@ from src.app.services.entries import (
     delete_entry,
     export_entries_csv,
     get_entry_summary,
+    get_last_nappy_duration,
+    get_next_feed_due_duration,
     get_next_feed_schedule,
     import_entries_csv,
     list_feed_amount_entries,
@@ -17,6 +19,7 @@ from src.app.services.entries import (
 from src.app.services.entry_confirmation import dispatch_entry_confirmation_push
 from src.app.services.webhooks import send_entry_webhook
 from src.app.services.home_kpis import dispatch_home_kpis
+from src.app.services.llm_chat import LlmChatError, answer_llm_question
 from src.app.services.llm_summary import LlmSummaryError, generate_llm_summary
 
 entries_api = Blueprint("entries_api", __name__, url_prefix="/api")
@@ -123,6 +126,18 @@ def generate_entries_llm_summary_route():
         return jsonify({"error": str(exc)}), exc.status_code
 
 
+@entries_api.post("/entries/llm-chat")
+def answer_entries_llm_chat_route():
+    payload = request.get_json(silent=True) or {}
+    try:
+        answer = answer_llm_question(_db_path(), payload)
+        return jsonify(answer)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except LlmChatError as exc:
+        return jsonify({"error": str(exc)}), exc.status_code
+
+
 @entries_api.get("/entries/feed-schedule")
 def get_next_feed_schedule_route():
     user_slug = request.args.get("user_slug")
@@ -130,6 +145,24 @@ def get_next_feed_schedule_route():
     try:
         schedule = get_next_feed_schedule(_db_path(), user_slug=user_slug, count=count)
         return jsonify(schedule)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+
+@entries_api.get("/entries/last-nappy")
+def get_last_nappy_duration_route():
+    user_slug = request.args.get("user_slug")
+    try:
+        return jsonify(get_last_nappy_duration(_db_path(), user_slug=user_slug))
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+
+@entries_api.get("/entries/next-feed-due")
+def get_next_feed_due_duration_route():
+    user_slug = request.args.get("user_slug")
+    try:
+        return jsonify(get_next_feed_due_duration(_db_path(), user_slug=user_slug))
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
 

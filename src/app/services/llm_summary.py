@@ -19,6 +19,8 @@ DEFAULT_PROMPT_PATH = (
     Path(__file__).resolve().parents[1] / "prompts" / "llm_summary_prompt.txt"
 )
 PROMPT_PATH_ENV_VAR = "BABY_TRACKER_LLM_SUMMARY_PROMPT_PATH"
+MANY_OVERNIGHT_WAKES_THRESHOLD = 3
+FEED_TREND_MIN_DELTA_PERCENT = 10.0
 
 
 class LlmSummaryError(Exception):
@@ -140,6 +142,10 @@ def _build_prompt(
 ) -> str:
     comparison_days = _build_comparison_days(all_entries, since_utc, until_utc)
     selected_day_stats = _build_day_stats(selected_entries)
+    selected_day_stats["feed_trend"] = _build_feed_trend_from_day_stats(
+        selected_day_stats,
+        [day["stats"] for day in comparison_days],
+    )
     selected_lines = json.dumps(
         [_summarize_entry(entry) for entry in selected_entries],
         ensure_ascii=False,
@@ -234,6 +240,13 @@ def _build_comparison_days(
 
 
 def _build_day_stats(entries: list[dict]) -> dict:
+    sleep_total_min = 0
+    sleep_longest_min = 0
+    night_sleep_stretch_count = 0
+    night_interrupting_event_count = 0
+    overnight_feed_count = 0
+    overnight_nappy_count = 0
+    overnight_cry_count = 0
     stats = {
         "event_count": len(entries),
         "feed_count": 0,
@@ -247,7 +260,13 @@ def _build_day_stats(entries: list[dict]) -> dict:
         "wee_count": 0,
         "poo_count": 0,
         "sleep_count": 0,
-        "sleep_total_min": 0,
+        "sleep_total_hours": 0.0,
+        "sleep_longest_stretch_hours": 0.0,
+        "overnight_wake_count": 0,
+        "many_overnight_wakes": False,
+        "many_overnight_wakes_threshold": MANY_OVERNIGHT_WAKES_THRESHOLD,
+        "night_interrupting_event_count": 0,
+        "sleep_explanation_signals": [],
         "cry_count": 0,
         "timed_event_count": 0,
     }
@@ -258,11 +277,13 @@ def _build_day_stats(entries: list[dict]) -> dict:
             value = entry.get(key)
             if isinstance(value, (int, float)):
                 total_amount += float(value)
-        duration = entry.get("feed_duration_min")
-        duration_min = int(duration) if isinstance(duration, int) else 0
+        duration_min = _duration_minutes(entry.get("feed_duration_min"))
         if entry_type == "feed":
             stats["feed_count"] += 1
             stats["total_feed_ml"] += total_amount
+            if _is_night_timestamp(_normalize_timestamp(entry["timestamp_utc"], "timestamp_utc")):
+                overnight_feed_count += 1
+                night_interrupting_event_count += 1
             amount_value = entry.get("amount_ml")
             if isinstance(amount_value, (int, float)):
                 stats["amount_total_ml"] += float(amount_value)
@@ -280,14 +301,26 @@ def _build_day_stats(entries: list[dict]) -> dict:
                 stats["expressed_feed_count"] += 1
         elif entry_type == "wee":
             stats["wee_count"] += 1
+            if _is_night_timestamp(_normalize_timestamp(entry["timestamp_utc"], "timestamp_utc")):
+                overnight_nappy_count += 1
+                night_interrupting_event_count += 1
         elif entry_type == "poo":
             stats["poo_count"] += 1
+            if _is_night_timestamp(_normalize_timestamp(entry["timestamp_utc"], "timestamp_utc")):
+                overnight_nappy_count += 1
+                night_interrupting_event_count += 1
         elif entry_type == "sleep":
             stats["sleep_count"] += 1
-            stats["sleep_total_min"] += duration_min
+            sleep_total_min += duration_min
+            sleep_longest_min = max(sleep_longest_min, duration_min)
+            if _entry_sleep_overlaps_night(entry):
+                night_sleep_stretch_count += 1
             stats["timed_event_count"] += 1
         elif entry_type == "cry":
             stats["cry_count"] += 1
+            if _is_night_timestamp(_normalize_timestamp(entry["timestamp_utc"], "timestamp_utc")):
+                overnight_cry_count += 1
+                night_interrupting_event_count += 1
             stats["timed_event_count"] += 1
         elif duration_min > 0:
             stats["timed_event_count"] += 1
@@ -295,7 +328,119 @@ def _build_day_stats(entries: list[dict]) -> dict:
     stats["amount_total_ml"] = round(stats["amount_total_ml"], 1)
     stats["expressed_total_ml"] = round(stats["expressed_total_ml"], 1)
     stats["formula_total_ml"] = round(stats["formula_total_ml"], 1)
+    overnight_wake_count = max(
+        max(0, night_sleep_stretch_count - 1),
+        night_interrupting_event_count,
+    )
+    stats["sleep_total_hours"] = _minutes_to_hours(sleep_total_min)
+    stats["sleep_longest_stretch_hours"] = _minutes_to_hours(sleep_longest_min)
+    stats["overnight_wake_count"] = overnight_wake_count
+    stats["many_overnight_wakes"] = (
+        overnight_wake_count >= MANY_OVERNIGHT_WAKES_THRESHOLD
+    )
+    stats["night_interrupting_event_count"] = night_interrupting_event_count
+    stats["sleep_explanation_signals"] = _build_wake_explanation_signals(
+        overnight_wake_count,
+        overnight_feed_count,
+        overnight_nappy_count,
+        overnight_cry_count,
+        sleep_longest_min,
+    )
     return stats
+
+
+def _build_feed_trend_from_day_stats(selected_stats: dict, comparison_stats: list[dict]) -> dict:
+    trend = {
+        "direction": "unknown",
+        "current_total_ml": selected_stats["total_feed_ml"],
+        "recent_average_total_ml": None,
+        "delta_ml": None,
+        "delta_percent": None,
+        "comparison_window_count": 0,
+    }
+    totals = [
+        float(stats["total_feed_ml"])
+        for stats in comparison_stats
+        if stats.get("feed_count", 0) > 0
+    ]
+    if not totals:
+        return trend
+
+    recent_average = sum(totals) / len(totals)
+    current_total = float(selected_stats["total_feed_ml"])
+    delta_ml = current_total - recent_average
+    delta_percent = (delta_ml / recent_average * 100) if recent_average else None
+    direction = "similar"
+    if delta_percent is not None and delta_percent >= FEED_TREND_MIN_DELTA_PERCENT:
+        direction = "increased"
+    elif delta_percent is not None and delta_percent <= -FEED_TREND_MIN_DELTA_PERCENT:
+        direction = "decreased"
+    trend.update(
+        {
+            "direction": direction,
+            "recent_average_total_ml": round(recent_average, 1),
+            "delta_ml": round(delta_ml, 1),
+            "delta_percent": round(delta_percent, 1) if delta_percent is not None else None,
+            "comparison_window_count": len(totals),
+        }
+    )
+    return trend
+
+
+def _build_wake_explanation_signals(
+    overnight_wake_count: int,
+    overnight_feed_count: int,
+    overnight_nappy_count: int,
+    overnight_cry_count: int,
+    sleep_longest_min: int,
+) -> list[str]:
+    if overnight_wake_count < MANY_OVERNIGHT_WAKES_THRESHOLD:
+        return []
+    signals: list[str] = []
+    if overnight_feed_count:
+        signals.append(
+            f"{overnight_feed_count} overnight feed event(s) could point to hunger or catch-up feeding."
+        )
+    if overnight_nappy_count:
+        signals.append(
+            f"{overnight_nappy_count} overnight nappy event(s) may have contributed to resettling."
+        )
+    if overnight_cry_count:
+        signals.append(
+            f"{overnight_cry_count} overnight crying event(s) suggest the wakes were unsettled."
+        )
+    if sleep_longest_min and sleep_longest_min < 120:
+        signals.append("The longest sleep stretch was under 2 hours, so sleep was quite fragmented.")
+    return signals
+
+
+def _entry_sleep_overlaps_night(entry: dict) -> bool:
+    start_utc = _normalize_timestamp(entry["timestamp_utc"], "timestamp_utc")
+    duration_min = _duration_minutes(entry.get("feed_duration_min"))
+    if duration_min <= 0:
+        return _is_night_timestamp(start_utc)
+    end_utc = start_utc + timedelta(minutes=duration_min)
+    cursor = start_utc
+    while cursor < end_utc:
+        if _is_night_timestamp(cursor):
+            return True
+        cursor += timedelta(minutes=30)
+    return _is_night_timestamp(end_utc)
+
+
+def _duration_minutes(value: object) -> int:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return 0
+    return max(0, int(round(float(value))))
+
+
+def _minutes_to_hours(minutes: int) -> float:
+    return round(minutes / 60, 2)
+
+
+def _is_night_timestamp(timestamp_utc: datetime) -> bool:
+    local_hour = timestamp_utc.astimezone().hour
+    return local_hour < 7 or local_hour >= 19
 
 
 def _collect_sample_notes(entries: list[dict], limit: int = 3) -> list[str]:

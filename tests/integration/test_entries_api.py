@@ -1,4 +1,5 @@
 import csv
+from datetime import datetime, timezone
 import io
 import json
 
@@ -138,6 +139,7 @@ def test_create_user_entry_sends_native_push_confirmation(client, monkeypatch):
     from src.app.services import entry_confirmation as confirmation_module
 
     monkeypatch.setattr(confirmation_module, "send_web_push", fake_send)
+    monkeypatch.setattr(confirmation_module, "_get_server_timezone", lambda: timezone.utc)
 
     subscribe_response = client.post(
         "/api/push/subscription",
@@ -159,7 +161,7 @@ def test_create_user_entry_sends_native_push_confirmation(client, monkeypatch):
     assert captured["subscription"]["endpoint"] == "https://push.example.com/device-1"
     assert captured["payload"] == {
         "title": "Entry saved",
-        "body": "Feed logged for suz",
+        "body": "Today: 0 ml / Yesterday by now: 0 ml",
         "url": "/suz",
         "tag": "entry-confirmation-suz",
     }
@@ -231,6 +233,7 @@ def test_create_entry_route_sends_confirmation_for_payload_user_slug(
     from src.app.services import entry_confirmation as confirmation_module
 
     monkeypatch.setattr(confirmation_module, "send_web_push", fake_send)
+    monkeypatch.setattr(confirmation_module, "_get_server_timezone", lambda: timezone.utc)
 
     subscribe_response = client.post(
         "/api/push/subscription",
@@ -255,6 +258,244 @@ def test_create_entry_route_sends_confirmation_for_payload_user_slug(
     assert response.status_code == 201
     assert captured["subscription"]["endpoint"] == "https://push.example.com/device-2"
     assert captured["payload"]["body"] == "Sleep logged for rob"
+
+
+def test_create_entry_route_sends_comparative_feed_confirmation(client, monkeypatch):
+    captured: dict = {}
+
+    def fake_send(subscription, payload, vapid_config):
+        captured["payload"] = payload
+        return {"sent": True}
+
+    from src.app.services import entry_confirmation as confirmation_module
+
+    monkeypatch.setattr(confirmation_module, "send_web_push", fake_send)
+    monkeypatch.setattr(confirmation_module, "_get_server_timezone", lambda: timezone.utc)
+
+    client.post(
+        "/api/push/subscription",
+        json={
+            "user_slug": "suz",
+            "subscription": {
+                "endpoint": "https://push.example.com/device-feed-entry",
+                "keys": {"p256dh": "p256dh-feed-entry", "auth": "auth-feed-entry"},
+            },
+        },
+    )
+    client.post(
+        "/api/entries",
+        json={
+            "type": "feed",
+            "client_event_id": "evt-feed-yesterday",
+            "user_slug": "suz",
+            "timestamp_utc": "2026-04-26T09:00:00+00:00",
+            "formula_ml": 80,
+        },
+    )
+    client.post(
+        "/api/entries",
+        json={
+            "type": "feed",
+            "client_event_id": "evt-feed-yesterday-other-user",
+            "user_slug": "rob",
+            "timestamp_utc": "2026-04-26T08:30:00+00:00",
+            "formula_ml": 25,
+        },
+    )
+
+    response = client.post(
+        "/api/entries",
+        json={
+            "type": "feed",
+            "client_event_id": "evt-feed-today",
+            "user_slug": "suz",
+            "timestamp_utc": "2026-04-27T09:00:00+00:00",
+            "formula_ml": 120,
+        },
+    )
+
+    assert response.status_code == 201
+    assert captured["payload"]["body"] == "Today: 120 ml / Yesterday by now: 105 ml"
+
+
+def test_create_completed_sleep_entry_sends_comparative_sleep_confirmation(
+    client, monkeypatch
+):
+    captured: dict = {}
+
+    def fake_send(subscription, payload, vapid_config):
+        captured["payload"] = payload
+        return {"sent": True}
+
+    from src.app.services import entry_confirmation as confirmation_module
+
+    monkeypatch.setattr(confirmation_module, "send_web_push", fake_send)
+    monkeypatch.setattr(confirmation_module, "_get_server_timezone", lambda: timezone.utc)
+
+    client.post(
+        "/api/push/subscription",
+        json={
+            "user_slug": "rob",
+            "subscription": {
+                "endpoint": "https://push.example.com/device-sleep-entry",
+                "keys": {"p256dh": "p256dh-sleep-entry", "auth": "auth-sleep-entry"},
+            },
+        },
+    )
+    client.post(
+        "/api/entries",
+        json={
+            "type": "sleep",
+            "client_event_id": "evt-sleep-yesterday",
+            "user_slug": "rob",
+            "timestamp_utc": "2026-04-26T05:30:00+00:00",
+            "feed_duration_min": 20,
+        },
+    )
+    client.post(
+        "/api/entries",
+        json={
+            "type": "sleep",
+            "client_event_id": "evt-sleep-yesterday-other-user",
+            "user_slug": "suz",
+            "timestamp_utc": "2026-04-26T05:45:00+00:00",
+            "feed_duration_min": 15,
+        },
+    )
+
+    response = client.post(
+        "/api/entries",
+        json={
+            "type": "sleep",
+            "client_event_id": "evt-sleep-today",
+            "user_slug": "rob",
+            "timestamp_utc": "2026-04-27T06:00:00+00:00",
+            "feed_duration_min": 50,
+        },
+    )
+
+    assert response.status_code == 201
+    assert captured["payload"]["body"] == "Slept today: 50 min / Yesterday by now: 35 min"
+
+
+def test_generic_create_auto_stops_active_sleep_for_same_user(client):
+    sleep = client.post(
+        "/api/entries",
+        json={
+            "type": "sleep",
+            "client_event_id": "evt-generic-sleep-active",
+            "user_slug": "suz",
+            "timestamp_utc": "2026-04-27T13:00:00+00:00",
+        },
+    ).get_json()
+
+    response = client.post(
+        "/api/entries",
+        json={
+            "type": "feed",
+            "client_event_id": "evt-generic-feed",
+            "user_slug": "suz",
+            "timestamp_utc": "2026-04-27T13:12:00+00:00",
+            "formula_ml": 90,
+        },
+    )
+
+    assert response.status_code == 201
+    sleeps = client.get("/api/entries?type=sleep").get_json()
+    updated = next(item for item in sleeps if item["id"] == sleep["id"])
+    assert updated["feed_duration_min"] == 12
+
+
+def test_generic_create_auto_stop_is_scoped_per_user(client):
+    suz_sleep = client.post(
+        "/api/entries",
+        json={
+            "type": "sleep",
+            "client_event_id": "evt-suz-sleep-active",
+            "user_slug": "suz",
+            "timestamp_utc": "2026-04-27T14:00:00+00:00",
+        },
+    ).get_json()
+    rob_sleep = client.post(
+        "/api/entries",
+        json={
+            "type": "sleep",
+            "client_event_id": "evt-rob-sleep-active",
+            "user_slug": "rob",
+            "timestamp_utc": "2026-04-27T14:05:00+00:00",
+        },
+    ).get_json()
+
+    response = client.post(
+        "/api/entries",
+        json={
+            "type": "poo",
+            "client_event_id": "evt-rob-poo",
+            "user_slug": "rob",
+            "timestamp_utc": "2026-04-27T14:25:00+00:00",
+        },
+    )
+
+    assert response.status_code == 201
+    sleeps = client.get("/api/entries?type=sleep").get_json()
+    suz_updated = next(item for item in sleeps if item["id"] == suz_sleep["id"])
+    rob_updated = next(item for item in sleeps if item["id"] == rob_sleep["id"])
+    assert suz_updated["feed_duration_min"] is None
+    assert rob_updated["feed_duration_min"] == 20
+
+
+def test_auto_stopped_sleep_does_not_send_separate_confirmation_push(client, monkeypatch):
+    calls: list[dict] = []
+
+    def fake_send(subscription, payload, vapid_config):
+        calls.append(payload)
+        return {"sent": True}
+
+    from src.app.services import entry_confirmation as confirmation_module
+
+    monkeypatch.setattr(confirmation_module, "send_web_push", fake_send)
+    monkeypatch.setattr(confirmation_module, "_get_server_timezone", lambda: timezone.utc)
+
+    client.post(
+        "/api/push/subscription",
+        json={
+            "user_slug": "suz",
+            "subscription": {
+                "endpoint": "https://push.example.com/device-single-push",
+                "keys": {"p256dh": "p256dh-single", "auth": "auth-single"},
+            },
+        },
+    )
+    client.post(
+        "/api/entries",
+        json={
+            "type": "sleep",
+            "client_event_id": "evt-auto-stop-sleep",
+            "user_slug": "suz",
+            "timestamp_utc": "2026-04-27T15:00:00+00:00",
+        },
+    )
+    calls.clear()
+
+    response = client.post(
+        "/api/entries",
+        json={
+            "type": "wee",
+            "client_event_id": "evt-auto-stop-trigger",
+            "user_slug": "suz",
+            "timestamp_utc": "2026-04-27T15:08:00+00:00",
+        },
+    )
+
+    assert response.status_code == 201
+    assert calls == [
+        {
+            "title": "Entry saved",
+            "body": "Wee logged for suz",
+            "url": "/suz",
+            "tag": "entry-confirmation-suz",
+        }
+    ]
 
 
 def test_list_entries_returns_all_users(client):
@@ -429,6 +670,128 @@ def test_entries_summary_returns_latest_entries(client):
             "Last feed: 2024-01-02 00:00 · Last wee: 2024-01-03 00:00 · "
             "Last poo: 2024-01-04 00:00 · Next feed: 2024-01-02 03:00"
         ),
+    }
+
+
+def test_last_nappy_duration_returns_latest_wee_or_poo(client, monkeypatch):
+    from src.app.services import entries as entries_module
+
+    monkeypatch.setattr(
+        entries_module,
+        "_now_utc",
+        lambda: datetime(2024, 1, 1, 12, 0, tzinfo=timezone.utc),
+    )
+    client.post(
+        "/api/users/suz/entries",
+        json={
+            "type": "wee",
+            "client_event_id": "evt-last-nappy-wee",
+            "timestamp_utc": "2024-01-01T09:00:00+00:00",
+        },
+    )
+    latest = client.post(
+        "/api/users/suz/entries",
+        json={
+            "type": "poo",
+            "client_event_id": "evt-last-nappy-poo",
+            "timestamp_utc": "2024-01-01T10:00:00+00:00",
+        },
+    ).get_json()
+
+    response = client.get("/api/entries/last-nappy?user_slug=suz")
+
+    assert response.status_code == 200
+    assert response.get_json() == {
+        "type": "poo",
+        "duration": "2 hours ago",
+        "timestamp_utc": latest["timestamp_utc"],
+    }
+
+
+def test_last_nappy_duration_uses_latest_wee_or_poo_across_all_users(
+    client, monkeypatch
+):
+    from src.app.services import entries as entries_module
+
+    monkeypatch.setattr(
+        entries_module,
+        "_now_utc",
+        lambda: datetime(2024, 1, 2, 12, 30, tzinfo=timezone.utc),
+    )
+    client.post(
+        "/api/users/suz/entries",
+        json={
+            "type": "poo",
+            "client_event_id": "evt-last-nappy-all-suz",
+            "timestamp_utc": "2024-01-01T10:00:00+00:00",
+        },
+    )
+    latest = client.post(
+        "/api/users/rob/entries",
+        json={
+            "type": "wee",
+            "client_event_id": "evt-last-nappy-all-rob",
+            "timestamp_utc": "2024-01-01T11:00:00+00:00",
+        },
+    ).get_json()
+
+    response = client.get("/api/entries/last-nappy")
+
+    assert response.status_code == 200
+    assert response.get_json() == {
+        "type": "wee",
+        "duration": "25 hours ago",
+        "timestamp_utc": latest["timestamp_utc"],
+    }
+
+
+def test_last_nappy_duration_returns_null_when_missing(client):
+    response = client.get("/api/entries/last-nappy")
+
+    assert response.status_code == 200
+    assert response.get_json() == {
+        "type": None,
+        "duration": None,
+        "timestamp_utc": None,
+    }
+
+
+def test_next_feed_due_duration_returns_time_until_next_feed(client, monkeypatch):
+    from src.app.services import entries as entries_module
+
+    monkeypatch.setattr(
+        entries_module,
+        "_now_utc",
+        lambda: datetime(2024, 1, 1, 11, 15, tzinfo=timezone.utc),
+    )
+    client.patch("/api/settings", json={"feed_interval_min": 120})
+    feed = client.post(
+        "/api/users/suz/entries",
+        json={
+            "type": "feed",
+            "client_event_id": "evt-next-feed-duration",
+            "timestamp_utc": "2024-01-01T10:00:00+00:00",
+        },
+    ).get_json()
+
+    response = client.get("/api/entries/next-feed-due?user_slug=suz")
+
+    assert response.status_code == 200
+    assert response.get_json() == {
+        "duration": "45 minutes",
+        "timestamp_utc": "2024-01-01T12:00:00+00:00",
+        "source_entry_id": feed["id"],
+    }
+
+
+def test_next_feed_due_duration_returns_null_without_schedule(client):
+    response = client.get("/api/entries/next-feed-due")
+
+    assert response.status_code == 200
+    assert response.get_json() == {
+        "duration": None,
+        "timestamp_utc": None,
+        "source_entry_id": None,
     }
 
 

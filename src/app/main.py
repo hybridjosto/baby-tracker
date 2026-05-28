@@ -1,21 +1,24 @@
+from datetime import datetime, timezone
 import os
 from pathlib import Path
+import sqlite3
+from time import perf_counter
 
-from flask import Flask, render_template, send_from_directory
+from flask import Flask, jsonify, render_template, send_from_directory
 
 from src.app.config import load_config
-from src.app.routes.entries import entries_api
 from src.app.routes.bottles import bottles_api
-from src.app.routes.goals import goals_api
-from src.app.routes.settings import settings_api
 from src.app.routes.calendar import calendar_api
+from src.app.routes.entries import entries_api
 from src.app.routes.feed import feed_api
+from src.app.routes.goals import goals_api
 from src.app.routes.pushcut import pushcut_api
+from src.app.routes.settings import settings_api
 from src.app.routes.home_kpis import home_kpis_api
-from src.app.services.push_subscriptions import build_vapid_config
-from src.app.storage.db import init_db
 from src.app.services.feed_due import start_feed_due_scheduler
 from src.app.services.home_kpis import start_home_kpis_scheduler
+from src.app.services.push_subscriptions import build_vapid_config
+from src.app.storage.db import init_db
 from src.lib.logging import configure_logging
 from src.lib.validation import normalize_user_slug, validate_entry_type
 
@@ -31,6 +34,7 @@ def _should_start_schedulers(enable_schedulers: bool) -> bool:
 def create_app() -> Flask:
     configure_logging()
     config = load_config()
+    started_at = perf_counter()
 
     app_root = Path(__file__).resolve().parents[2]
     template_dir = app_root / "src" / "web" / "templates"
@@ -71,6 +75,45 @@ def create_app() -> Flask:
         return {
             "static_version": config.static_version,
         }
+
+    @app.get(f"{config.base_path}/healthz")
+    def healthz():
+        db_started_at = perf_counter()
+        try:
+            conn = sqlite3.connect(app.config["DB_PATH"])
+            try:
+                conn.execute("SELECT 1").fetchone()
+            finally:
+                conn.close()
+        except sqlite3.Error as exc:
+            db_ms = round((perf_counter() - db_started_at) * 1000, 2)
+            return (
+                jsonify(
+                    {
+                        "ok": False,
+                        "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+                        "uptime_seconds": round(perf_counter() - started_at, 2),
+                        "db": {
+                            "ok": False,
+                            "latency_ms": db_ms,
+                            "error": str(exc),
+                        },
+                    }
+                ),
+                503,
+            )
+
+        return jsonify(
+            {
+                "ok": True,
+                "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+                "uptime_seconds": round(perf_counter() - started_at, 2),
+                "db": {
+                    "ok": True,
+                    "latency_ms": round((perf_counter() - db_started_at) * 1000, 2),
+                },
+            }
+        )
 
     def render_log_page(
         user_slug: str,

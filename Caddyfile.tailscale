@@ -6,8 +6,8 @@
 :8443 {
   bind 100.113.227.1
 
-  @api path /api*
-  handle @api {
+  @probe_or_api path /healthz /api*
+  handle @probe_or_api {
     reverse_proxy 100.113.227.1:8000
   }
 

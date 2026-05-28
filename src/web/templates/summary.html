@@ -753,6 +753,44 @@
             html.dark .ai-summary-output {
                 color: #e6f2ea;
             }
+            .ai-chat-form {
+                display: grid;
+                grid-template-columns: 1fr auto;
+                gap: 8px;
+            }
+            .ai-chat-input {
+                min-width: 0;
+                border: 1px solid var(--border);
+                border-radius: 10px;
+                padding: 10px 12px;
+                background: var(--surface);
+                color: var(--text-primary);
+                font: inherit;
+            }
+            .ai-chat-prompts {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+            .ai-chat-chip {
+                border: 1px solid var(--border);
+                border-radius: 999px;
+                padding: 8px 10px;
+                background: var(--surface-muted);
+                color: var(--text-primary);
+                font-size: 12px;
+                font-weight: 700;
+                cursor: pointer;
+            }
+            .ai-chat-chip:disabled {
+                cursor: wait;
+                opacity: 0.72;
+            }
+            @media (max-width: 560px) {
+                .ai-chat-form {
+                    grid-template-columns: 1fr;
+                }
+            }
             .ruler-wrap {
                 position: relative;
                 margin-top: 16px;
@@ -1309,6 +1347,13 @@
                         <span class="sleep-gantt-legend-item"
                             ><i
                                 class="sleep-gantt-legend-dot"
+                                style="background: #f97316"
+                            ></i
+                            >Sick</span
+                        >
+                        <span class="sleep-gantt-legend-item"
+                            ><i
+                                class="sleep-gantt-legend-dot"
                                 style="background: #7dd3fc"
                             ></i
                             >Wee</span
@@ -1457,6 +1502,71 @@
                             <div>Avg express</div>
                         </div>
                         <div id="insight-timeframe-body"></div>
+                    </div>
+                </section>
+
+                <section class="summary-panel">
+                    <div class="summary-panel-header">
+                        <h2>Ask AI</h2>
+                        <div class="summary-panel-meta">Tracker chat</div>
+                    </div>
+                    <div class="ai-summary-body">
+                        <form class="ai-chat-form" id="ai-chat-form">
+                            <input
+                                class="ai-chat-input"
+                                id="ai-chat-question"
+                                type="text"
+                                autocomplete="off"
+                                placeholder="How did last night's sleep go?"
+                            />
+                            <button
+                                class="ai-summary-btn"
+                                id="ai-chat-submit"
+                                type="submit"
+                            >
+                                Ask
+                            </button>
+                        </form>
+                        <div class="ai-chat-prompts">
+                            <button
+                                class="ai-chat-chip"
+                                type="button"
+                                data-ai-chat-question="How did last night's sleep go?"
+                                data-ai-chat-preset="last_night"
+                            >
+                                Last night's sleep
+                            </button>
+                            <button
+                                class="ai-chat-chip"
+                                type="button"
+                                data-ai-chat-question="What stood out today?"
+                            >
+                                What stood out?
+                            </button>
+                            <button
+                                class="ai-chat-chip"
+                                type="button"
+                                data-ai-chat-question="How was feeding yesterday?"
+                                data-ai-chat-preset="yesterday"
+                            >
+                                Yesterday's feeds
+                            </button>
+                            <button
+                                class="ai-chat-chip"
+                                type="button"
+                                data-ai-chat-question="How does sleep look over the last 7 days?"
+                                data-ai-chat-preset="last_7_days"
+                            >
+                                7-day sleep
+                            </button>
+                        </div>
+                        <div class="ai-summary-meta" id="ai-chat-meta">
+                            Ask about the selected day or use a suggested question.
+                        </div>
+                        <div
+                            class="ai-summary-output"
+                            id="ai-chat-output"
+                        ></div>
                     </div>
                 </section>
 

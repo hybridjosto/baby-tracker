@@ -9,6 +9,7 @@ from src.app.storage.entries import (
     create_entry as repo_create_entry,
     delete_entry as repo_delete_entry,
     get_entry_by_client_event_id as repo_get_entry_by_client_event_id,
+    get_latest_entry_by_types as repo_get_latest_entry_by_types,
     get_latest_active_timed_entry as repo_get_latest_active_timed_entry,
     list_entries as repo_list_entries,
     list_entries_for_export as repo_list_entries_for_export,
@@ -35,7 +36,11 @@ class EntryNotFoundError(Exception):
 
 
 def _now_utc_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return _now_utc().isoformat()
+
+
+def _now_utc() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 def _parse_csv_timestamp(value: str) -> str:
@@ -86,6 +91,37 @@ def _parse_utc_iso(value: str, *, field_name: str = "timestamp_utc") -> datetime
     return parsed.astimezone(timezone.utc)
 
 
+def _stop_active_timed_entry_in_connection(
+    conn,
+    entry_type: str,
+    *,
+    user_slug: str | None,
+    end_timestamp_utc: str,
+) -> dict | None:
+    entry = repo_get_latest_active_timed_entry(
+        conn,
+        entry_type,
+        user_slug=user_slug,
+    )
+    if not entry:
+        return None
+
+    end_dt = _parse_utc_iso(end_timestamp_utc, field_name="end_timestamp_utc")
+    start_dt = _parse_utc_iso(entry["timestamp_utc"])
+    duration_min = max(
+        0,
+        math.floor(((end_dt - start_dt).total_seconds() / 60) + 0.5),
+    )
+    return repo_update_entry(
+        conn,
+        entry["id"],
+        {
+            "feed_duration_min": duration_min,
+            "updated_at_utc": _now_utc_iso(),
+        },
+    )
+
+
 def create_entry(db_path: str, payload: dict) -> dict:
     validated = validate_entry_payload(payload, require_client_event=True)
     validated["user_slug"] = normalize_user_slug(payload.get("user_slug"))
@@ -97,6 +133,15 @@ def create_entry(db_path: str, payload: dict) -> dict:
     validated["updated_at_utc"] = validated["created_at_utc"]
 
     with get_connection(db_path) as conn:
+        existing = repo_get_entry_by_client_event_id(conn, validated["client_event_id"])
+        if existing:
+            raise DuplicateEntryError(existing)
+        _stop_active_timed_entry_in_connection(
+            conn,
+            "sleep",
+            user_slug=validated["user_slug"],
+            end_timestamp_utc=validated["timestamp_utc"],
+        )
         entry, duplicate = repo_create_entry(conn, validated)
     if duplicate:
         raise DuplicateEntryError(entry)
@@ -115,33 +160,17 @@ def stop_active_timed_event(
         _normalize_timestamp_utc(end_timestamp_utc, field_name="end_timestamp_utc")
         or _now_utc_iso()
     )
-    end_dt = _parse_utc_iso(end_timestamp, field_name="end_timestamp_utc")
 
     with get_connection(db_path) as conn:
-        entry = repo_get_latest_active_timed_entry(
+        entry = _stop_active_timed_entry_in_connection(
             conn,
             entry_type,
             user_slug=normalized_slug,
+            end_timestamp_utc=end_timestamp,
         )
         if not entry:
             raise EntryNotFoundError()
-
-        start_dt = _parse_utc_iso(entry["timestamp_utc"])
-        duration_min = max(
-            0,
-            math.floor(((end_dt - start_dt).total_seconds() / 60) + 0.5),
-        )
-        updated = repo_update_entry(
-            conn,
-            entry["id"],
-            {
-                "feed_duration_min": duration_min,
-                "updated_at_utc": _now_utc_iso(),
-            },
-        )
-    if not updated:
-        raise EntryNotFoundError()
-    return updated
+    return entry
 
 
 def _normalize_filter_ts(value: str | None) -> str | None:
@@ -219,6 +248,89 @@ def get_next_feed_time(db_path: str, user_slug: str | None = None) -> dict:
         parsed = parsed.replace(tzinfo=timezone.utc)
     next_dt = parsed.astimezone(timezone.utc) + timedelta(minutes=feed_interval_min)
     return {"timestamp_utc": next_dt.isoformat(), "source_entry_id": latest_feed["id"]}
+
+
+def get_last_nappy_duration(
+    db_path: str, user_slug: str | None = None, now_utc: datetime | None = None
+) -> dict:
+    normalized_slug = normalize_user_slug(user_slug) if user_slug else None
+    with get_connection(db_path) as conn:
+        latest = repo_get_latest_entry_by_types(
+            conn,
+            ["wee", "poo"],
+            user_slug=normalized_slug,
+        )
+    if not latest:
+        return {"type": None, "duration": None, "timestamp_utc": None}
+
+    timestamp = _parse_utc_iso(latest["timestamp_utc"])
+    now = (now_utc or _now_utc()).astimezone(timezone.utc)
+    return {
+        "type": latest["type"],
+        "duration": _format_past_duration(timestamp, now),
+        "timestamp_utc": latest["timestamp_utc"],
+    }
+
+
+def get_next_feed_due_duration(
+    db_path: str, user_slug: str | None = None, now_utc: datetime | None = None
+) -> dict:
+    next_feed = get_next_feed_time(db_path, user_slug=user_slug)
+    timestamp_utc = next_feed.get("timestamp_utc")
+    if not timestamp_utc:
+        return {"duration": None, "timestamp_utc": None, "source_entry_id": None}
+
+    timestamp = _parse_utc_iso(timestamp_utc)
+    now = (now_utc or _now_utc()).astimezone(timezone.utc)
+    return {
+        "duration": _format_due_duration(timestamp, now),
+        "timestamp_utc": timestamp_utc,
+        "source_entry_id": next_feed.get("source_entry_id"),
+    }
+
+
+def _format_past_duration(timestamp: datetime, now: datetime) -> str:
+    if timestamp >= now:
+        return "just now"
+    return f"{_format_duration_words(now - timestamp)} ago"
+
+
+def _format_due_duration(timestamp: datetime, now: datetime) -> str:
+    delta = timestamp - now
+    if abs(delta.total_seconds()) < 60:
+        return "now"
+    duration = _format_duration_words(abs(delta))
+    if delta.total_seconds() < 0:
+        return f"{duration} ago"
+    return duration
+
+
+def _format_duration_words(delta: timedelta) -> str:
+    total_minutes = max(1, round(delta.total_seconds() / 60))
+    if total_minutes < 48 * 60:
+        hours, minutes = divmod(total_minutes, 60)
+        parts: list[str] = []
+        if hours:
+            parts.append(_plural(hours, "hour"))
+        if minutes and not hours:
+            parts.append(_plural(minutes, "minute"))
+        return " ".join(parts) if parts else "1 minute"
+
+    days, day_remainder = divmod(total_minutes, 24 * 60)
+    hours, minutes = divmod(day_remainder, 60)
+    parts: list[str] = []
+    if days:
+        parts.append(_plural(days, "day"))
+    if hours:
+        parts.append(_plural(hours, "hour"))
+    if minutes and not days:
+        parts.append(_plural(minutes, "minute"))
+    return " ".join(parts) if parts else "1 minute"
+
+
+def _plural(value: int, unit: str) -> str:
+    suffix = "" if value == 1 else "s"
+    return f"{value} {unit}{suffix}"
 
 
 def get_next_feed_schedule(
