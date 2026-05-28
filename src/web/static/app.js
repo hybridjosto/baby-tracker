@@ -153,6 +153,8 @@ const summaryTotalIntakeAvgEl = document.getElementById("summary-total-intake-av
 const summarySleepDurationEl = document.getElementById("summary-sleep-duration");
 const summarySleepDurationAvgEl = document.getElementById("summary-sleep-duration-avg");
 const summarySleepDayNightEl = document.getElementById("summary-sleep-day-night");
+const summaryCurrentWeightEl = document.getElementById("summary-current-weight");
+const summaryWeightPercentileEl = document.getElementById("summary-weight-percentile");
 const homeSleepDurationEl = document.getElementById("home-sleep-duration");
 const homeSleepDurationAvgEl = document.getElementById("home-sleep-duration-avg");
 const homeSleepDayNightEl = document.getElementById("home-sleep-day-night");
@@ -189,6 +191,11 @@ const insightTimeframeBodyEl = document.getElementById("insight-timeframe-body")
 const sleepTrendChartEl = document.getElementById("sleep-trend-chart");
 const sleepTrendLabelsEl = document.getElementById("sleep-trend-labels");
 const sleepTrendAverageChipEl = document.getElementById("sleep-trend-average-chip");
+const weightPercentileChartEl = document.getElementById("weight-percentile-chart");
+const weightPercentileLabelsEl = document.getElementById("weight-percentile-labels");
+const weightPercentileLatestEl = document.getElementById("weight-percentile-latest");
+const weightPercentileRangeEl = document.getElementById("weight-percentile-range");
+const weightPercentileEmptyEl = document.getElementById("weight-percentile-empty");
 const homeSleepTrendChartEl = document.getElementById("home-sleep-trend-chart");
 const homeSleepTrendLabelsEl = document.getElementById("home-sleep-trend-labels");
 const homeSleepTrendAverageChipEl = document.getElementById("home-sleep-trend-average-chip");
@@ -377,6 +384,40 @@ let pushReminderState = {
   supported: false,
   configured: false,
 };
+const WHO_BOY_WEIGHT_LMS_BY_MONTH = [
+  { month: 0, l: 0.3487, m: 3.3464, s: 0.14602 },
+  { month: 1, l: 0.2297, m: 4.4709, s: 0.13395 },
+  { month: 2, l: 0.1970, m: 5.5675, s: 0.12385 },
+  { month: 3, l: 0.1738, m: 6.3762, s: 0.11727 },
+  { month: 4, l: 0.1553, m: 7.0023, s: 0.11316 },
+  { month: 5, l: 0.1395, m: 7.5105, s: 0.11080 },
+  { month: 6, l: 0.1257, m: 7.9340, s: 0.10958 },
+  { month: 7, l: 0.1134, m: 8.2970, s: 0.10902 },
+  { month: 8, l: 0.1021, m: 8.6151, s: 0.10882 },
+  { month: 9, l: 0.0917, m: 8.9014, s: 0.10881 },
+  { month: 10, l: 0.0820, m: 9.1649, s: 0.10891 },
+  { month: 11, l: 0.0730, m: 9.4122, s: 0.10906 },
+  { month: 12, l: 0.0644, m: 9.6479, s: 0.10925 },
+  { month: 13, l: 0.0563, m: 9.8749, s: 0.10949 },
+  { month: 14, l: 0.0487, m: 10.0953, s: 0.10976 },
+  { month: 15, l: 0.0413, m: 10.3108, s: 0.11007 },
+  { month: 16, l: 0.0343, m: 10.5228, s: 0.11041 },
+  { month: 17, l: 0.0275, m: 10.7319, s: 0.11079 },
+  { month: 18, l: 0.0211, m: 10.9385, s: 0.11119 },
+  { month: 19, l: 0.0148, m: 11.1430, s: 0.11164 },
+  { month: 20, l: 0.0087, m: 11.3462, s: 0.11211 },
+  { month: 21, l: 0.0029, m: 11.5486, s: 0.11261 },
+  { month: 22, l: -0.0028, m: 11.7504, s: 0.11314 },
+  { month: 23, l: -0.0083, m: 11.9514, s: 0.11369 },
+  { month: 24, l: -0.0137, m: 12.1515, s: 0.11426 },
+];
+const WHO_WEIGHT_PERCENTILE_LINES = [
+  { label: "3rd", z: -1.8808 },
+  { label: "15th", z: -1.0364 },
+  { label: "50th", z: 0 },
+  { label: "85th", z: 1.0364 },
+  { label: "97th", z: 1.8808 },
+];
 
 
 function getPreferredTheme() {
@@ -1298,6 +1339,7 @@ let refreshTimer = null;
 let summaryDate = null;
 let summaryEntries = [];
 let summaryGanttEntries = [];
+let summaryWeightEntries = [];
 let summaryInsightsEntries = [];
 let summaryInsightsAnchor = null;
 let summaryInsightsLoading = null;
@@ -2217,6 +2259,9 @@ function applyUserState() {
   if (pageType === "summary") {
     initSummaryHandlers();
     loadSummaryEntries();
+  }
+  if (pageType === "weight") {
+    void loadWeightPercentileEntries();
   }
   if (pageType === "timeline") {
     initTimelineHandlers();
@@ -4756,6 +4801,323 @@ function renderSleepTrendChart(entries) {
     averageChipEl: sleepTrendAverageChipEl,
     baseDate: summaryDate || new Date(),
   });
+}
+
+function interpolateBoyWeightLms(ageMonths) {
+  if (!Number.isFinite(ageMonths) || ageMonths < 0) {
+    return null;
+  }
+  const last = WHO_BOY_WEIGHT_LMS_BY_MONTH[WHO_BOY_WEIGHT_LMS_BY_MONTH.length - 1];
+  if (ageMonths > last.month) {
+    return null;
+  }
+  const lowerIndex = Math.floor(ageMonths);
+  const upperIndex = Math.min(lowerIndex + 1, last.month);
+  const lower = WHO_BOY_WEIGHT_LMS_BY_MONTH[lowerIndex];
+  const upper = WHO_BOY_WEIGHT_LMS_BY_MONTH[upperIndex];
+  if (!lower || !upper) {
+    return null;
+  }
+  const ratio = upper.month === lower.month ? 0 : (ageMonths - lower.month);
+  return {
+    l: lower.l + ((upper.l - lower.l) * ratio),
+    m: lower.m + ((upper.m - lower.m) * ratio),
+    s: lower.s + ((upper.s - lower.s) * ratio),
+  };
+}
+
+function weightForBoyZ(ageMonths, zScore) {
+  const lms = interpolateBoyWeightLms(ageMonths);
+  if (!lms) {
+    return null;
+  }
+  if (Math.abs(lms.l) < 0.000001) {
+    return lms.m * Math.exp(lms.s * zScore);
+  }
+  const base = 1 + (lms.l * lms.s * zScore);
+  if (base <= 0) {
+    return null;
+  }
+  return lms.m * (base ** (1 / lms.l));
+}
+
+function erfApprox(value) {
+  const sign = value < 0 ? -1 : 1;
+  const x = Math.abs(value);
+  const a1 = 0.254829592;
+  const a2 = -0.284496736;
+  const a3 = 1.421413741;
+  const a4 = -1.453152027;
+  const a5 = 1.061405429;
+  const p = 0.3275911;
+  const t = 1 / (1 + (p * x));
+  const y = 1 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t
+    * Math.exp(-x * x);
+  return sign * y;
+}
+
+function normalCdf(value) {
+  return 0.5 * (1 + erfApprox(value / Math.SQRT2));
+}
+
+function formatOrdinal(value) {
+  const rounded = Math.round(value);
+  const mod100 = rounded % 100;
+  if (mod100 >= 11 && mod100 <= 13) {
+    return `${rounded}th`;
+  }
+  const mod10 = rounded % 10;
+  if (mod10 === 1) {
+    return `${rounded}st`;
+  }
+  if (mod10 === 2) {
+    return `${rounded}nd`;
+  }
+  if (mod10 === 3) {
+    return `${rounded}rd`;
+  }
+  return `${rounded}th`;
+}
+
+function boyWeightPercentile(ageMonths, weightKg) {
+  const lms = interpolateBoyWeightLms(ageMonths);
+  if (!lms || !Number.isFinite(weightKg) || weightKg <= 0) {
+    return null;
+  }
+  const zScore = Math.abs(lms.l) < 0.000001
+    ? Math.log(weightKg / lms.m) / lms.s
+    : (((weightKg / lms.m) ** lms.l) - 1) / (lms.l * lms.s);
+  return normalCdf(zScore) * 100;
+}
+
+function getWeightLogPoints(entries) {
+  const dob = parseDob(state.babyDob || "");
+  if (!dob) {
+    return [];
+  }
+  return entries
+    .filter((entry) => (
+      entry
+      && entry.type === "weight"
+    ))
+    .map((entry) => {
+      const loggedAt = new Date(entry.timestamp_utc);
+      const weightKg = Number.parseFloat(entry.weight_kg);
+      if (Number.isNaN(loggedAt.getTime()) || !Number.isFinite(weightKg) || weightKg <= 0) {
+        return null;
+      }
+      const ageDays = (loggedAt.getTime() - dob.getTime()) / (24 * 60 * 60 * 1000);
+      const ageWeeks = ageDays / 7;
+      const ageMonths = ageDays / 30.4375;
+      const percentile = boyWeightPercentile(ageMonths, weightKg);
+      if (ageWeeks < 0 || percentile === null) {
+        return null;
+      }
+      return {
+        timestamp: loggedAt,
+        ageWeeks,
+        ageMonths,
+        weightKg,
+        percentile,
+      };
+    })
+    .filter(Boolean)
+    .sort((left, right) => left.ageWeeks - right.ageWeeks);
+}
+
+function renderWeightPercentileChart(entries = summaryWeightEntries) {
+  if (
+    !weightPercentileChartEl
+    || !weightPercentileLabelsEl
+    || !weightPercentileLatestEl
+    || !weightPercentileRangeEl
+    || !weightPercentileEmptyEl
+  ) {
+    return;
+  }
+  weightPercentileChartEl.innerHTML = "";
+  weightPercentileLabelsEl.innerHTML = "";
+  weightPercentileLatestEl.textContent = "--";
+  weightPercentileRangeEl.textContent = "Logged weights by age";
+
+  const points = getWeightLogPoints(entries);
+  const hasDob = Boolean(parseDob(state.babyDob || ""));
+  const hasAnyWeight = entries.some((entry) => entry && entry.type === "weight");
+  const shouldShowEmpty = !hasDob || !hasAnyWeight || points.length === 0;
+  weightPercentileEmptyEl.style.display = shouldShowEmpty ? "block" : "none";
+  weightPercentileChartEl.style.display = shouldShowEmpty ? "none" : "block";
+  weightPercentileLabelsEl.style.display = shouldShowEmpty ? "none" : "flex";
+  if (shouldShowEmpty) {
+    weightPercentileRangeEl.textContent = !hasDob
+      ? "Add date of birth in Settings"
+      : "No usable weight logs yet";
+    return;
+  }
+
+  const svgNS = "http://www.w3.org/2000/svg";
+  const width = 320;
+  const height = 128;
+  const paddingLeft = 28;
+  const paddingRight = 34;
+  const paddingTop = 10;
+  const paddingBottom = 18;
+  const plotWidth = width - paddingLeft - paddingRight;
+  const plotHeight = height - paddingTop - paddingBottom;
+  const maxLoggedWeeks = Math.max(...points.map((point) => point.ageWeeks), 1);
+  const xMaxWeeks = Math.min(104, Math.max(26, Math.ceil(maxLoggedWeeks / 4) * 4));
+  const xMaxMonths = xMaxWeeks * 7 / 30.4375;
+  const curveSamples = [];
+  const sampleCount = Math.max(8, Math.ceil(xMaxWeeks / 2));
+  for (let index = 0; index <= sampleCount; index++) {
+    const ageWeeks = (index / sampleCount) * xMaxWeeks;
+    const ageMonths = (ageWeeks * 7) / 30.4375;
+    if (ageMonths <= WHO_BOY_WEIGHT_LMS_BY_MONTH[WHO_BOY_WEIGHT_LMS_BY_MONTH.length - 1].month) {
+      curveSamples.push({ ageWeeks, ageMonths });
+    }
+  }
+  const curveWeights = curveSamples.flatMap((sample) => (
+    WHO_WEIGHT_PERCENTILE_LINES
+      .map((line) => weightForBoyZ(sample.ageMonths, line.z))
+      .filter((weight) => weight !== null)
+  ));
+  const allWeights = points.map((point) => point.weightKg).concat(curveWeights);
+  const yMinKg = Math.max(0, Math.floor((Math.min(...allWeights) - 0.5) * 2) / 2);
+  const yMaxKg = Math.ceil((Math.max(...allWeights, 1) + 0.5) * 2) / 2;
+  const kgSpan = Math.max(1, yMaxKg - yMinKg);
+  const xForWeeks = (ageWeeks) => paddingLeft + (ageWeeks / xMaxWeeks) * plotWidth;
+  const yForKg = (weightKg) => paddingTop + ((yMaxKg - weightKg) / kgSpan) * plotHeight;
+
+  [yMinKg, yMaxKg].forEach((weightKg) => {
+    const y = yForKg(weightKg);
+    const gridLine = document.createElementNS(svgNS, "line");
+    gridLine.setAttribute("x1", paddingLeft);
+    gridLine.setAttribute("x2", width - paddingRight);
+    gridLine.setAttribute("y1", y.toFixed(1));
+    gridLine.setAttribute("y2", y.toFixed(1));
+    gridLine.setAttribute("class", "weight-percentile-grid");
+    weightPercentileChartEl.appendChild(gridLine);
+
+    const label = document.createElementNS(svgNS, "text");
+    label.setAttribute("x", "2");
+    label.setAttribute("y", (y + 3).toFixed(1));
+    label.setAttribute("class", "weight-percentile-label");
+    label.textContent = `${weightKg.toFixed(1)}kg`;
+    weightPercentileChartEl.appendChild(label);
+  });
+
+  WHO_WEIGHT_PERCENTILE_LINES.forEach((line) => {
+    const pathPoints = curveSamples
+      .map((sample) => {
+        const weightKg = weightForBoyZ(sample.ageMonths, line.z);
+        if (weightKg === null) {
+          return null;
+        }
+        return {
+          x: xForWeeks(sample.ageWeeks),
+          y: yForKg(weightKg),
+        };
+      })
+      .filter(Boolean);
+    if (pathPoints.length < 2) {
+      return;
+    }
+    const path = document.createElementNS(svgNS, "path");
+    const d = pathPoints
+      .map((point, index) => `${index === 0 ? "M" : "L"}${point.x.toFixed(1)} ${point.y.toFixed(1)}`)
+      .join(" ");
+    path.setAttribute("d", d);
+    path.setAttribute("class", line.label === "50th"
+      ? "weight-percentile-line is-median"
+      : "weight-percentile-line");
+    weightPercentileChartEl.appendChild(path);
+
+    const lastPoint = pathPoints[pathPoints.length - 1];
+    const label = document.createElementNS(svgNS, "text");
+    label.setAttribute("x", (lastPoint.x + 4).toFixed(1));
+    label.setAttribute("y", (lastPoint.y + 3).toFixed(1));
+    label.setAttribute("class", "weight-percentile-label");
+    label.textContent = line.label;
+    weightPercentileChartEl.appendChild(label);
+  });
+
+  if (points.length > 1) {
+    const path = document.createElementNS(svgNS, "path");
+    const d = points
+      .map((point, index) => `${index === 0 ? "M" : "L"}${xForWeeks(point.ageWeeks).toFixed(1)} ${yForKg(point.weightKg).toFixed(1)}`)
+      .join(" ");
+    path.setAttribute("d", d);
+    path.setAttribute("class", "weight-percentile-log-line");
+    weightPercentileChartEl.appendChild(path);
+  }
+
+  points.forEach((point) => {
+    const dot = document.createElementNS(svgNS, "circle");
+    dot.setAttribute("cx", xForWeeks(point.ageWeeks).toFixed(1));
+    dot.setAttribute("cy", yForKg(point.weightKg).toFixed(1));
+    dot.setAttribute("r", "3.6");
+    dot.setAttribute("class", "weight-percentile-dot");
+    weightPercentileChartEl.appendChild(dot);
+  });
+
+  const latest = points[points.length - 1];
+  weightPercentileLatestEl.textContent = `${latest.weightKg.toFixed(2)} kg at ${Math.round(latest.ageWeeks)}w, ${formatOrdinal(latest.percentile)}`;
+  weightPercentileRangeEl.textContent = `${points.length} weight ${points.length === 1 ? "log" : "logs"} · WHO boys 0-${Math.round(xMaxMonths)} months`;
+  ["Birth", `${Math.round(xMaxWeeks / 2)}w`, `${Math.round(xMaxWeeks)}w`].forEach((label) => {
+    const labelEl = document.createElement("span");
+    labelEl.textContent = label;
+    weightPercentileLabelsEl.appendChild(labelEl);
+  });
+}
+
+function renderSummaryWeightCard(entries = summaryWeightEntries) {
+  if (!summaryCurrentWeightEl || !summaryWeightPercentileEl) {
+    return;
+  }
+  const points = getWeightLogPoints(entries);
+  const hasDob = Boolean(parseDob(state.babyDob || ""));
+  const hasAnyWeight = entries.some((entry) => entry && entry.type === "weight");
+  if (!hasAnyWeight) {
+    summaryCurrentWeightEl.textContent = "--";
+    summaryWeightPercentileEl.textContent = "No weight logged";
+    return;
+  }
+  if (!hasDob) {
+    const latestEntry = entries
+      .filter((entry) => entry && entry.type === "weight")
+      .sort((left, right) => Date.parse(right.timestamp_utc || "") - Date.parse(left.timestamp_utc || ""))[0];
+    const weightKg = latestEntry ? Number.parseFloat(latestEntry.weight_kg) : Number.NaN;
+    summaryCurrentWeightEl.textContent = Number.isFinite(weightKg)
+      ? `${weightKg.toFixed(2)} kg`
+      : "--";
+    summaryWeightPercentileEl.textContent = "Set DOB for percentile";
+    return;
+  }
+  if (!points.length) {
+    summaryCurrentWeightEl.textContent = "--";
+    summaryWeightPercentileEl.textContent = "No usable weight logs";
+    return;
+  }
+  const latest = points[points.length - 1];
+  summaryCurrentWeightEl.textContent = `${latest.weightKg.toFixed(2)} kg`;
+  summaryWeightPercentileEl.textContent = `${formatOrdinal(latest.percentile)} · ${Math.round(latest.ageWeeks)} weeks`;
+}
+
+function renderWeightPercentileSurfaces(entries = summaryWeightEntries) {
+  renderWeightPercentileChart(entries);
+  renderSummaryWeightCard(entries);
+}
+
+async function loadWeightPercentileEntries() {
+  try {
+    const entries = await loadEntriesWithFallback({
+      limit: 500,
+      type: "weight",
+    });
+    summaryWeightEntries = entries;
+    renderWeightPercentileSurfaces(entries);
+  } catch (err) {
+    renderWeightPercentileSurfaces(summaryWeightEntries);
+  }
 }
 
 function renderHomeSleepTrendChart(entries) {
@@ -8500,19 +8862,25 @@ async function loadSummaryEntries() {
       since: trendWindow.sinceIso,
       until: trendWindow.untilIso,
     });
+    const cachedWeightEntries = await listEntriesLocalSafe({
+      limit: 500,
+      type: "weight",
+    });
     if (cachedEntries) {
       summaryEntries = cachedEntries;
       summaryGanttEntries = cachedGanttEntries || cachedEntries;
+      summaryWeightEntries = cachedWeightEntries || summaryWeightEntries;
       renderSummaryStats(cachedEntries);
       renderSleepGanttTypeOptions(cachedEntries);
       renderSleepGantt(summaryGanttEntries.length ? summaryGanttEntries : cachedEntries);
       renderMilkExpressSummary(cachedEntries);
       renderSleepTrendChart(cachedTrendEntries || cachedEntries);
+      renderWeightPercentileSurfaces(summaryWeightEntries);
     }
 
     void syncNow();
 
-    const [entries, ganttEntries, trendEntries] = await Promise.all([
+    const [entries, ganttEntries, trendEntries, weightEntries] = await Promise.all([
       loadEntriesWithFallback({
         limit: 200,
         since: dayWindow.sinceIso,
@@ -8528,15 +8896,21 @@ async function loadSummaryEntries() {
         since: trendWindow.sinceIso,
         until: trendWindow.untilIso,
       }),
+      loadEntriesWithFallback({
+        limit: 500,
+        type: "weight",
+      }),
       ensureMilkExpressAllEntries(),
     ]);
     summaryEntries = entries;
     summaryGanttEntries = ganttEntries;
+    summaryWeightEntries = weightEntries;
     renderSummaryStats(entries);
     renderSleepGanttTypeOptions(entries);
     renderSleepGantt(ganttEntries.length ? ganttEntries : entries);
     renderMilkExpressSummary(entries);
     renderSleepTrendChart(trendEntries);
+    renderWeightPercentileSurfaces(weightEntries);
     await loadSummaryInsights();
   } catch (err) {
     setStatus(`Failed to load entries: ${err.message || "unknown error"}`);
@@ -8854,6 +9228,9 @@ async function loadBabySettings() {
     applyCustomEventTypes();
     updateAgeDisplay();
     updateNextFeed();
+    if (pageType === "summary" || pageType === "weight") {
+      renderWeightPercentileSurfaces(summaryWeightEntries);
+    }
     if (pageType === "settings") {
       void refreshPushReminderState();
     }
@@ -8914,6 +9291,9 @@ async function saveBabySettings(patch) {
     applyCustomEventTypes();
     updateAgeDisplay();
     updateNextFeed();
+    if (pageType === "summary" || pageType === "weight") {
+      renderWeightPercentileSurfaces(summaryWeightEntries);
+    }
     if (pageType === "settings") {
       void refreshPushReminderState();
     }
@@ -8985,5 +9365,10 @@ if ("serviceWorker" in navigator) {
 window.addEventListener("online", () => {
   setStatus("Back online");
   void syncNow();
+});
+window.addEventListener("baby-tracker:weights-updated", () => {
+  if (pageType === "weight" || pageType === "summary") {
+    void loadWeightPercentileEntries();
+  }
 });
 scheduleSync();
