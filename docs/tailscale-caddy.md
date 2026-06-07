@@ -1,47 +1,47 @@
-# Local-only API via Caddy + Tailscale
+# Baby Tracker via Tailscale
 
-This setup keeps the Flask app bound to localhost while Caddy serves only the `/api`
-endpoints and the `/healthz` reliability probe over your tailnet.
+The preferred live setup is Tailscale Serve:
+
+```text
+https://homelab.tail458584.ts.net/baby -> http://127.0.0.1:8000/baby
+```
+
+Baby Tracker should own port `8000`. Other local apps, including the Reel
+Transcriber, should use a different host port.
 
 ## Prereqs
 - Tailscale installed on the host running the app and Caddy
 - Caddy installed on the same host
 
-## 1) Run the app
-
-If your app is already bound to `100.113.227.1:8000`, you can keep it as-is.
-Otherwise, you can bind to loopback so only Caddy can reach it.
+## 1) Run the app on `/baby`
 
 ```sh
-BABY_TRACKER_HOST=127.0.0.1 BABY_TRACKER_PORT=8000 uv run python -m src.app.main
+BABY_TRACKER_BASE_PATH=/baby BABY_TRACKER_HOST=127.0.0.1 BABY_TRACKER_PORT=8000 uv run python -m src.app.main
 ```
 
-## 2) Run Caddy on the Tailscale interface
-
-Use the provided `Caddyfile.tailscale` (already set to `100.113.227.1`).
+## 2) Publish with Tailscale Serve
 
 ```sh
-caddy run --config Caddyfile.tailscale
+tailscale serve --bg --set-path /baby http://127.0.0.1:8000/baby
+tailscale serve status
 ```
 
-The API and health probe will be reachable from your tailnet at:
+The app and health probe should then be reachable at:
 
 ```text
-http://100.113.227.1:8443/api/entries
-http://100.113.227.1:8443/healthz
+https://homelab.tail458584.ts.net/baby
+https://homelab.tail458584.ts.net/baby/healthz
 ```
 
-## 3) Optional: expose the full UI
+## 3) Optional Caddy fallback
 
-If you want the UI too, change the Caddyfile to proxy all paths:
-
-```text
-:8443 {
-  bind {$TAILSCALE_IP}
-  reverse_proxy 127.0.0.1:8000
-}
-```
+If Caddy is used instead of Tailscale Serve, use the provided
+`Caddyfile.tailscale` as a fallback. It proxies `/baby*` to the local app and
+returns 404 for anything else.
 
 ## Notes
-- This config intentionally returns 404 for paths other than `/api*` and `/healthz`.
-- If you already use a different port, update `reverse_proxy` and the app's port.
+- If `https://homelab.tail458584.ts.net/baby` returns `{"detail":"Not Found"}`,
+  something else is likely bound to `127.0.0.1:8000`.
+- If direct `http://<tailscale-ip>:8000/` returns 404, retry
+  `http://<tailscale-ip>:8000/baby/`; this deployment is intentionally mounted
+  under `/baby`.

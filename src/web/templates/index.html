@@ -502,6 +502,16 @@
       .sleep-trend-dot {
         fill: #7c83ff;
       }
+      .feed-volume-bar {
+        fill: var(--primary);
+        rx: 4;
+      }
+      .feed-volume-value {
+        fill: var(--text-secondary);
+        font-size: 9px;
+        font-weight: 700;
+        text-anchor: middle;
+      }
       .sleep-trend-grid {
         stroke: var(--border-light);
         stroke-width: 1;
@@ -1667,6 +1677,22 @@
             </div>
             <svg id="home-sleep-trend-chart" viewBox="0 0 320 80" role="img" aria-label="Daily sleep trend for today plus the last 7 complete days"></svg>
             <div class="sleep-trend-labels" id="home-sleep-trend-labels"></div>
+          </div>
+        </section>
+
+        <section class="home-sleep-trend-card">
+          <div class="home-sleep-trend-header">
+            <div>
+              <h3>Feed volume</h3>
+              <div class="home-sleep-trend-meta-copy">Last 7 days · all caregivers</div>
+            </div>
+          </div>
+          <div class="sleep-trend-chart-wrap">
+            <div class="sleep-trend-meta">
+              <div class="sleep-trend-average-chip" id="home-feed-volume-average-chip"></div>
+            </div>
+            <svg id="home-feed-volume-chart" viewBox="0 0 320 80" role="img" aria-label="Daily feed volume for the last 7 days across all caregivers"></svg>
+            <div class="sleep-trend-labels" id="home-feed-volume-labels"></div>
           </div>
         </section>
         <div class="edit-modal-backdrop" id="edit-entry-backdrop" hidden></div>

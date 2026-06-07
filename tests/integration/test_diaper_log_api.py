@@ -24,3 +24,17 @@ def test_poo_log_accepts_notes_payload(client):
     assert response.status_code == 201
     entry = response.get_json()
     assert entry["notes"] == "big one"
+
+
+def test_poo_and_wee_routes_persist_distinct_event_types(client):
+    poo_response = client.post("/api/poo/log?user_slug=josh")
+    wee_response = client.post("/api/wee/log?user_slug=josh")
+
+    assert poo_response.status_code == 201
+    assert wee_response.status_code == 201
+    assert poo_response.get_json()["type"] == "poo"
+    assert wee_response.get_json()["type"] == "wee"
+
+    entries_response = client.get("/api/entries?user_slug=josh")
+    assert entries_response.status_code == 200
+    assert [entry["type"] for entry in entries_response.get_json()] == ["wee", "poo"]

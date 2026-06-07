@@ -275,6 +275,10 @@
       .history-weight {
         font-weight: 700;
       }
+      .history-percentile {
+        font-size: 12px;
+        color: var(--text-secondary);
+      }
       .history-main {
         display: grid;
         gap: 2px;
@@ -430,6 +434,7 @@
       const suggestionsEl = document.getElementById("suggestions");
       const historyEl = document.getElementById("weight-history");
       const activeUser = document.body.dataset.user || window.localStorage.getItem("baby-tracker-user") || "";
+      let babyDob = "";
 
       function buildEntryId(value) {
         return Number.parseInt(value, 10);
@@ -451,15 +456,38 @@
         return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
       }
 
+      async function loadWeightSettings() {
+        try {
+          const resp = await fetch(buildUrl("/api/settings"));
+          if (!resp.ok) return;
+          const settings = await resp.json();
+          babyDob = settings.dob || "";
+        } catch (err) {
+          babyDob = "";
+        }
+      }
+
+      function getPercentileByEntryId(entries) {
+        const helper = window.BabyTrackerWeightPercentiles;
+        if (!helper || !babyDob) return new Map();
+        const points = helper.getWeightLogPointsForDob(entries, babyDob);
+        return new Map(points.map((point) => [
+          point.entryId,
+          helper.formatOrdinal(point.percentile),
+        ]));
+      }
+
+      function formatHistoryPercentile(entry, percentileByEntryId) {
+        if (!babyDob) return "Set DOB for percentile";
+        return percentileByEntryId.get(entry.id) || "Percentile unavailable";
+      }
+
       async function loadWeights() {
         try {
           const resp = await fetch(buildUrl("/api/entries?type=weight&limit=20"));
           if (!resp.ok) throw new Error("Failed to load weights");
           const entries = await resp.json();
-          const filteredEntries = activeUser
-            ? entries.filter((entry) => entry.user_slug === activeUser)
-            : entries;
-          renderWeights(filteredEntries);
+          renderWeights(entries);
           window.dispatchEvent(new CustomEvent("baby-tracker:weights-updated"));
         } catch (err) {
           setStatus("Could not load weight history", true);
@@ -512,11 +540,13 @@
           });
         });
 
+        const percentileByEntryId = getPercentileByEntryId(entries);
         historyEl.innerHTML = entries.map(e => `
           <div class="history-item">
             <div class="history-main">
               <div class="history-meta">${formatDate(e.timestamp_utc)}</div>
               <div class="history-weight">${parseFloat(e.weight_kg || 0).toFixed(2)} kg</div>
+              <div class="history-percentile">${formatHistoryPercentile(e, percentileByEntryId)}</div>
             </div>
             <div class="history-actions">
               <button class="history-btn" type="button" data-action="edit" data-entry-id="${e.id}">Edit</button>
@@ -530,7 +560,7 @@
         const resp = await fetch(buildUrl("/api/entries?type=weight&limit=20"));
         if (!resp.ok) throw new Error("Could not load weight entry");
         const entries = await resp.json();
-        const entry = entries.find((item) => item.id === entryId && (!activeUser || item.user_slug === activeUser));
+        const entry = entries.find((item) => item.id === entryId);
         if (!entry) throw new Error("Weight entry not found");
 
         const nextWeight = window.prompt("Weight in kg", parseFloat(entry.weight_kg || 0).toFixed(2));
@@ -653,6 +683,7 @@
 
       weightDateInput.value = new Date().toISOString().split("T")[0];
 
+      await loadWeightSettings();
       loadWeights();
     </script>
   </body>

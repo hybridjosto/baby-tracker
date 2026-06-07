@@ -1,14 +1,13 @@
 {
-  # Tailscale IPs are private; disable auto HTTPS to keep HTTP-only.
+  # This file is a fallback for a Caddy-based tailnet proxy.
+  # The active setup uses Tailscale Serve:
+  #   /baby -> http://127.0.0.1:8000/baby
   auto_https off
 }
 
 :8443 {
-  bind 100.113.227.1
-
-  @probe_or_api path /healthz /api*
-  handle @probe_or_api {
-    reverse_proxy 100.113.227.1:8000
+  handle /baby* {
+    reverse_proxy 127.0.0.1:8000
   }
 
   respond "Not Found" 404

@@ -199,6 +199,9 @@ const weightPercentileEmptyEl = document.getElementById("weight-percentile-empty
 const homeSleepTrendChartEl = document.getElementById("home-sleep-trend-chart");
 const homeSleepTrendLabelsEl = document.getElementById("home-sleep-trend-labels");
 const homeSleepTrendAverageChipEl = document.getElementById("home-sleep-trend-average-chip");
+const homeFeedVolumeChartEl = document.getElementById("home-feed-volume-chart");
+const homeFeedVolumeLabelsEl = document.getElementById("home-feed-volume-labels");
+const homeFeedVolumeAverageChipEl = document.getElementById("home-feed-volume-average-chip");
 
 const timelineWrapEl = document.getElementById("timeline-wrap");
 const timelineTrackEl = document.getElementById("timeline-track");
@@ -4891,7 +4894,11 @@ function boyWeightPercentile(ageMonths, weightKg) {
 }
 
 function getWeightLogPoints(entries) {
-  const dob = parseDob(state.babyDob || "");
+  return getWeightLogPointsForDob(entries, state.babyDob || "");
+}
+
+function getWeightLogPointsForDob(entries, dobValue) {
+  const dob = parseDob(dobValue || "");
   if (!dob) {
     return [];
   }
@@ -4914,6 +4921,7 @@ function getWeightLogPoints(entries) {
         return null;
       }
       return {
+        entryId: entry.id,
         timestamp: loggedAt,
         ageWeeks,
         ageMonths,
@@ -4924,6 +4932,11 @@ function getWeightLogPoints(entries) {
     .filter(Boolean)
     .sort((left, right) => left.ageWeeks - right.ageWeeks);
 }
+
+window.BabyTrackerWeightPercentiles = {
+  formatOrdinal,
+  getWeightLogPointsForDob,
+};
 
 function renderWeightPercentileChart(entries = summaryWeightEntries) {
   if (
@@ -5126,6 +5139,102 @@ function renderHomeSleepTrendChart(entries) {
     labelsEl: homeSleepTrendLabelsEl,
     averageChipEl: homeSleepTrendAverageChipEl,
     baseDate: new Date(),
+  });
+}
+
+function renderHomeFeedVolumeChart(entries) {
+  if (!homeFeedVolumeChartEl || !homeFeedVolumeLabelsEl || !homeFeedVolumeAverageChipEl) {
+    return;
+  }
+  homeFeedVolumeChartEl.innerHTML = "";
+  homeFeedVolumeLabelsEl.innerHTML = "";
+  homeFeedVolumeAverageChipEl.textContent = "";
+
+  const today = new Date();
+  const daysShown = 7;
+  const dailyTotals = [];
+
+  for (let i = daysShown - 1; i >= 0; i -= 1) {
+    const date = new Date(today);
+    date.setDate(date.getDate() - i);
+    date.setHours(0, 0, 0, 0);
+    const nextDate = new Date(date);
+    nextDate.setDate(nextDate.getDate() + 1);
+
+    const totalMl = entries.reduce((sum, entry) => {
+      if (!isFeedType(entry.type) || isBreastfeedInProgress(entry)) {
+        return sum;
+      }
+      const entryDate = new Date(entry.timestamp_utc);
+      if (Number.isNaN(entryDate.getTime()) || entryDate < date || entryDate >= nextDate) {
+        return sum;
+      }
+      return sum + getFeedEntryTotalMl(entry);
+    }, 0);
+
+    dailyTotals.push({ date, totalMl });
+  }
+
+  const sevenDayTotalMl = dailyTotals.reduce((sum, day) => sum + day.totalMl, 0);
+  const averageMl = sevenDayTotalMl / daysShown;
+  const maxMl = Math.max(...dailyTotals.map((day) => day.totalMl), averageMl, 1);
+  const svgNS = "http://www.w3.org/2000/svg";
+  const width = 320;
+  const height = 80;
+  const paddingX = 8;
+  const paddingY = 8;
+  const plotWidth = width - paddingX * 2;
+  const plotHeight = height - paddingY * 2;
+  const barGap = 5;
+  const barWidth = (plotWidth - (barGap * (daysShown - 1))) / daysShown;
+
+  const gridLine = document.createElementNS(svgNS, "line");
+  gridLine.setAttribute("x1", paddingX);
+  gridLine.setAttribute("x2", width - paddingX);
+  gridLine.setAttribute("y1", height - paddingY);
+  gridLine.setAttribute("y2", height - paddingY);
+  gridLine.setAttribute("class", "sleep-trend-grid");
+  homeFeedVolumeChartEl.appendChild(gridLine);
+
+  if (averageMl > 0) {
+    homeFeedVolumeAverageChipEl.textContent = `7-day total: ${formatMl(sevenDayTotalMl)} · Avg ${formatMl(averageMl)}/day`;
+    const averageY = height - paddingY - (averageMl / maxMl) * plotHeight;
+    const averageLine = document.createElementNS(svgNS, "line");
+    averageLine.setAttribute("x1", paddingX);
+    averageLine.setAttribute("x2", width - paddingX);
+    averageLine.setAttribute("y1", averageY.toFixed(1));
+    averageLine.setAttribute("y2", averageY.toFixed(1));
+    averageLine.setAttribute("class", "sleep-trend-average-line");
+    homeFeedVolumeChartEl.appendChild(averageLine);
+  } else {
+    homeFeedVolumeAverageChipEl.textContent = "7-day total: --";
+  }
+
+  dailyTotals.forEach((day, index) => {
+    const barHeight = (day.totalMl / maxMl) * plotHeight;
+    const x = paddingX + index * (barWidth + barGap);
+    const y = height - paddingY - barHeight;
+    const bar = document.createElementNS(svgNS, "rect");
+    bar.setAttribute("x", x.toFixed(1));
+    bar.setAttribute("y", y.toFixed(1));
+    bar.setAttribute("width", Math.max(1, barWidth).toFixed(1));
+    bar.setAttribute("height", Math.max(0, barHeight).toFixed(1));
+    bar.setAttribute("rx", "3");
+    bar.setAttribute("class", "feed-volume-bar");
+    homeFeedVolumeChartEl.appendChild(bar);
+
+    if (day.totalMl > 0) {
+      const value = document.createElementNS(svgNS, "text");
+      value.setAttribute("x", (x + barWidth / 2).toFixed(1));
+      value.setAttribute("y", Math.max(9, y - 3).toFixed(1));
+      value.setAttribute("class", "feed-volume-value");
+      value.textContent = `${Math.round(day.totalMl)}`;
+      homeFeedVolumeChartEl.appendChild(value);
+    }
+
+    const labelEl = document.createElement("span");
+    labelEl.textContent = day.date.toLocaleDateString(undefined, { weekday: "short" });
+    homeFeedVolumeLabelsEl.appendChild(labelEl);
   });
 }
 
@@ -8743,6 +8852,12 @@ async function loadHomeEntries() {
     homeSleepTrendWindow.since.setDate(homeSleepTrendWindow.since.getDate() - 7);
     homeSleepTrendWindow.sinceIso = homeSleepTrendWindow.since.toISOString();
     homeSleepTrendWindow.untilIso = homeSleepTrendWindow.until.toISOString();
+    const homeFeedVolumeSince = new Date(todayWindow.since);
+    homeFeedVolumeSince.setDate(homeFeedVolumeSince.getDate() - 6);
+    const homeFeedVolumeWindow = {
+      sinceIso: homeFeedVolumeSince.toISOString(),
+      untilIso: homeSleepTrendWindow.untilIso,
+    };
     const chartUntil = new Date(now);
     const chartWindow = createWindow(
       new Date(chartUntil.getTime() - HOME_CHART_TOTAL_HOURS * 60 * 60 * 1000),
@@ -8768,6 +8883,12 @@ async function loadHomeEntries() {
       since: homeSleepTrendWindow.sinceIso,
       until: homeSleepTrendWindow.untilIso,
     });
+    const cachedFeedVolumeEntries = await listEntriesLocalSafe({
+      limit: 500,
+      type: "feed",
+      since: homeFeedVolumeWindow.sinceIso,
+      until: homeFeedVolumeWindow.untilIso,
+    });
     if (cachedEntries) {
       const cachedChartEntries = (cachedChartSourceEntries || cachedEntries).filter(
         (entry) => entryOverlapsChartWindow(entry, chartWindow),
@@ -8780,15 +8901,17 @@ async function loadHomeEntries() {
       renderLastByType(cachedEntries);
       renderLatestEntry(cachedEntries[0] || null);
       renderHomeSleepTrendChart(cachedSleepTrendEntries || cachedEntries);
+      renderHomeFeedVolumeChart(cachedFeedVolumeEntries || []);
     } else {
       renderChart([], chartWindows);
       renderLatestEntry(null);
       renderHomeSleepTrendChart(cachedSleepTrendEntries || []);
+      renderHomeFeedVolumeChart(cachedFeedVolumeEntries || []);
     }
 
     void syncNow();
 
-    const [entries, chartSourceEntries, currentGoal, sleepTrendEntries] = await Promise.all([
+    const [entries, chartSourceEntries, currentGoal, sleepTrendEntries, feedVolumeEntries] = await Promise.all([
       loadEntriesWithFallback({
         limit: 200,
         since: statsWindow.sinceIso,
@@ -8805,6 +8928,12 @@ async function loadHomeEntries() {
         since: homeSleepTrendWindow.sinceIso,
         until: homeSleepTrendWindow.untilIso,
       }),
+      loadEntriesWithFallback({
+        limit: 500,
+        type: "feed",
+        since: homeFeedVolumeWindow.sinceIso,
+        until: homeFeedVolumeWindow.untilIso,
+      }),
     ]);
     state.activeFeedingGoal = currentGoal;
     const chartEntries = chartSourceEntries.filter((entry) => entryOverlapsChartWindow(entry, chartWindow));
@@ -8816,6 +8945,7 @@ async function loadHomeEntries() {
     renderLastByType(entries);
     renderLatestEntry(entries[0] || null);
     renderHomeSleepTrendChart(sleepTrendEntries);
+    renderHomeFeedVolumeChart(feedVolumeEntries);
   } catch (err) {
     setStatus(`Failed to load entries: ${err.message || "unknown error"}`);
   } finally {
