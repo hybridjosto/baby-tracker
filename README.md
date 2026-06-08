@@ -116,6 +116,14 @@ Example sync response:
 }
 ```
 
+## AI-Assisted Historical Backfill
+- The Event Log includes an **Add previous entries with AI** panel for describing up to 10 historical events in plain text.
+- AI creates editable drafts only. Entries are written after warnings are reviewed and **Save entries** is selected.
+- `POST /api/users/<user_slug>/entries/backfill/parse` accepts `text`, optional `reference_time_utc`, and optional `timezone`.
+- `POST /api/users/<user_slug>/entries/backfill/commit` accepts the returned `batch_id` and reviewed `entries`.
+- Backfill writes are atomic and retry-safe. They do not stop active sleep timers or trigger entry pushes, webhooks, or KPI dispatches.
+- The parser uses the existing OpenAI model, timeout, and server-side API key configuration.
+
 ## Local-only API via Caddy + Tailscale
 Use Caddy to expose just the `/api` endpoints over your tailnet while keeping the
 Flask app bound to localhost. See `docs/tailscale-caddy.md`.

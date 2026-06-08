@@ -186,6 +186,180 @@
         font-size: 12px;
         color: var(--text-secondary);
       }
+      .backfill-panel {
+        margin-top: 12px;
+        padding: 14px;
+        border-radius: 16px;
+        border: 1px solid var(--border-light);
+        background: var(--surface-soft);
+        display: grid;
+        gap: 12px;
+      }
+      html.dark .backfill-panel {
+        border-color: var(--border-dark);
+        background: rgba(26, 44, 32, 0.9);
+      }
+      .backfill-heading {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: start;
+      }
+      .backfill-title {
+        font-weight: 700;
+        font-size: 15px;
+      }
+      .backfill-hint,
+      .backfill-status {
+        color: var(--text-secondary);
+        font-size: 12px;
+      }
+      .backfill-input {
+        width: 100%;
+        min-height: 92px;
+        resize: vertical;
+        box-sizing: border-box;
+        border: 1px solid var(--border-light);
+        border-radius: 12px;
+        padding: 10px 12px;
+        background: #ffffff;
+        color: var(--text-primary);
+        font: inherit;
+        font-size: 16px;
+      }
+      html.dark .backfill-input,
+      html.dark .backfill-field input,
+      html.dark .backfill-field select,
+      html.dark .backfill-field textarea {
+        border-color: var(--border-dark);
+        background: rgba(16, 24, 18, 0.8);
+        color: #f3f6f4;
+      }
+      .backfill-actions {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .backfill-actions button,
+      .backfill-draft-actions button {
+        border: 1px solid var(--border-light);
+        border-radius: 10px;
+        padding: 8px 11px;
+        background: var(--surface-muted);
+        color: var(--text-primary);
+        cursor: pointer;
+        font-weight: 600;
+      }
+      .backfill-actions .primary {
+        border-color: transparent;
+        background: #2f6b48;
+        color: #ffffff;
+      }
+      .backfill-actions button:disabled {
+        cursor: not-allowed;
+        opacity: 0.55;
+      }
+      html.dark .backfill-actions button,
+      html.dark .backfill-draft-actions button {
+        border-color: var(--border-dark);
+        background: rgba(255, 255, 255, 0.08);
+        color: #f3f6f4;
+      }
+      html.dark .backfill-actions .primary {
+        border-color: transparent;
+        background: #3d8058;
+      }
+      .backfill-drafts {
+        display: grid;
+        gap: 10px;
+      }
+      .backfill-draft {
+        border: 1px solid var(--border-light);
+        border-radius: 14px;
+        padding: 12px;
+        background: #ffffff;
+        display: grid;
+        gap: 10px;
+      }
+      .backfill-draft.has-warning {
+        border-color: #c68a25;
+      }
+      .backfill-draft.has-error {
+        border-color: #b84d4d;
+      }
+      html.dark .backfill-draft {
+        border-color: var(--border-dark);
+        background: rgba(16, 24, 18, 0.72);
+      }
+      .backfill-draft-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+      }
+      .backfill-draft-title {
+        font-size: 13px;
+        font-weight: 700;
+      }
+      .backfill-draft-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 9px;
+      }
+      .backfill-field {
+        display: grid;
+        gap: 4px;
+        min-width: 0;
+      }
+      .backfill-field.is-wide {
+        grid-column: 1 / -1;
+      }
+      .backfill-field label {
+        font-size: 11px;
+        color: var(--text-secondary);
+      }
+      .backfill-field input,
+      .backfill-field select,
+      .backfill-field textarea {
+        width: 100%;
+        min-width: 0;
+        box-sizing: border-box;
+        border: 1px solid var(--border-light);
+        border-radius: 9px;
+        padding: 8px 9px;
+        background: #ffffff;
+        color: var(--text-primary);
+        font: inherit;
+        font-size: 14px;
+      }
+      .backfill-field textarea {
+        min-height: 58px;
+        resize: vertical;
+      }
+      .backfill-messages {
+        display: grid;
+        gap: 5px;
+        color: #8c5b08;
+        font-size: 12px;
+      }
+      .backfill-messages.is-error {
+        color: #a63737;
+      }
+      html.dark .backfill-messages {
+        color: #f0bc62;
+      }
+      html.dark .backfill-messages.is-error {
+        color: #ff8e8e;
+      }
+      .backfill-draft-actions {
+        display: flex;
+        gap: 7px;
+        flex-wrap: wrap;
+      }
+      .backfill-draft-actions .danger {
+        color: #a63737;
+      }
       .user-row {
         display: flex;
         gap: 8px;
@@ -440,6 +614,15 @@
         .log-buttons {
           justify-content: flex-start;
         }
+        .backfill-heading {
+          display: grid;
+        }
+        .backfill-draft-grid {
+          grid-template-columns: 1fr;
+        }
+        .backfill-field.is-wide {
+          grid-column: auto;
+        }
       }
     </style>
   </head>
@@ -628,6 +811,31 @@
             </div>
           </form>
         </div>
+        <section class="backfill-panel" id="backfill-panel" aria-labelledby="backfill-title">
+          <div class="backfill-heading">
+            <div>
+              <div class="backfill-title" id="backfill-title">Add previous entries with AI</div>
+              <div class="backfill-hint">
+                Describe up to 10 past events. Review every draft before saving.
+              </div>
+            </div>
+            <div class="backfill-status" id="backfill-status"></div>
+          </div>
+          <textarea
+            class="backfill-input"
+            id="backfill-input"
+            placeholder="Yesterday: feed 120ml at 8am, slept 9:30–11, wee at 11:15"
+          ></textarea>
+          <div class="backfill-actions">
+            <button class="primary" id="backfill-parse" type="button">Create drafts</button>
+            <button id="backfill-clear" type="button" hidden>Clear</button>
+          </div>
+          <div class="backfill-drafts" id="backfill-drafts"></div>
+          <div class="backfill-actions" id="backfill-save-row" hidden>
+            <button class="primary" id="backfill-save" type="button">Save entries</button>
+            <span class="backfill-hint">Warnings must be reviewed before saving.</span>
+          </div>
+        </section>
         <form class="import-panel" id="csv-upload-form">
           <label for="csv-file">Import CSV</label>
           <div class="import-row">

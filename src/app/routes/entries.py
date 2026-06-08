@@ -6,6 +6,7 @@ from src.app.services.entries import (
     create_entry,
     delete_entry,
     export_entries_csv,
+    get_awake_duration,
     get_entry_summary,
     get_last_nappy_duration,
     get_next_feed_due_duration,
@@ -17,6 +18,12 @@ from src.app.services.entries import (
     update_entry,
 )
 from src.app.services.entry_confirmation import dispatch_entry_confirmation_push
+from src.app.services.entry_backfill import (
+    BackfillValidationError,
+    EntryBackfillError,
+    commit_backfill_entries,
+    parse_backfill_text,
+)
 from src.app.services.webhooks import send_entry_webhook
 from src.app.services.home_kpis import dispatch_home_kpis
 from src.app.services.llm_chat import LlmChatError, answer_llm_question
@@ -167,6 +174,15 @@ def get_next_feed_due_duration_route():
         return jsonify({"error": str(exc)}), 400
 
 
+@entries_api.get("/entries/awake-duration")
+def get_awake_duration_route():
+    user_slug = request.args.get("user_slug")
+    try:
+        return jsonify(get_awake_duration(_db_path(), user_slug=user_slug))
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+
 @entries_api.post("/entries")
 def create_entry_route():
     payload = request.get_json(silent=True) or {}
@@ -214,6 +230,28 @@ def import_user_entries_route(user_slug: str):
     try:
         result = import_entries_csv(_db_path(), user_slug, file_storage)
         return jsonify(result), 201
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+
+@entries_api.post("/users/<user_slug>/entries/backfill/parse")
+def parse_user_entry_backfill_route(user_slug: str):
+    payload = request.get_json(silent=True) or {}
+    try:
+        return jsonify(parse_backfill_text(_db_path(), user_slug, payload))
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except EntryBackfillError as exc:
+        return jsonify({"error": str(exc)}), exc.status_code
+
+
+@entries_api.post("/users/<user_slug>/entries/backfill/commit")
+def commit_user_entry_backfill_route(user_slug: str):
+    payload = request.get_json(silent=True) or {}
+    try:
+        return jsonify(commit_backfill_entries(_db_path(), user_slug, payload)), 201
+    except BackfillValidationError as exc:
+        return jsonify({"error": str(exc), "details": exc.errors}), 400
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
 

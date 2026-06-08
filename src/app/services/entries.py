@@ -11,6 +11,7 @@ from src.app.storage.entries import (
     get_entry_by_client_event_id as repo_get_entry_by_client_event_id,
     get_latest_entry_by_types as repo_get_latest_entry_by_types,
     get_latest_active_timed_entry as repo_get_latest_active_timed_entry,
+    get_latest_completed_sleep as repo_get_latest_completed_sleep,
     list_entries as repo_list_entries,
     list_entries_for_export as repo_list_entries_for_export,
     list_entries_updated_since as repo_list_entries_updated_since,
@@ -286,6 +287,50 @@ def get_next_feed_due_duration(
         "duration": _format_due_duration(timestamp, now),
         "timestamp_utc": timestamp_utc,
         "source_entry_id": next_feed.get("source_entry_id"),
+    }
+
+
+def get_awake_duration(
+    db_path: str, user_slug: str | None = None, now_utc: datetime | None = None
+) -> dict:
+    normalized_slug = normalize_user_slug(user_slug) if user_slug else None
+    with get_connection(db_path) as conn:
+        latest_sleep = repo_get_latest_completed_sleep(
+            conn,
+            user_slug=normalized_slug,
+        )
+        active_sleep = repo_get_latest_active_timed_entry(
+            conn,
+            "sleep",
+            user_slug=normalized_slug,
+        )
+
+    now = (now_utc or _now_utc()).astimezone(timezone.utc)
+    if active_sleep:
+        active_start = _parse_utc_iso(active_sleep["timestamp_utc"])
+        if active_start <= now:
+            return {
+                "is_awake": False,
+                "duration": None,
+                "timestamp_utc": None,
+                "source_entry_id": active_sleep["id"],
+            }
+
+    if not latest_sleep:
+        return {
+            "is_awake": None,
+            "duration": None,
+            "timestamp_utc": None,
+            "source_entry_id": None,
+        }
+
+    sleep_start = _parse_utc_iso(latest_sleep["timestamp_utc"])
+    sleep_end = sleep_start + timedelta(minutes=latest_sleep["feed_duration_min"])
+    return {
+        "is_awake": True,
+        "duration": _format_past_duration(sleep_end, now),
+        "timestamp_utc": sleep_end.isoformat(),
+        "source_entry_id": latest_sleep["id"],
     }
 
 

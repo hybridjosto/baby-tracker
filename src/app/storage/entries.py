@@ -48,6 +48,55 @@ def create_entry(conn: sqlite3.Connection | None, payload: dict) -> tuple[dict, 
         return existing, True
 
 
+def create_entries_batch(
+    conn: sqlite3.Connection | None, payloads: list[dict]
+) -> tuple[list[dict], list[dict]]:
+    assert conn is not None
+    created: list[dict] = []
+    duplicates: list[dict] = []
+    try:
+        conn.execute("BEGIN")
+        for payload in payloads:
+            try:
+                cursor = conn.execute(
+                    """
+                    INSERT INTO entries (
+                        user_slug, type, timestamp_utc, client_event_id, notes,
+                        amount_ml, expressed_ml, formula_ml, feed_duration_min,
+                        weight_kg, caregiver_id, created_at_utc, updated_at_utc
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        payload["user_slug"],
+                        payload["type"],
+                        payload["timestamp_utc"],
+                        payload["client_event_id"],
+                        payload.get("notes"),
+                        payload.get("amount_ml"),
+                        payload.get("expressed_ml"),
+                        payload.get("formula_ml"),
+                        payload.get("feed_duration_min"),
+                        payload.get("weight_kg"),
+                        payload.get("caregiver_id"),
+                        payload["created_at_utc"],
+                        payload["updated_at_utc"],
+                    ),
+                )
+                created.append(get_entry(conn, cursor.lastrowid))
+            except sqlite3.IntegrityError:
+                existing = get_entry_by_client_event_id(
+                    conn, payload["client_event_id"]
+                )
+                if not existing:
+                    raise
+                duplicates.append(existing)
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    return created, duplicates
+
+
 def list_entries(
     conn: sqlite3.Connection | None,
     limit: int,
@@ -214,6 +263,37 @@ def get_latest_active_timed_entry(
         FROM entries
         WHERE {' AND '.join(clauses)}
         ORDER BY timestamp_utc DESC
+        LIMIT 1
+        """,
+        params,
+    )
+    row = cursor.fetchone()
+    return dict(row) if row else None
+
+
+def get_latest_completed_sleep(
+    conn: sqlite3.Connection | None, user_slug: str | None = None
+) -> Optional[dict]:
+    assert conn is not None
+    clauses = [
+        "type = 'sleep'",
+        "feed_duration_min IS NOT NULL",
+        "deleted_at_utc IS NULL",
+    ]
+    params: list[object] = []
+    if user_slug:
+        clauses.append("user_slug = ?")
+        params.append(user_slug)
+    cursor = conn.execute(
+        f"""
+        SELECT id, user_slug, type, timestamp_utc, client_event_id, notes, amount_ml,
+               expressed_ml, formula_ml, feed_duration_min, weight_kg, caregiver_id,
+               created_at_utc, updated_at_utc, deleted_at_utc
+        FROM entries
+        WHERE {' AND '.join(clauses)}
+        ORDER BY (
+            julianday(timestamp_utc) + (feed_duration_min / 1440.0)
+        ) DESC, id DESC
         LIMIT 1
         """,
         params,

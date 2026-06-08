@@ -795,6 +795,124 @@ def test_next_feed_due_duration_returns_null_without_schedule(client):
     }
 
 
+def test_awake_duration_uses_latest_completed_sleep_end_across_all_users(
+    client, monkeypatch
+):
+    from src.app.services import entries as entries_module
+
+    monkeypatch.setattr(
+        entries_module,
+        "_now_utc",
+        lambda: datetime(2024, 1, 1, 14, 30, tzinfo=timezone.utc),
+    )
+    latest_end = client.post(
+        "/api/users/suz/entries",
+        json={
+            "type": "sleep",
+            "client_event_id": "evt-awake-duration-suz",
+            "timestamp_utc": "2024-01-01T08:00:00+00:00",
+            "feed_duration_min": 240,
+        },
+    ).get_json()
+    client.post(
+        "/api/users/rob/entries",
+        json={
+            "type": "sleep",
+            "client_event_id": "evt-awake-duration-rob",
+            "timestamp_utc": "2024-01-01T10:00:00+00:00",
+            "feed_duration_min": 60,
+        },
+    )
+
+    response = client.get("/api/entries/awake-duration")
+
+    assert response.status_code == 200
+    assert response.get_json() == {
+        "is_awake": True,
+        "duration": "2 hours ago",
+        "timestamp_utc": "2024-01-01T12:00:00+00:00",
+        "source_entry_id": latest_end["id"],
+    }
+
+
+def test_awake_duration_supports_user_filter(client, monkeypatch):
+    from src.app.services import entries as entries_module
+
+    monkeypatch.setattr(
+        entries_module,
+        "_now_utc",
+        lambda: datetime(2024, 1, 1, 14, 30, tzinfo=timezone.utc),
+    )
+    client.post(
+        "/api/users/suz/entries",
+        json={
+            "type": "sleep",
+            "client_event_id": "evt-awake-duration-filter-suz",
+            "timestamp_utc": "2024-01-01T08:00:00+00:00",
+            "feed_duration_min": 240,
+        },
+    )
+    rob_sleep = client.post(
+        "/api/users/rob/entries",
+        json={
+            "type": "sleep",
+            "client_event_id": "evt-awake-duration-filter-rob",
+            "timestamp_utc": "2024-01-01T10:00:00+00:00",
+            "feed_duration_min": 60,
+        },
+    ).get_json()
+
+    response = client.get("/api/entries/awake-duration?user_slug=rob")
+
+    assert response.status_code == 200
+    assert response.get_json() == {
+        "is_awake": True,
+        "duration": "3 hours ago",
+        "timestamp_utc": "2024-01-01T11:00:00+00:00",
+        "source_entry_id": rob_sleep["id"],
+    }
+
+
+def test_awake_duration_reports_active_sleep(client, monkeypatch):
+    from src.app.services import entries as entries_module
+
+    monkeypatch.setattr(
+        entries_module,
+        "_now_utc",
+        lambda: datetime(2024, 1, 1, 14, 30, tzinfo=timezone.utc),
+    )
+    active_sleep = client.post(
+        "/api/users/suz/entries",
+        json={
+            "type": "sleep",
+            "client_event_id": "evt-awake-duration-active",
+            "timestamp_utc": "2024-01-01T14:00:00+00:00",
+        },
+    ).get_json()
+
+    response = client.get("/api/entries/awake-duration")
+
+    assert response.status_code == 200
+    assert response.get_json() == {
+        "is_awake": False,
+        "duration": None,
+        "timestamp_utc": None,
+        "source_entry_id": active_sleep["id"],
+    }
+
+
+def test_awake_duration_returns_null_without_sleep(client):
+    response = client.get("/api/entries/awake-duration")
+
+    assert response.status_code == 200
+    assert response.get_json() == {
+        "is_awake": None,
+        "duration": None,
+        "timestamp_utc": None,
+        "source_entry_id": None,
+    }
+
+
 def test_entries_llm_summary_calls_openai_with_selected_window_and_context(
     client, monkeypatch
 ):

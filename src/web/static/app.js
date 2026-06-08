@@ -125,6 +125,13 @@ const refreshBtn = document.getElementById("refresh-btn");
 const csvFormEl = document.getElementById("csv-upload-form");
 const csvFileEl = document.getElementById("csv-file");
 const csvUploadBtn = document.getElementById("csv-upload-btn");
+const backfillInputEl = document.getElementById("backfill-input");
+const backfillParseBtn = document.getElementById("backfill-parse");
+const backfillClearBtn = document.getElementById("backfill-clear");
+const backfillDraftsEl = document.getElementById("backfill-drafts");
+const backfillSaveRowEl = document.getElementById("backfill-save-row");
+const backfillSaveBtn = document.getElementById("backfill-save");
+const backfillStatusEl = document.getElementById("backfill-status");
 const summaryDateInputEl = document.getElementById("summary-date");
 const summaryDateLabelEl = document.getElementById("summary-date-label");
 const summaryPrevBtn = document.getElementById("summary-prev");
@@ -376,6 +383,8 @@ let editEntryModalInitialized = false;
 let editEntryModalResolver = null;
 let editEntryModalEntry = null;
 let editEntryModalMode = "full";
+let backfillBatchId = null;
+let backfillDrafts = [];
 let breastfeedHydrated = false;
 let timedEventHydrated = false;
 let quickFeedKind = "formula";
@@ -1661,9 +1670,336 @@ function initLogHandlers() {
   if (csvFormEl) {
     csvFormEl.addEventListener("submit", handleCsvUpload);
   }
+  initBackfillHandlers();
   initEditEntryModalHandlers();
   startAutoRefresh(loadLogEntries);
   updateLogEmptyMessage();
+}
+
+function setBackfillStatus(message) {
+  if (backfillStatusEl) {
+    backfillStatusEl.textContent = message || "";
+  }
+}
+
+function getBackfillAllowedTypes() {
+  return ["feed", "sleep", "wee", "poo", "cry", "weight", ...state.customEventTypes];
+}
+
+function normalizeBackfillNumber(value) {
+  if (value === "" || value === null || value === undefined) {
+    return null;
+  }
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function validateBackfillDraftClient(draft) {
+  const errors = [];
+  if (!getBackfillAllowedTypes().includes(draft.type)) {
+    errors.push("Choose an allowed entry type.");
+  }
+  const timestamp = Date.parse(draft.timestamp_utc || "");
+  if (!Number.isFinite(timestamp)) {
+    errors.push("Choose a date and time.");
+  } else if (timestamp > Date.now()) {
+    errors.push("Date and time cannot be in the future.");
+  }
+  if (
+    draft.type === "feed"
+    && draft.amount_ml === null
+    && draft.expressed_ml === null
+    && draft.formula_ml === null
+  ) {
+    errors.push("Feed entries need an amount in ml.");
+  }
+  if (draft.type === "sleep" && draft.feed_duration_min === null) {
+    errors.push("Sleep entries need a duration.");
+  }
+  if (draft.type === "weight" && draft.weight_kg === null) {
+    errors.push("Weight entries need a weight.");
+  }
+  return errors;
+}
+
+function updateBackfillSaveState() {
+  if (!backfillSaveBtn) {
+    return;
+  }
+  const blocked = !backfillDrafts.length || backfillDrafts.some((draft) => (
+    (draft.warnings || []).length > 0
+    || validateBackfillDraftClient(draft).length > 0
+  ));
+  backfillSaveBtn.disabled = blocked;
+}
+
+function createBackfillField(labelText, input) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "backfill-field";
+  const label = document.createElement("label");
+  label.textContent = labelText;
+  wrapper.append(label, input);
+  return wrapper;
+}
+
+function renderBackfillDrafts() {
+  if (!backfillDraftsEl || !backfillSaveRowEl || !backfillClearBtn) {
+    return;
+  }
+  backfillDraftsEl.innerHTML = "";
+  backfillSaveRowEl.hidden = backfillDrafts.length === 0;
+  backfillClearBtn.hidden = backfillDrafts.length === 0;
+
+  backfillDrafts.forEach((draft, index) => {
+    const clientErrors = validateBackfillDraftClient(draft);
+    const serverErrors = Array.isArray(draft.errors) ? draft.errors : [];
+    const errors = [...new Set([...serverErrors, ...clientErrors])];
+    const warnings = Array.isArray(draft.warnings) ? draft.warnings : [];
+    const card = document.createElement("article");
+    card.className = "backfill-draft";
+    if (warnings.length) {
+      card.classList.add("has-warning");
+    }
+    if (errors.length) {
+      card.classList.add("has-error");
+    }
+
+    const header = document.createElement("div");
+    header.className = "backfill-draft-header";
+    const title = document.createElement("div");
+    title.className = "backfill-draft-title";
+    title.textContent = `Draft ${index + 1}`;
+    const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.className = "danger";
+    removeBtn.textContent = "Remove";
+    removeBtn.addEventListener("click", () => {
+      backfillDrafts.splice(index, 1);
+      renderBackfillDrafts();
+    });
+    const headerActions = document.createElement("div");
+    headerActions.className = "backfill-draft-actions";
+    headerActions.appendChild(removeBtn);
+    header.append(title, headerActions);
+
+    const grid = document.createElement("div");
+    grid.className = "backfill-draft-grid";
+    const typeSelect = document.createElement("select");
+    getBackfillAllowedTypes().forEach((type) => {
+      const option = document.createElement("option");
+      option.value = type;
+      option.textContent = formatEntryTypeLabel(type);
+      option.selected = type === draft.type;
+      typeSelect.appendChild(option);
+    });
+    typeSelect.addEventListener("change", () => {
+      draft.type = typeSelect.value;
+      draft.errors = [];
+      renderBackfillDrafts();
+    });
+
+    const timeInput = document.createElement("input");
+    timeInput.type = "datetime-local";
+    timeInput.step = "60";
+    timeInput.value = draft.timestamp_utc
+      ? toLocalDateTimeValue(draft.timestamp_utc)
+      : "";
+    timeInput.addEventListener("change", () => {
+      const next = new Date(timeInput.value);
+      draft.timestamp_utc = Number.isNaN(next.getTime()) ? null : next.toISOString();
+      draft.errors = [];
+      renderBackfillDrafts();
+    });
+
+    const numericFields = [
+      ["Amount (ml)", "amount_ml"],
+      ["Formula (ml)", "formula_ml"],
+      ["Expressed (ml)", "expressed_ml"],
+      ["Duration (min)", "feed_duration_min"],
+      ["Weight (kg)", "weight_kg"],
+    ];
+    grid.append(
+      createBackfillField("Type", typeSelect),
+      createBackfillField("Date & time", timeInput),
+    );
+    numericFields.forEach(([label, field]) => {
+      const input = document.createElement("input");
+      input.type = "number";
+      input.min = "0";
+      input.step = field === "weight_kg" ? "0.01" : "0.1";
+      input.inputMode = "decimal";
+      input.value = draft[field] === null || draft[field] === undefined
+        ? ""
+        : String(draft[field]);
+      input.addEventListener("change", () => {
+        draft[field] = normalizeBackfillNumber(input.value);
+        draft.errors = [];
+        renderBackfillDrafts();
+      });
+      grid.appendChild(createBackfillField(label, input));
+    });
+
+    const notesInput = document.createElement("textarea");
+    notesInput.value = draft.notes || "";
+    notesInput.placeholder = "Optional notes";
+    notesInput.addEventListener("change", () => {
+      draft.notes = notesInput.value.trim() || null;
+      draft.errors = [];
+    });
+    const notesField = createBackfillField("Notes", notesInput);
+    notesField.classList.add("is-wide");
+    grid.appendChild(notesField);
+
+    card.append(header, grid);
+    if (warnings.length) {
+      const warningList = document.createElement("div");
+      warningList.className = "backfill-messages";
+      warnings.forEach((warning) => {
+        const line = document.createElement("div");
+        line.textContent = warning;
+        warningList.appendChild(line);
+      });
+      const resolveBtn = document.createElement("button");
+      resolveBtn.type = "button";
+      resolveBtn.textContent = "Mark warnings reviewed";
+      resolveBtn.addEventListener("click", () => {
+        draft.warnings = [];
+        draft.errors = [];
+        renderBackfillDrafts();
+      });
+      const actions = document.createElement("div");
+      actions.className = "backfill-draft-actions";
+      actions.appendChild(resolveBtn);
+      card.append(warningList, actions);
+    }
+    if (errors.length) {
+      const errorList = document.createElement("div");
+      errorList.className = "backfill-messages is-error";
+      errors.forEach((error) => {
+        const line = document.createElement("div");
+        line.textContent = error;
+        errorList.appendChild(line);
+      });
+      card.appendChild(errorList);
+    }
+    backfillDraftsEl.appendChild(card);
+  });
+  updateBackfillSaveState();
+}
+
+function clearBackfill() {
+  backfillBatchId = null;
+  backfillDrafts = [];
+  if (backfillInputEl) {
+    backfillInputEl.value = "";
+  }
+  setBackfillStatus("");
+  renderBackfillDrafts();
+}
+
+async function parseBackfillText() {
+  if (!state.userValid) {
+    setStatus("Choose a user below before creating drafts.");
+    return;
+  }
+  const text = backfillInputEl ? backfillInputEl.value.trim() : "";
+  if (!text) {
+    setBackfillStatus("Describe at least one previous event.");
+    return;
+  }
+  backfillParseBtn.disabled = true;
+  setBackfillStatus("Structuring with OpenAI...");
+  try {
+    const response = await fetch(
+      buildUrl(`/api/users/${state.activeUser}/entries/backfill/parse`),
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text,
+          reference_time_utc: new Date().toISOString(),
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+        }),
+      },
+    );
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      setBackfillStatus(payload.error || "Could not create drafts.");
+      return;
+    }
+    backfillBatchId = payload.batch_id;
+    backfillDrafts = Array.isArray(payload.drafts) ? payload.drafts : [];
+    setBackfillStatus(
+      payload.truncated
+        ? "Created the first 10 drafts. Review them carefully."
+        : `Created ${backfillDrafts.length} draft${backfillDrafts.length === 1 ? "" : "s"}.`,
+    );
+    renderBackfillDrafts();
+  } catch (error) {
+    setBackfillStatus("Could not reach the backfill service.");
+  } finally {
+    backfillParseBtn.disabled = false;
+  }
+}
+
+async function saveBackfillEntries() {
+  if (!backfillBatchId || !backfillDrafts.length || !state.userValid) {
+    return;
+  }
+  updateBackfillSaveState();
+  if (backfillSaveBtn.disabled) {
+    setBackfillStatus("Correct errors and review warnings before saving.");
+    return;
+  }
+  backfillSaveBtn.disabled = true;
+  setBackfillStatus("Saving entries...");
+  try {
+    const response = await fetch(
+      buildUrl(`/api/users/${state.activeUser}/entries/backfill/commit`),
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          batch_id: backfillBatchId,
+          entries: backfillDrafts,
+        }),
+      },
+    );
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const details = Array.isArray(payload.details) ? payload.details : [];
+      details.forEach((detail) => {
+        const draft = backfillDrafts.find((item) => item.draft_id === detail.draft_id);
+        if (draft) {
+          draft.errors = detail.errors || [];
+        }
+      });
+      setBackfillStatus(payload.error || "Could not save entries.");
+      renderBackfillDrafts();
+      return;
+    }
+    const saved = (payload.created || 0) + (payload.duplicates || 0);
+    clearBackfill();
+    setBackfillStatus(`Saved ${saved} entr${saved === 1 ? "y" : "ies"}.`);
+    await loadLogEntries();
+  } catch (error) {
+    setBackfillStatus("Could not reach the backfill service.");
+  } finally {
+    updateBackfillSaveState();
+  }
+}
+
+function initBackfillHandlers() {
+  if (!backfillParseBtn || !backfillSaveBtn || !backfillClearBtn) {
+    return;
+  }
+  backfillParseBtn.addEventListener("click", () => {
+    void parseBackfillText();
+  });
+  backfillSaveBtn.addEventListener("click", () => {
+    void saveBackfillEntries();
+  });
+  backfillClearBtn.addEventListener("click", clearBackfill);
 }
 
 function initSummaryHandlers() {
