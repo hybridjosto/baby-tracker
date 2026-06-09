@@ -35,7 +35,8 @@
         </script>
         <style>
             .card {
-                max-width: 520px;
+                width: 100%;
+                max-width: 960px;
                 margin: 0 auto;
             }
             h1 {
@@ -603,12 +604,20 @@
                 color: #ffb4b4;
             }
             .sleep-trend-labels {
-                display: flex;
-                justify-content: space-between;
+                position: relative;
+                width: min(100%, 320px);
+                min-height: 14px;
                 font-size: 10px;
                 color: var(--text-secondary);
-                padding: 0 4px;
-                margin-top: 4px;
+                padding: 0;
+                margin: 4px auto 0;
+            }
+            .sleep-trend-labels span,
+            .weight-percentile-labels span {
+                position: absolute;
+                top: 0;
+                transform: translateX(-50%);
+                white-space: nowrap;
             }
             .weight-percentile-chart-wrap {
                 padding: 10px 0;
@@ -672,12 +681,13 @@
                 stroke: var(--card-dark);
             }
             .weight-percentile-labels {
-                display: flex;
-                justify-content: space-between;
+                position: relative;
+                width: min(100%, 320px);
+                min-height: 14px;
                 font-size: 10px;
                 color: var(--text-secondary);
-                padding: 0 4px;
-                margin-top: 4px;
+                padding: 0;
+                margin: 4px auto 0;
             }
             .weight-percentile-empty {
                 display: none;

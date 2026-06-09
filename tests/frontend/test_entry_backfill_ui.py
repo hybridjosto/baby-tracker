@@ -17,6 +17,16 @@ def test_log_page_contains_ai_backfill_controls(client):
     assert "Import CSV" in template
     assert "Add previous entries with AI" in rendered
     assert 'id="backfill-input"' in rendered
+    assert rendered.index('id="backfill-panel"') < rendered.index('id="log-entries"')
+
+
+def test_home_page_links_to_backfill_panel(client):
+    response = client.get("/")
+
+    assert response.status_code == 200
+    rendered = response.get_data(as_text=True)
+    assert "Add previous entries" in rendered
+    assert 'href="/log#backfill-panel"' in rendered
 
 
 def test_backfill_frontend_calls_parse_and_commit_endpoints():

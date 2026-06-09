@@ -698,6 +698,31 @@
           </div>
         </div>
         {% include "active_timer_banners.html" %}
+        <section class="backfill-panel" id="backfill-panel" aria-labelledby="backfill-title">
+          <div class="backfill-heading">
+            <div>
+              <div class="backfill-title" id="backfill-title">Add previous entries with AI</div>
+              <div class="backfill-hint">
+                Describe up to 10 past events. Review every draft before saving.
+              </div>
+            </div>
+            <div class="backfill-status" id="backfill-status"></div>
+          </div>
+          <textarea
+            class="backfill-input"
+            id="backfill-input"
+            placeholder="Yesterday: feed 120ml at 8am, slept 9:30–11, wee at 11:15"
+          ></textarea>
+          <div class="backfill-actions">
+            <button class="primary" id="backfill-parse" type="button">Create drafts</button>
+            <button id="backfill-clear" type="button" hidden>Clear</button>
+          </div>
+          <div class="backfill-drafts" id="backfill-drafts"></div>
+          <div class="backfill-actions" id="backfill-save-row" hidden>
+            <button class="primary" id="backfill-save" type="button">Save entries</button>
+            <span class="backfill-hint">Warnings must be reviewed before saving.</span>
+          </div>
+        </section>
         <div class="log-wrap">
           <ul id="log-entries"></ul>
           <ul class="log-skeleton" aria-hidden="true">
@@ -811,31 +836,6 @@
             </div>
           </form>
         </div>
-        <section class="backfill-panel" id="backfill-panel" aria-labelledby="backfill-title">
-          <div class="backfill-heading">
-            <div>
-              <div class="backfill-title" id="backfill-title">Add previous entries with AI</div>
-              <div class="backfill-hint">
-                Describe up to 10 past events. Review every draft before saving.
-              </div>
-            </div>
-            <div class="backfill-status" id="backfill-status"></div>
-          </div>
-          <textarea
-            class="backfill-input"
-            id="backfill-input"
-            placeholder="Yesterday: feed 120ml at 8am, slept 9:30–11, wee at 11:15"
-          ></textarea>
-          <div class="backfill-actions">
-            <button class="primary" id="backfill-parse" type="button">Create drafts</button>
-            <button id="backfill-clear" type="button" hidden>Clear</button>
-          </div>
-          <div class="backfill-drafts" id="backfill-drafts"></div>
-          <div class="backfill-actions" id="backfill-save-row" hidden>
-            <button class="primary" id="backfill-save" type="button">Save entries</button>
-            <span class="backfill-hint">Warnings must be reviewed before saving.</span>
-          </div>
-        </section>
         <form class="import-panel" id="csv-upload-form">
           <label for="csv-file">Import CSV</label>
           <div class="import-row">

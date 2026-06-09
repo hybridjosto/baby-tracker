@@ -84,6 +84,8 @@ const userInputEl = document.getElementById("user-input");
 const userMessageEl = document.getElementById("today-label")
   || document.getElementById("user-message");
 const userChipEl = document.getElementById("user-chip");
+const homeHeaderDefaultEl = document.getElementById("home-header-default");
+const homeHeaderTimersEl = document.getElementById("home-header-timers");
 
 const feedBtn = document.getElementById("log-feed");
 const feedMenu = document.getElementById("feed-menu");
@@ -827,6 +829,17 @@ function startMiscTimedEventTicker() {
   miscTimedEventTickerId = window.setInterval(updateMiscTimedEventControls, 30000);
 }
 
+function syncHomeHeaderTimerState() {
+  if (!homeHeaderDefaultEl || !homeHeaderTimersEl) {
+    return;
+  }
+  const hasActiveTimer = Boolean(
+    homeHeaderTimersEl.querySelector(".active-timer-banner.is-active"),
+  );
+  homeHeaderDefaultEl.hidden = hasActiveTimer;
+  homeHeaderTimersEl.setAttribute("aria-hidden", hasActiveTimer ? "false" : "true");
+}
+
 function updateTimedEventBanner(startInfo, durationMinutes) {
   if (
     !timedEventBannerEl
@@ -846,6 +859,7 @@ function updateTimedEventBanner(startInfo, durationMinutes) {
       timedEventBannerActionEl.removeAttribute("title");
       timedEventBannerActionEl.textContent = "End timed event";
     }
+    syncHomeHeaderTimerState();
     return;
   }
   const label = formatEntryTypeLabel(startInfo.type);
@@ -864,6 +878,7 @@ function updateTimedEventBanner(startInfo, durationMinutes) {
       ? `End ${label.toLowerCase()}`
       : "Choose a user to log the event";
   }
+  syncHomeHeaderTimerState();
 }
 
 function updateMiscTimedEventControls() {
@@ -936,6 +951,7 @@ function updateBreastfeedBanner(startInfo, durationMinutes) {
       breastfeedBannerActionEl.disabled = false;
       breastfeedBannerActionEl.removeAttribute("title");
     }
+    syncHomeHeaderTimerState();
     return;
   }
   const startedBy = startInfo.startedBy || "--";
@@ -951,6 +967,7 @@ function updateBreastfeedBanner(startInfo, durationMinutes) {
       ? "End breastfeeding"
       : "Choose a user to log the feed";
   }
+  syncHomeHeaderTimerState();
 }
 
 function updateBreastfeedButton() {
@@ -5127,10 +5144,15 @@ function renderSleepTrendChartInto(entries, { chartEl, labelsEl, averageChipEl, 
     chartEl.appendChild(dot);
 
     const label = dailyTotals[index].date.toLocaleDateString(undefined, { weekday: "short" });
-    const labelEl = document.createElement("span");
-    labelEl.textContent = label;
-    labelsEl.appendChild(labelEl);
+    appendChartAxisLabel(labelsEl, label, point.x, width);
   });
+}
+
+function appendChartAxisLabel(labelsEl, label, x, chartWidth) {
+  const labelEl = document.createElement("span");
+  labelEl.textContent = label;
+  labelEl.style.left = `${(x / chartWidth) * 100}%`;
+  labelsEl.appendChild(labelEl);
 }
 
 function renderSleepTrendChart(entries) {
@@ -5411,10 +5433,12 @@ function renderWeightPercentileChart(entries = summaryWeightEntries) {
   const latest = points[points.length - 1];
   weightPercentileLatestEl.textContent = `${latest.weightKg.toFixed(2)} kg at ${Math.round(latest.ageWeeks)}w, ${formatOrdinal(latest.percentile)}`;
   weightPercentileRangeEl.textContent = `${points.length} weight ${points.length === 1 ? "log" : "logs"} · WHO boys 0-${Math.round(xMaxMonths)} months`;
-  ["Birth", `${Math.round(xMaxWeeks / 2)}w`, `${Math.round(xMaxWeeks)}w`].forEach((label) => {
-    const labelEl = document.createElement("span");
-    labelEl.textContent = label;
-    weightPercentileLabelsEl.appendChild(labelEl);
+  [
+    { label: "Birth", x: paddingLeft },
+    { label: `${Math.round(xMaxWeeks / 2)}w`, x: paddingLeft + plotWidth / 2 },
+    { label: `${Math.round(xMaxWeeks)}w`, x: width - paddingRight },
+  ].forEach(({ label, x }) => {
+    appendChartAxisLabel(weightPercentileLabelsEl, label, x, width);
   });
 }
 
@@ -5568,9 +5592,12 @@ function renderHomeFeedVolumeChart(entries) {
       homeFeedVolumeChartEl.appendChild(value);
     }
 
-    const labelEl = document.createElement("span");
-    labelEl.textContent = day.date.toLocaleDateString(undefined, { weekday: "short" });
-    homeFeedVolumeLabelsEl.appendChild(labelEl);
+    appendChartAxisLabel(
+      homeFeedVolumeLabelsEl,
+      day.date.toLocaleDateString(undefined, { weekday: "short" }),
+      x + barWidth / 2,
+      width,
+    );
   });
 }
 
@@ -6879,8 +6906,9 @@ function renderChart(entries, chartWindows) {
     chartPanelsEl.appendChild(panelEl);
   });
   const latestPanelEl = chartPanelsEl.querySelector('[data-chart-latest="true"]');
-  if (latestPanelEl) {
-    latestPanelEl.scrollIntoView({ behavior: "auto", block: "nearest", inline: "start" });
+  const chartScrollEl = chartPanelsEl.closest(".chart-wrap");
+  if (latestPanelEl && chartScrollEl) {
+    chartScrollEl.scrollLeft = chartScrollEl.scrollWidth;
   }
 }
 
