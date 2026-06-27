@@ -12,9 +12,10 @@ from src.app.services.push_subscriptions import (
     SendPushFn,
     VapidConfig,
     build_push_payload,
+    claim_push_subscription_notification,
     delete_push_subscription,
     list_push_subscriptions,
-    mark_push_subscription_notified,
+    restore_push_subscription_delivery_state,
     send_web_push,
 )
 
@@ -74,8 +75,16 @@ def dispatch_feed_due(
         due_users.append(user_slug)
         if (
             subscription.get("last_notified_entry_id") == source_entry_id
-            and subscription.get("last_notified_due_at_utc") == next_timestamp
         ):
+            continue
+        claimed = claim_push_subscription_notification(
+            db_path,
+            user_slug=user_slug,
+            entry_id=source_entry_id,
+            due_at_utc=next_timestamp,
+            sent_at_utc=now.isoformat(),
+        )
+        if not claimed:
             continue
         payload = build_push_payload(
             title="Feed due",
@@ -85,19 +94,19 @@ def dispatch_feed_due(
         )
         result = sender(subscription, payload, vapid_config)
         if result.get("sent"):
-            mark_push_subscription_notified(
-                db_path,
-                user_slug=user_slug,
-                last_notified_entry_id=source_entry_id,
-                last_notified_due_at_utc=next_timestamp,
-                last_sent_at_utc=now.isoformat(),
-            )
             sent_users.append(user_slug)
             continue
         reason = result.get("reason")
         if reason == "invalid_subscription":
             delete_push_subscription(db_path, user_slug)
             invalid_users.append(user_slug)
+            continue
+        restore_push_subscription_delivery_state(
+            db_path,
+            user_slug=user_slug,
+            claimed_entry_id=source_entry_id,
+            previous_state=subscription,
+        )
 
     if sent_users:
         return {"sent": True, "users": sent_users}

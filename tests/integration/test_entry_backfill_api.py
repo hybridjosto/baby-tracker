@@ -171,6 +171,94 @@ def test_parse_backfill_rejects_malformed_openai_response(client, monkeypatch):
     assert response.get_json()["error"] == "OpenAI returned invalid backfill drafts"
 
 
+def test_shortcut_backfill_parses_and_commits_in_one_request(client, monkeypatch):
+    from src.app.services import entry_backfill
+
+    monkeypatch.setattr(
+        entry_backfill,
+        "_call_openai",
+        lambda **kwargs: json.dumps(
+            {
+                "drafts": [
+                    _draft(
+                        "feed-1",
+                        "feed",
+                        "2026-06-06T07:00:00+00:00",
+                        formula_ml=120,
+                    ),
+                    _draft(
+                        "wee-1",
+                        "wee",
+                        "2026-06-06T08:00:00+00:00",
+                    ),
+                ]
+            }
+        ),
+    )
+    request_payload = {
+        "text": "Yesterday at 8am 120ml formula, then a wee at 9am",
+        "reference_time_utc": "2026-06-07T12:00:00+00:00",
+        "timezone": "Europe/London",
+        "request_id": "shortcut-run-123",
+    }
+
+    first = client.post(
+        "/api/users/suz/entries/backfill",
+        json=request_payload,
+    )
+    second = client.post(
+        "/api/users/suz/entries/backfill",
+        json=request_payload,
+    )
+
+    assert first.status_code == 201
+    assert first.get_json()["created"] == 2
+    assert first.get_json()["duplicates"] == 0
+    assert first.get_json()["parsed"] == 2
+    assert first.get_json()["request_id"] == "shortcut-run-123"
+    assert second.status_code == 201
+    assert second.get_json()["created"] == 0
+    assert second.get_json()["duplicates"] == 2
+    assert second.get_json()["batch_id"] == first.get_json()["batch_id"]
+    entries = client.get("/api/entries").get_json()
+    assert len(entries) == 2
+
+
+def test_shortcut_backfill_does_not_save_ambiguous_drafts(client, monkeypatch):
+    from src.app.services import entry_backfill
+
+    monkeypatch.setattr(
+        entry_backfill,
+        "_call_openai",
+        lambda **kwargs: json.dumps(
+            {
+                "drafts": [
+                    _draft(
+                        "feed-1",
+                        "feed",
+                        "2026-06-06T07:00:00+00:00",
+                        warnings=["Feed amount was not supplied."],
+                    )
+                ]
+            }
+        ),
+    )
+
+    response = client.post(
+        "/api/users/suz/entries/backfill",
+        json={
+            "text": "Yesterday morning there was a feed",
+            "reference_time_utc": "2026-06-07T12:00:00+00:00",
+        },
+    )
+
+    assert response.status_code == 400
+    payload = response.get_json()
+    assert payload["error"] == "Backfill entries require correction"
+    assert payload["drafts"][0]["warnings"] == ["Feed amount was not supplied."]
+    assert client.get("/api/entries").get_json() == []
+
+
 def test_commit_backfill_is_atomic_and_rejects_unresolved_warnings(client):
     response = client.post(
         "/api/users/suz/entries/backfill/commit",

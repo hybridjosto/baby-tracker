@@ -119,10 +119,29 @@ Example sync response:
 ## AI-Assisted Historical Backfill
 - The Event Log includes an **Add previous entries with AI** panel for describing up to 10 historical events in plain text.
 - AI creates editable drafts only. Entries are written after warnings are reviewed and **Save entries** is selected.
+- `POST /api/users/<user_slug>/entries/backfill` is the single-call Siri Shortcut endpoint. It accepts `text`, optional `reference_time_utc`, optional `timezone`, and optional `request_id`, then parses and atomically saves the entries when every draft is valid and unambiguous.
 - `POST /api/users/<user_slug>/entries/backfill/parse` accepts `text`, optional `reference_time_utc`, and optional `timezone`.
 - `POST /api/users/<user_slug>/entries/backfill/commit` accepts the returned `batch_id` and reviewed `entries`.
 - Backfill writes are atomic and retry-safe. They do not stop active sleep timers or trigger entry pushes, webhooks, or KPI dispatches.
 - The parser uses the existing OpenAI model, timeout, and server-side API key configuration.
+
+Example Shortcut request:
+
+```http
+POST https://homelab.tail458584.ts.net/baby/api/users/josh/entries/backfill
+Content-Type: application/json
+
+{
+  "text": "Yesterday at 8pm 120ml formula, slept from 9pm until 11pm",
+  "timezone": "Europe/London",
+  "request_id": "a UUID generated once for this Shortcut run"
+}
+```
+
+In Apple Shortcuts, use **Dictate Text**, create a **Dictionary** with the dictated
+text, `Europe/London`, and a generated UUID, then pass it as the JSON request body
+to **Get Contents of URL**. A successful request returns HTTP `201`. Ambiguous or
+incomplete input returns HTTP `400` with `drafts` and `details`, and saves nothing.
 
 ## Local-only API via Caddy + Tailscale
 Use Caddy to expose just the `/api` endpoints over your tailnet while keeping the

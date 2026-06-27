@@ -135,3 +135,73 @@ def update_push_subscription_delivery_state(
     )
     conn.commit()
     return get_push_subscription(conn, user_slug)
+
+
+def claim_push_subscription_notification(
+    conn: sqlite3.Connection | None,
+    *,
+    user_slug: str,
+    entry_id: int,
+    due_at_utc: str,
+    sent_at_utc: str,
+) -> bool:
+    assert conn is not None
+    now = _now_utc_iso()
+    result = conn.execute(
+        """
+        UPDATE push_subscriptions
+        SET last_notified_entry_id = ?,
+            last_notified_due_at_utc = ?,
+            last_sent_at_utc = ?,
+            updated_at_utc = ?
+        WHERE user_slug = ?
+          AND (
+              last_notified_entry_id IS NULL
+              OR last_notified_entry_id <> ?
+          )
+        """,
+        (
+            entry_id,
+            due_at_utc,
+            sent_at_utc,
+            now,
+            user_slug,
+            entry_id,
+        ),
+    )
+    conn.commit()
+    return result.rowcount > 0
+
+
+def restore_push_subscription_delivery_state(
+    conn: sqlite3.Connection | None,
+    *,
+    user_slug: str,
+    claimed_entry_id: int,
+    last_notified_entry_id: int | None,
+    last_notified_due_at_utc: str | None,
+    last_sent_at_utc: str | None,
+) -> bool:
+    assert conn is not None
+    now = _now_utc_iso()
+    result = conn.execute(
+        """
+        UPDATE push_subscriptions
+        SET last_notified_entry_id = ?,
+            last_notified_due_at_utc = ?,
+            last_sent_at_utc = ?,
+            updated_at_utc = ?
+        WHERE user_slug = ?
+          AND last_notified_entry_id = ?
+        """,
+        (
+            last_notified_entry_id,
+            last_notified_due_at_utc,
+            last_sent_at_utc,
+            now,
+            user_slug,
+            claimed_entry_id,
+        ),
+    )
+    conn.commit()
+    return result.rowcount > 0

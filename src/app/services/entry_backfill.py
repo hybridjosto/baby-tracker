@@ -31,7 +31,7 @@ def parse_backfill_text(
     *,
     now_utc: datetime | None = None,
 ) -> dict:
-    normalize_user_slug(user_slug)
+    normalized_slug = normalize_user_slug(user_slug)
     text = _normalize_text(payload.get("text"))
     reference_time = _normalize_reference_time(
         payload.get("reference_time_utc"),
@@ -53,7 +53,15 @@ def parse_backfill_text(
         timeout_seconds=settings["openai_timeout_seconds"],
     )
     raw_drafts = _parse_openai_drafts(content)
-    batch_id = uuid.uuid4().hex
+    request_id = _normalize_request_id(payload.get("request_id"))
+    batch_id = (
+        uuid.uuid5(
+            uuid.NAMESPACE_URL,
+            f"baby-tracker-backfill:{normalized_slug}:{request_id}",
+        ).hex
+        if request_id
+        else uuid.uuid4().hex
+    )
     drafts = [
         _normalize_draft(
             raw,
@@ -73,6 +81,7 @@ def parse_backfill_text(
         "reference_time_utc": reference_time.isoformat(),
         "timezone": timezone_name,
         "allowed_types": allowed_types,
+        "request_id": request_id,
     }
 
 
@@ -200,6 +209,17 @@ def _normalize_batch_id(value: object) -> str:
     cleaned = value.strip().lower()
     if len(cleaned) != 32 or any(char not in "0123456789abcdef" for char in cleaned):
         raise ValueError("batch_id must be a 32-character hexadecimal ID")
+    return cleaned
+
+
+def _normalize_request_id(value: object) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError("request_id must be a non-empty string")
+    cleaned = value.strip()
+    if len(cleaned) > 200:
+        raise ValueError("request_id must be 200 characters or fewer")
     return cleaned
 
 

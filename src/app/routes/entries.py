@@ -245,6 +245,55 @@ def parse_user_entry_backfill_route(user_slug: str):
         return jsonify({"error": str(exc)}), exc.status_code
 
 
+@entries_api.post("/users/<user_slug>/entries/backfill")
+def create_user_entry_backfill_route(user_slug: str):
+    payload = request.get_json(silent=True) or {}
+    parsed = None
+    try:
+        parsed = parse_backfill_text(_db_path(), user_slug, payload)
+        parsed["drafts"] = [
+            {**draft, "draft_id": f"draft-{index}"}
+            for index, draft in enumerate(parsed["drafts"], start=1)
+        ]
+        result = commit_backfill_entries(
+            _db_path(),
+            user_slug,
+            {
+                "batch_id": parsed["batch_id"],
+                "entries": parsed["drafts"],
+            },
+        )
+        return (
+            jsonify(
+                {
+                    **result,
+                    "parsed": parsed["count"],
+                    "truncated": parsed["truncated"],
+                    "model": parsed["model"],
+                    "provider": parsed["provider"],
+                    "request_id": parsed["request_id"],
+                }
+            ),
+            201,
+        )
+    except BackfillValidationError as exc:
+        return (
+            jsonify(
+                {
+                    "error": str(exc),
+                    "details": exc.errors,
+                    "batch_id": parsed["batch_id"] if parsed else None,
+                    "drafts": parsed["drafts"] if parsed else [],
+                }
+            ),
+            400,
+        )
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except EntryBackfillError as exc:
+        return jsonify({"error": str(exc)}), exc.status_code
+
+
 @entries_api.post("/users/<user_slug>/entries/backfill/commit")
 def commit_user_entry_backfill_route(user_slug: str):
     payload = request.get_json(silent=True) or {}

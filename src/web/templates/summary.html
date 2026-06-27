@@ -336,6 +336,43 @@
                 color: var(--text-secondary);
                 text-align: right;
             }
+            .summary-event-list {
+                display: grid;
+                gap: 8px;
+                margin: 0;
+                padding: 0;
+                list-style: none;
+            }
+            .summary-event-item {
+                display: grid;
+                grid-template-columns: minmax(0, 1fr) auto;
+                gap: 12px;
+                padding: 10px 12px;
+                border-radius: 12px;
+                background: var(--surface-soft);
+            }
+            html.dark .summary-event-item {
+                background: rgba(255, 255, 255, 0.06);
+            }
+            .summary-event-main {
+                min-width: 0;
+            }
+            .summary-event-title {
+                font-size: 14px;
+                font-weight: 700;
+            }
+            .summary-event-detail,
+            .summary-event-byline {
+                margin-top: 3px;
+                font-size: 12px;
+                color: var(--text-secondary);
+                overflow-wrap: anywhere;
+            }
+            .summary-event-time {
+                font-size: 13px;
+                font-weight: 700;
+                white-space: nowrap;
+            }
             .sleep-gantt-controls {
                 display: flex;
                 flex-wrap: wrap;
@@ -526,13 +563,21 @@
             }
             .sleep-trend-meta {
                 display: flex;
-                justify-content: flex-start;
+                align-items: center;
+                justify-content: space-between;
+                gap: 8px;
+                flex-wrap: wrap;
                 margin: 0 0 8px;
             }
             .sleep-trend-chart-wrap svg {
                 display: block;
                 width: 100%;
-                height: 80px;
+                height: 112px;
+            }
+            .sleep-trend-goal-band {
+                fill: rgba(19, 236, 91, 0.12);
+                stroke: rgba(19, 236, 91, 0.32);
+                stroke-width: 1;
             }
             .sleep-trend-line {
                 stroke: #7c83ff;
@@ -543,6 +588,44 @@
             }
             .sleep-trend-dot {
                 fill: #7c83ff;
+            }
+            .sleep-trend-line-day {
+                stroke: #f59e0b;
+                stroke-width: 1.8;
+                fill: none;
+                stroke-linecap: round;
+                stroke-linejoin: round;
+            }
+            .sleep-trend-line-night {
+                stroke: #38bdf8;
+                stroke-width: 1.8;
+                fill: none;
+                stroke-linecap: round;
+                stroke-linejoin: round;
+            }
+            .sleep-trend-legend {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                flex-wrap: wrap;
+                font-size: 11px;
+                color: var(--text-secondary);
+            }
+            .sleep-trend-legend span {
+                display: inline-flex;
+                align-items: center;
+                gap: 5px;
+            }
+            .sleep-trend-legend i {
+                width: 14px;
+                height: 3px;
+                border-radius: 999px;
+                background: var(--legend-color);
+            }
+            .sleep-trend-legend .is-band i {
+                height: 8px;
+                border: 1px solid rgba(19, 236, 91, 0.32);
+                background: rgba(19, 236, 91, 0.12);
             }
             .sleep-trend-grid {
                 stroke: var(--border-light);
@@ -1326,31 +1409,6 @@
                     </button>
                 </div>
 
-                <section class="summary-panel">
-                    <div class="summary-panel-header">
-                        <h2>Summary</h2>
-                        <div class="summary-panel-meta">Selected day</div>
-                    </div>
-                    <div class="ai-summary-body">
-                        <div class="ai-summary-actions">
-                            <button
-                                class="ai-summary-btn"
-                                id="ai-summary-generate"
-                                type="button"
-                            >
-                                Generate summary
-                            </button>
-                            <div class="ai-summary-meta" id="ai-summary-meta">
-                                Uses notes and events from this date.
-                            </div>
-                        </div>
-                        <div
-                            class="ai-summary-output"
-                            id="ai-summary-output"
-                        ></div>
-                    </div>
-                </section>
-
                 <div class="summary-section-title">Overview</div>
                 <section class="summary-grid">
                     <div class="summary-card">
@@ -1491,12 +1549,27 @@
                                 class="sleep-trend-average-chip"
                                 id="sleep-trend-average-chip"
                             ></div>
+                            <div
+                                class="sleep-trend-legend"
+                                aria-label="Sleep trend legend"
+                            >
+                                <span style="--legend-color: #7c83ff"
+                                    ><i></i>Total</span
+                                >
+                                <span style="--legend-color: #f59e0b"
+                                    ><i></i>Day</span
+                                >
+                                <span style="--legend-color: #38bdf8"
+                                    ><i></i>Night</span
+                                >
+                                <span class="is-band"><i></i>Goal 12–15h</span>
+                            </div>
                         </div>
                         <svg
                             id="sleep-trend-chart"
-                            viewBox="0 0 320 80"
+                            viewBox="0 0 320 112"
                             role="img"
-                            aria-label="Daily sleep trend for today plus the last 7 complete days"
+                            aria-label="Daily total, day, and night sleep trend with a 12 to 15 hour goal band"
                         ></svg>
                         <div
                             class="sleep-trend-labels"
@@ -1712,6 +1785,50 @@
                         <div
                             class="ai-summary-output"
                             id="ai-chat-output"
+                        ></div>
+                    </div>
+                </section>
+
+                <section class="summary-panel" id="summary-events-panel">
+                    <div class="summary-panel-header">
+                        <h2>Events</h2>
+                        <div
+                            class="summary-panel-meta"
+                            id="summary-events-count"
+                        >
+                            Selected day
+                        </div>
+                    </div>
+                    <ul
+                        class="summary-event-list"
+                        id="summary-events-list"
+                    ></ul>
+                    <div class="summary-empty" id="summary-events-empty">
+                        No events logged for this day.
+                    </div>
+                </section>
+
+                <section class="summary-panel" id="ai-summary-panel">
+                    <div class="summary-panel-header">
+                        <h2>Summary</h2>
+                        <div class="summary-panel-meta">Selected day</div>
+                    </div>
+                    <div class="ai-summary-body">
+                        <div class="ai-summary-actions">
+                            <button
+                                class="ai-summary-btn"
+                                id="ai-summary-generate"
+                                type="button"
+                            >
+                                Generate summary
+                            </button>
+                            <div class="ai-summary-meta" id="ai-summary-meta">
+                                Uses notes and events from this date.
+                            </div>
+                        </div>
+                        <div
+                            class="ai-summary-output"
+                            id="ai-summary-output"
                         ></div>
                     </div>
                 </section>

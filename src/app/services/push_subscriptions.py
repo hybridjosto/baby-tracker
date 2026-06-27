@@ -7,9 +7,11 @@ from typing import Callable
 
 from src.app.storage.db import get_connection
 from src.app.storage.push_subscriptions import (
+    claim_push_subscription_notification as repo_claim_push_subscription_notification,
     delete_push_subscription as repo_delete_push_subscription,
     get_push_subscription as repo_get_push_subscription,
     list_push_subscriptions as repo_list_push_subscriptions,
+    restore_push_subscription_delivery_state as repo_restore_push_subscription_delivery_state,
     upsert_push_subscription as repo_upsert_push_subscription,
     update_push_subscription_delivery_state,
 )
@@ -114,6 +116,46 @@ def mark_push_subscription_notified(
             last_notified_entry_id=last_notified_entry_id,
             last_notified_due_at_utc=last_notified_due_at_utc,
             last_sent_at_utc=last_sent_at_utc,
+        )
+
+
+def claim_push_subscription_notification(
+    db_path: str,
+    *,
+    user_slug: str,
+    entry_id: int,
+    due_at_utc: str,
+    sent_at_utc: str,
+) -> bool:
+    normalized = normalize_user_slug(user_slug)
+    with get_connection(db_path) as conn:
+        return repo_claim_push_subscription_notification(
+            conn,
+            user_slug=normalized,
+            entry_id=entry_id,
+            due_at_utc=due_at_utc,
+            sent_at_utc=sent_at_utc,
+        )
+
+
+def restore_push_subscription_delivery_state(
+    db_path: str,
+    *,
+    user_slug: str,
+    claimed_entry_id: int,
+    previous_state: dict,
+) -> bool:
+    normalized = normalize_user_slug(user_slug)
+    with get_connection(db_path) as conn:
+        return repo_restore_push_subscription_delivery_state(
+            conn,
+            user_slug=normalized,
+            claimed_entry_id=claimed_entry_id,
+            last_notified_entry_id=previous_state.get("last_notified_entry_id"),
+            last_notified_due_at_utc=previous_state.get(
+                "last_notified_due_at_utc"
+            ),
+            last_sent_at_utc=previous_state.get("last_sent_at_utc"),
         )
 
 

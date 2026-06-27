@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+import threading
 
 from src.app.services.entries import create_entry
 from src.app.services.feed_due import dispatch_feed_due
@@ -79,7 +80,7 @@ def test_dispatch_feed_due_only_sends_once_per_due_time(tmp_path):
     assert len(calls) == 1
 
 
-def test_dispatch_feed_due_sends_again_when_due_time_changes(tmp_path):
+def test_dispatch_feed_due_does_not_send_again_when_due_time_changes(tmp_path):
     db_path = str(tmp_path / "test.sqlite")
     _setup_feed(db_path)
 
@@ -111,9 +112,79 @@ def test_dispatch_feed_due_sends_again_when_due_time_changes(tmp_path):
         now_utc=datetime(2026, 1, 1, 2, 2, tzinfo=timezone.utc),
         send_fn=sender,
     )
-    assert second["sent"] is True
+    assert second["sent"] is False
+    assert second["reason"] == "already_sent"
     assert second["users"] == ["suz"]
-    assert len(calls) == 2
+    assert len(calls) == 1
+
+
+def test_dispatch_feed_due_allows_retry_after_failed_delivery(tmp_path):
+    db_path = str(tmp_path / "test.sqlite")
+    _setup_feed(db_path)
+    calls = []
+
+    def sender(subscription, payload, vapid_config):
+        calls.append(subscription["user_slug"])
+        if len(calls) == 1:
+            return {"sent": False, "reason": "push_failed"}
+        return {"sent": True}
+
+    now = datetime(2026, 1, 1, 1, 1, tzinfo=timezone.utc)
+    first = dispatch_feed_due(
+        db_path,
+        vapid_config=VAPID_CONFIG,
+        now_utc=now,
+        send_fn=sender,
+    )
+    second = dispatch_feed_due(
+        db_path,
+        vapid_config=VAPID_CONFIG,
+        now_utc=now,
+        send_fn=sender,
+    )
+
+    assert first == {"sent": False, "reason": "already_sent", "users": ["suz"]}
+    assert second == {"sent": True, "users": ["suz"]}
+    assert calls == ["suz", "suz"]
+
+
+def test_dispatch_feed_due_claims_feed_once_across_concurrent_runs(tmp_path):
+    db_path = str(tmp_path / "test.sqlite")
+    _setup_feed(db_path)
+    calls = []
+    sender_started = threading.Event()
+    release_sender = threading.Event()
+
+    def sender(subscription, payload, vapid_config):
+        calls.append(subscription["user_slug"])
+        sender_started.set()
+        release_sender.wait(timeout=2)
+        return {"sent": True}
+
+    now = datetime(2026, 1, 1, 1, 1, tzinfo=timezone.utc)
+    results = []
+
+    def dispatch():
+        results.append(
+            dispatch_feed_due(
+                db_path,
+                vapid_config=VAPID_CONFIG,
+                now_utc=now,
+                send_fn=sender,
+            )
+        )
+
+    first = threading.Thread(target=dispatch)
+    second = threading.Thread(target=dispatch)
+    first.start()
+    assert sender_started.wait(timeout=2)
+    second.start()
+    second.join(timeout=2)
+    release_sender.set()
+    first.join(timeout=2)
+
+    assert len(calls) == 1
+    assert sorted(result["sent"] for result in results) == [False, True]
 
 
 def test_dispatch_feed_due_not_due(tmp_path):

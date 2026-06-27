@@ -138,6 +138,9 @@ const summaryDateInputEl = document.getElementById("summary-date");
 const summaryDateLabelEl = document.getElementById("summary-date-label");
 const summaryPrevBtn = document.getElementById("summary-prev");
 const summaryNextBtn = document.getElementById("summary-next");
+const summaryEventsListEl = document.getElementById("summary-events-list");
+const summaryEventsEmptyEl = document.getElementById("summary-events-empty");
+const summaryEventsCountEl = document.getElementById("summary-events-count");
 const aiSummaryGenerateBtn = document.getElementById("ai-summary-generate");
 const aiSummaryMetaEl = document.getElementById("ai-summary-meta");
 const aiSummaryOutputEl = document.getElementById("ai-summary-output");
@@ -4297,6 +4300,73 @@ function computeFeedTotalMl(entries) {
   return totalMl;
 }
 
+function renderSummaryEventList(entries) {
+  if (!summaryEventsListEl || !summaryEventsEmptyEl || !summaryEventsCountEl) {
+    return;
+  }
+  summaryEventsListEl.replaceChildren();
+  const sortedEntries = [...entries].sort((a, b) => {
+    return new Date(b.timestamp_utc).getTime() - new Date(a.timestamp_utc).getTime();
+  });
+  const count = sortedEntries.length;
+  summaryEventsCountEl.textContent = `${count} event${count === 1 ? "" : "s"} · selected day`;
+  summaryEventsEmptyEl.style.display = count ? "none" : "block";
+
+  sortedEntries.forEach((entry) => {
+    const item = document.createElement("li");
+    item.className = "summary-event-item";
+
+    const main = document.createElement("div");
+    main.className = "summary-event-main";
+    const title = document.createElement("div");
+    title.className = "summary-event-title";
+    title.textContent = formatEntryTypeLabel(entry.type);
+    main.appendChild(title);
+
+    const details = [];
+    if (entry.amount_ml !== null && entry.amount_ml !== undefined) {
+      details.push(`Amount ${formatMl(entry.amount_ml)}`);
+    }
+    if (entry.expressed_ml !== null && entry.expressed_ml !== undefined) {
+      details.push(`Expressed ${formatMl(entry.expressed_ml)}`);
+    }
+    if (entry.formula_ml !== null && entry.formula_ml !== undefined) {
+      details.push(`Formula ${formatMl(entry.formula_ml)}`);
+    }
+    if (entry.weight_kg !== null && entry.weight_kg !== undefined) {
+      details.push(`${Number(entry.weight_kg).toFixed(2)} kg`);
+    }
+    if (entry.feed_duration_min !== null && entry.feed_duration_min !== undefined) {
+      details.push(`Duration ${formatDurationMinutes(entry.feed_duration_min)}`);
+    }
+    if (details.length) {
+      const detail = document.createElement("div");
+      detail.className = "summary-event-detail";
+      detail.textContent = details.join(" · ");
+      main.appendChild(detail);
+    }
+    if (entry.notes) {
+      const notes = document.createElement("div");
+      notes.className = "summary-event-detail";
+      notes.textContent = entry.notes;
+      main.appendChild(notes);
+    }
+    if (entry.user_slug) {
+      const byline = document.createElement("div");
+      byline.className = "summary-event-byline";
+      byline.textContent = `Logged by ${entry.user_slug}`;
+      main.appendChild(byline);
+    }
+
+    const time = document.createElement("time");
+    time.className = "summary-event-time";
+    time.dateTime = entry.timestamp_utc;
+    time.textContent = formatSummaryTime(entry.timestamp_utc);
+    item.append(main, time);
+    summaryEventsListEl.appendChild(item);
+  });
+}
+
 function setSummaryDate(date) {
   summaryDate = date;
   if (summaryDateInputEl) {
@@ -5048,7 +5118,17 @@ function renderMilkExpressSparkline(dayMatches) {
   milkExpressSparklineEl.appendChild(dot);
 }
 
-function renderSleepTrendChartInto(entries, { chartEl, labelsEl, averageChipEl, baseDate }) {
+function renderSleepTrendChartInto(
+  entries,
+  {
+    chartEl,
+    labelsEl,
+    averageChipEl,
+    baseDate,
+    showGoalBand = false,
+    showSplitSeries = false,
+  },
+) {
   if (!chartEl || !labelsEl || !averageChipEl) {
     return;
   }
@@ -5065,34 +5145,47 @@ function renderSleepTrendChartInto(entries, { chartEl, labelsEl, averageChipEl, 
     const date = new Date(today);
     date.setDate(date.getDate() - i);
     date.setHours(0, 0, 0, 0);
-    const nextDate = new Date(date);
-    nextDate.setDate(nextDate.getDate() + 1);
-
-    const dayEntries = entries.filter((entry) => {
-      if (!isSleepType(entry.type)) return false;
-      const entryDate = new Date(entry.timestamp_utc);
-      return entryDate >= date && entryDate < nextDate;
+    const split = getSplitSleepMinutesForDay(entries, date);
+    dailyTotals.push({
+      date,
+      dayMinutes: split.dayMinutes,
+      nightMinutes: split.nightMinutes,
+      totalMinutes: split.dayMinutes + split.nightMinutes,
     });
-
-    const totalMinutes = dayEntries.reduce((sum, entry) => {
-      const duration = Number.parseFloat(entry.feed_duration_min);
-      return sum + (Number.isFinite(duration) && duration > 0 ? duration : 0);
-    }, 0);
-
-    dailyTotals.push({ date, totalMinutes });
   }
 
   const averageWindowTotals = dailyTotals.slice(0, averageWindowDays);
-  const maxMinutes = Math.max(...dailyTotals.map((d) => d.totalMinutes), 1);
+  const goalMinMinutes = 12 * 60;
+  const goalMaxMinutes = 15 * 60;
+  const maxMinutes = Math.max(
+    ...dailyTotals.map((day) => day.totalMinutes),
+    showGoalBand ? goalMaxMinutes : 0,
+    1,
+  );
   const averageMinutes = averageWindowTotals.reduce((sum, day) => sum + day.totalMinutes, 0)
     / averageWindowDays;
   const svgNS = "http://www.w3.org/2000/svg";
   const width = 320;
-  const height = 80;
+  const height = showSplitSeries ? 112 : 80;
   const paddingX = 8;
   const paddingY = 8;
   const plotWidth = width - paddingX * 2;
   const plotHeight = height - paddingY * 2;
+  const getY = (minutes) => {
+    return height - paddingY - (minutes / maxMinutes) * plotHeight;
+  };
+
+  if (showGoalBand) {
+    const goalTopY = getY(goalMaxMinutes);
+    const goalBottomY = getY(goalMinMinutes);
+    const goalBand = document.createElementNS(svgNS, "rect");
+    goalBand.setAttribute("x", paddingX);
+    goalBand.setAttribute("y", goalTopY.toFixed(1));
+    goalBand.setAttribute("width", plotWidth.toFixed(1));
+    goalBand.setAttribute("height", Math.max(1, goalBottomY - goalTopY).toFixed(1));
+    goalBand.setAttribute("class", "sleep-trend-goal-band");
+    chartEl.appendChild(goalBand);
+  }
 
   const gridLine = document.createElementNS(svgNS, "line");
   gridLine.setAttribute("x1", paddingX);
@@ -5104,7 +5197,7 @@ function renderSleepTrendChartInto(entries, { chartEl, labelsEl, averageChipEl, 
 
   if (averageMinutes > 0) {
     averageChipEl.textContent = `Avg last 7 complete days: ${formatDurationMinutes(averageMinutes)}`;
-    const averageY = height - paddingY - (averageMinutes / maxMinutes) * plotHeight;
+    const averageY = getY(averageMinutes);
     const averageLine = document.createElementNS(svgNS, "line");
     averageLine.setAttribute("x1", paddingX);
     averageLine.setAttribute("x2", width - paddingX);
@@ -5116,26 +5209,36 @@ function renderSleepTrendChartInto(entries, { chartEl, labelsEl, averageChipEl, 
     averageChipEl.textContent = "Avg last 7 complete days: --";
   }
 
-  const points = dailyTotals.map((day, index) => {
+  const buildPoints = (field) => dailyTotals.map((day, index) => {
     const x = paddingX + (index / (daysShown - 1)) * plotWidth;
-    const y = height - paddingY - (day.totalMinutes / maxMinutes) * plotHeight;
+    const y = getY(day[field]);
     return { x, y };
   });
+  const totalPoints = buildPoints("totalMinutes");
 
-  if (points.length > 1) {
+  const appendTrendPath = (points, className) => {
+    if (points.length <= 1) {
+      return;
+    }
     const path = document.createElementNS(svgNS, "path");
     const d = points
       .map((point, index) => {
         const cmd = index === 0 ? "M" : "L";
         return `${cmd}${point.x.toFixed(1)} ${point.y.toFixed(1)}`;
-    })
+      })
       .join(" ");
     path.setAttribute("d", d);
-    path.setAttribute("class", "sleep-trend-line");
+    path.setAttribute("class", className);
     chartEl.appendChild(path);
-  }
+  };
 
-  points.forEach((point, index) => {
+  if (showSplitSeries) {
+    appendTrendPath(buildPoints("dayMinutes"), "sleep-trend-line-day");
+    appendTrendPath(buildPoints("nightMinutes"), "sleep-trend-line-night");
+  }
+  appendTrendPath(totalPoints, "sleep-trend-line");
+
+  totalPoints.forEach((point, index) => {
     const dot = document.createElementNS(svgNS, "circle");
     dot.setAttribute("cx", point.x.toFixed(1));
     dot.setAttribute("cy", point.y.toFixed(1));
@@ -5161,6 +5264,8 @@ function renderSleepTrendChart(entries) {
     labelsEl: sleepTrendLabelsEl,
     averageChipEl: sleepTrendAverageChipEl,
     baseDate: summaryDate || new Date(),
+    showGoalBand: true,
+    showSplitSeries: true,
   });
 }
 
@@ -9338,7 +9443,7 @@ async function loadSummaryEntries() {
       since: new Date(ganttWindow.since),
       until: ganttWindow.until,
     };
-    trendWindow.since.setDate(trendWindow.since.getDate() - 7);
+    trendWindow.since.setDate(trendWindow.since.getDate() - 8);
     trendWindow.sinceIso = trendWindow.since.toISOString();
     trendWindow.untilIso = trendWindow.until.toISOString();
     const cachedEntries = await listEntriesLocalSafe({
@@ -9365,6 +9470,7 @@ async function loadSummaryEntries() {
       summaryGanttEntries = cachedGanttEntries || cachedEntries;
       summaryWeightEntries = cachedWeightEntries || summaryWeightEntries;
       renderSummaryStats(cachedEntries);
+      renderSummaryEventList(cachedEntries);
       renderSleepGanttTypeOptions(cachedEntries);
       renderSleepGantt(summaryGanttEntries.length ? summaryGanttEntries : cachedEntries);
       renderMilkExpressSummary(cachedEntries);
@@ -9400,6 +9506,7 @@ async function loadSummaryEntries() {
     summaryGanttEntries = ganttEntries;
     summaryWeightEntries = weightEntries;
     renderSummaryStats(entries);
+    renderSummaryEventList(entries);
     renderSleepGanttTypeOptions(entries);
     renderSleepGantt(ganttEntries.length ? ganttEntries : entries);
     renderMilkExpressSummary(entries);
