@@ -429,11 +429,15 @@ const WHO_BOY_WEIGHT_LMS_BY_MONTH = [
   { month: 24, l: -0.0137, m: 12.1515, s: 0.11426 },
 ];
 const WHO_WEIGHT_PERCENTILE_LINES = [
-  { label: "3rd", z: -1.8808 },
-  { label: "15th", z: -1.0364 },
-  { label: "50th", z: 0 },
-  { label: "85th", z: 1.0364 },
-  { label: "97th", z: 1.8808 },
+  { label: "0.4th", z: -2.6521, style: "dashed" },
+  { label: "2nd", z: -2.0537, style: "solid" },
+  { label: "9th", z: -1.3408, style: "dashed" },
+  { label: "25th", z: -0.6745, style: "solid" },
+  { label: "50th", z: 0, style: "dashed" },
+  { label: "75th", z: 0.6745, style: "solid" },
+  { label: "91st", z: 1.3408, style: "dashed" },
+  { label: "98th", z: 2.0537, style: "solid" },
+  { label: "99.6th", z: 2.6521, style: "dashed" },
 ];
 
 
@@ -1414,6 +1418,8 @@ const timelineHourMap = new Map();
 const SUMMARY_INSIGHTS_PAGE_LIMIT = 250;
 const SUMMARY_INSIGHTS_INITIAL_WINDOW_DAYS = 30;
 const SUMMARY_INSIGHTS_MAX_PAGES = 120;
+const BACKGROUND_SYNC_INTERVAL_MS = 5 * 60 * 1000;
+const AUTO_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 const SUMMARY_GANTT_LOOKBACK_HOURS = 24;
 const RULER_DAYS_BACK = 7;
 const RULER_WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -3192,11 +3198,16 @@ function startAutoRefresh(refreshFn) {
   if (refreshTimer) {
     return;
   }
+  let autoRefreshInFlight = false;
   refreshTimer = window.setInterval(() => {
-    if (state.userValid) {
-      void refreshFn();
+    if (!state.userValid || !navigator.onLine || document.visibilityState === "hidden" || autoRefreshInFlight) {
+      return;
     }
-  }, 120000);
+    autoRefreshInFlight = true;
+    Promise.resolve(refreshFn()).finally(() => {
+      autoRefreshInFlight = false;
+    });
+  }, AUTO_REFRESH_INTERVAL_MS);
 }
 
 function generateId() {
@@ -3612,8 +3623,11 @@ function scheduleSync() {
     return;
   }
   syncTimerId = window.setInterval(() => {
+    if (!navigator.onLine || document.visibilityState === "hidden") {
+      return;
+    }
     void syncNow();
-  }, 60000);
+  }, BACKGROUND_SYNC_INTERVAL_MS);
 }
 
 function setNextFeedShortcut(enabled, href) {
@@ -5360,6 +5374,13 @@ function getWeightLogPoints(entries) {
   return getWeightLogPointsForDob(entries, state.babyDob || "");
 }
 
+function formatCompletedWeeks(ageWeeks) {
+  if (!Number.isFinite(ageWeeks)) {
+    return "--";
+  }
+  return String(Math.max(0, Math.floor(ageWeeks)));
+}
+
 function getWeightLogPointsForDob(entries, dobValue) {
   const dob = parseDob(dobValue || "");
   if (!dob) {
@@ -5422,7 +5443,7 @@ function renderWeightPercentileChart(entries = summaryWeightEntries) {
   const shouldShowEmpty = !hasDob || !hasAnyWeight || points.length === 0;
   weightPercentileEmptyEl.style.display = shouldShowEmpty ? "block" : "none";
   weightPercentileChartEl.style.display = shouldShowEmpty ? "none" : "block";
-  weightPercentileLabelsEl.style.display = shouldShowEmpty ? "none" : "flex";
+  weightPercentileLabelsEl.style.display = "none";
   if (shouldShowEmpty) {
     weightPercentileRangeEl.textContent = !hasDob
       ? "Add date of birth in Settings"
@@ -5431,19 +5452,19 @@ function renderWeightPercentileChart(entries = summaryWeightEntries) {
   }
 
   const svgNS = "http://www.w3.org/2000/svg";
-  const width = 320;
-  const height = 128;
-  const paddingLeft = 28;
-  const paddingRight = 34;
-  const paddingTop = 10;
-  const paddingBottom = 18;
+  const width = 640;
+  const height = 430;
+  const paddingLeft = 56;
+  const paddingRight = 58;
+  const paddingTop = 18;
+  const paddingBottom = 62;
   const plotWidth = width - paddingLeft - paddingRight;
   const plotHeight = height - paddingTop - paddingBottom;
   const maxLoggedWeeks = Math.max(...points.map((point) => point.ageWeeks), 1);
-  const xMaxWeeks = Math.min(104, Math.max(26, Math.ceil(maxLoggedWeeks / 4) * 4));
+  const xMaxWeeks = Math.min(104, Math.max(52, Math.ceil(maxLoggedWeeks / 4) * 4));
   const xMaxMonths = xMaxWeeks * 7 / 30.4375;
   const curveSamples = [];
-  const sampleCount = Math.max(8, Math.ceil(xMaxWeeks / 2));
+  const sampleCount = Math.max(52, Math.ceil(xMaxWeeks));
   for (let index = 0; index <= sampleCount; index++) {
     const ageWeeks = (index / sampleCount) * xMaxWeeks;
     const ageMonths = (ageWeeks * 7) / 30.4375;
@@ -5457,29 +5478,70 @@ function renderWeightPercentileChart(entries = summaryWeightEntries) {
       .filter((weight) => weight !== null)
   ));
   const allWeights = points.map((point) => point.weightKg).concat(curveWeights);
-  const yMinKg = Math.max(0, Math.floor((Math.min(...allWeights) - 0.5) * 2) / 2);
-  const yMaxKg = Math.ceil((Math.max(...allWeights, 1) + 0.5) * 2) / 2;
+  const yMinKg = 0.5;
+  const yMaxKg = Math.max(13, Math.ceil((Math.max(...allWeights, 1) + 0.5) * 2) / 2);
   const kgSpan = Math.max(1, yMaxKg - yMinKg);
   const xForWeeks = (ageWeeks) => paddingLeft + (ageWeeks / xMaxWeeks) * plotWidth;
   const yForKg = (weightKg) => paddingTop + ((yMaxKg - weightKg) / kgSpan) * plotHeight;
 
-  [yMinKg, yMaxKg].forEach((weightKg) => {
+  const appendSvgText = (text, attributes = {}) => {
+    const label = document.createElementNS(svgNS, "text");
+    label.textContent = text;
+    Object.entries(attributes).forEach(([name, value]) => {
+      label.setAttribute(name, value);
+    });
+    weightPercentileChartEl.appendChild(label);
+    return label;
+  };
+
+  for (let ageWeeks = 0; ageWeeks <= xMaxWeeks; ageWeeks += 2) {
+    const x = xForWeeks(ageWeeks);
+    const gridLine = document.createElementNS(svgNS, "line");
+    gridLine.setAttribute("x1", x.toFixed(1));
+    gridLine.setAttribute("x2", x.toFixed(1));
+    gridLine.setAttribute("y1", paddingTop);
+    gridLine.setAttribute("y2", paddingTop + plotHeight);
+    gridLine.setAttribute("class", ageWeeks % 4 === 0
+      ? "weight-percentile-grid is-major"
+      : "weight-percentile-grid");
+    weightPercentileChartEl.appendChild(gridLine);
+
+    appendSvgText(String(ageWeeks), {
+      x: x.toFixed(1),
+      y: String(height - 18),
+      class: "weight-percentile-axis-label",
+      "text-anchor": "middle",
+    });
+  }
+
+  for (let weightKg = yMinKg; weightKg <= yMaxKg + 0.001; weightKg += 0.5) {
     const y = yForKg(weightKg);
     const gridLine = document.createElementNS(svgNS, "line");
     gridLine.setAttribute("x1", paddingLeft);
     gridLine.setAttribute("x2", width - paddingRight);
     gridLine.setAttribute("y1", y.toFixed(1));
     gridLine.setAttribute("y2", y.toFixed(1));
-    gridLine.setAttribute("class", "weight-percentile-grid");
+    gridLine.setAttribute("class", Number.isInteger(weightKg)
+      ? "weight-percentile-grid is-major"
+      : "weight-percentile-grid");
     weightPercentileChartEl.appendChild(gridLine);
 
-    const label = document.createElementNS(svgNS, "text");
-    label.setAttribute("x", "2");
-    label.setAttribute("y", (y + 3).toFixed(1));
-    label.setAttribute("class", "weight-percentile-label");
-    label.textContent = `${weightKg.toFixed(1)}kg`;
-    weightPercentileChartEl.appendChild(label);
-  });
+    const kgLabel = Number.isInteger(weightKg) ? String(weightKg) : weightKg.toFixed(1);
+    appendSvgText(weightKg === yMinKg ? `${kgLabel}kg` : kgLabel, {
+      x: String(paddingLeft - 8),
+      y: (y + 4).toFixed(1),
+      class: "weight-percentile-axis-label",
+      "text-anchor": "end",
+    });
+  }
+
+  const axisLine = document.createElementNS(svgNS, "rect");
+  axisLine.setAttribute("x", paddingLeft);
+  axisLine.setAttribute("y", paddingTop);
+  axisLine.setAttribute("width", plotWidth);
+  axisLine.setAttribute("height", plotHeight);
+  axisLine.setAttribute("class", "weight-percentile-plot-border");
+  weightPercentileChartEl.appendChild(axisLine);
 
   WHO_WEIGHT_PERCENTILE_LINES.forEach((line) => {
     const pathPoints = curveSamples
@@ -5504,16 +5566,15 @@ function renderWeightPercentileChart(entries = summaryWeightEntries) {
     path.setAttribute("d", d);
     path.setAttribute("class", line.label === "50th"
       ? "weight-percentile-line is-median"
-      : "weight-percentile-line");
+      : `weight-percentile-line is-${line.style}`);
     weightPercentileChartEl.appendChild(path);
 
     const lastPoint = pathPoints[pathPoints.length - 1];
-    const label = document.createElementNS(svgNS, "text");
-    label.setAttribute("x", (lastPoint.x + 4).toFixed(1));
-    label.setAttribute("y", (lastPoint.y + 3).toFixed(1));
-    label.setAttribute("class", "weight-percentile-label");
-    label.textContent = line.label;
-    weightPercentileChartEl.appendChild(label);
+    appendSvgText(line.label, {
+      x: (lastPoint.x + 5).toFixed(1),
+      y: (lastPoint.y + 3).toFixed(1),
+      class: "weight-percentile-centile-label",
+    });
   });
 
   if (points.length > 1) {
@@ -5535,16 +5596,45 @@ function renderWeightPercentileChart(entries = summaryWeightEntries) {
     weightPercentileChartEl.appendChild(dot);
   });
 
-  const latest = points[points.length - 1];
-  weightPercentileLatestEl.textContent = `${latest.weightKg.toFixed(2)} kg at ${Math.round(latest.ageWeeks)}w, ${formatOrdinal(latest.percentile)}`;
-  weightPercentileRangeEl.textContent = `${points.length} weight ${points.length === 1 ? "log" : "logs"} · WHO boys 0-${Math.round(xMaxMonths)} months`;
-  [
-    { label: "Birth", x: paddingLeft },
-    { label: `${Math.round(xMaxWeeks / 2)}w`, x: paddingLeft + plotWidth / 2 },
-    { label: `${Math.round(xMaxWeeks)}w`, x: width - paddingRight },
-  ].forEach(({ label, x }) => {
-    appendChartAxisLabel(weightPercentileLabelsEl, label, x, width);
+  for (let month = 1; month <= Math.floor(xMaxMonths); month++) {
+    const ageWeeks = (month * 30.4375) / 7;
+    if (ageWeeks > xMaxWeeks) {
+      break;
+    }
+    const x = xForWeeks(ageWeeks);
+    const marker = document.createElementNS(svgNS, "line");
+    marker.setAttribute("x1", x.toFixed(1));
+    marker.setAttribute("x2", x.toFixed(1));
+    marker.setAttribute("y1", String(height - 28));
+    marker.setAttribute("y2", String(height - 8));
+    marker.setAttribute("class", "weight-percentile-month-marker");
+    weightPercentileChartEl.appendChild(marker);
+
+    const circle = document.createElementNS(svgNS, "circle");
+    circle.setAttribute("cx", x.toFixed(1));
+    circle.setAttribute("cy", String(height - 38));
+    circle.setAttribute("r", "10");
+    circle.setAttribute("class", "weight-percentile-month-circle");
+    weightPercentileChartEl.appendChild(circle);
+
+    appendSvgText(String(month), {
+      x: x.toFixed(1),
+      y: String(height - 34),
+      class: "weight-percentile-month-label",
+      "text-anchor": "middle",
+    });
+  }
+
+  appendSvgText("Age in weeks / months", {
+    x: String(paddingLeft + (plotWidth / 2)),
+    y: String(height - 50),
+    class: "weight-percentile-axis-title",
+    "text-anchor": "middle",
   });
+
+  const latest = points[points.length - 1];
+  weightPercentileLatestEl.textContent = `${latest.weightKg.toFixed(2)} kg at ${formatCompletedWeeks(latest.ageWeeks)}w, ${formatOrdinal(latest.percentile)}`;
+  weightPercentileRangeEl.textContent = `${points.length} weight ${points.length === 1 ? "log" : "logs"} · WHO boys 0-${Math.round(xMaxMonths)} months`;
 }
 
 function renderSummaryWeightCard(entries = summaryWeightEntries) {
@@ -5577,7 +5667,7 @@ function renderSummaryWeightCard(entries = summaryWeightEntries) {
   }
   const latest = points[points.length - 1];
   summaryCurrentWeightEl.textContent = `${latest.weightKg.toFixed(2)} kg`;
-  summaryWeightPercentileEl.textContent = `${formatOrdinal(latest.percentile)} · ${Math.round(latest.ageWeeks)} weeks`;
+  summaryWeightPercentileEl.textContent = `${formatOrdinal(latest.percentile)} · ${formatCompletedWeeks(latest.ageWeeks)} weeks`;
 }
 
 function renderWeightPercentileSurfaces(entries = summaryWeightEntries) {

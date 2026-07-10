@@ -2,13 +2,6 @@ const STATIC_VERSION = "{{ static_version }}";
 const CACHE_NAME = `baby-tracker-shell-${STATIC_VERSION}`;
 const PRECACHE_URLS = [
   "./",
-  "./log",
-  "./summary",
-  "./timeline",
-  "./calendar",
-  "./calendar/add",
-  "./goals",
-  "./settings",
   "./sw.js",
   `./static/app.js?v=${STATIC_VERSION}`,
   `./static/styles.css?v=${STATIC_VERSION}`,

@@ -35,13 +35,21 @@ def test_chart_labels_use_svg_axis_coordinates():
     assert "function appendChartAxisLabel(" in javascript
     assert "labelEl.style.left = `${(x / chartWidth) * 100}%`;" in javascript
     assert "x + barWidth / 2" in javascript
-    assert "x: paddingLeft + plotWidth / 2" in javascript
+    assert "const width = 640;" in javascript
+    assert "Age in weeks / months" in javascript
+    assert "function formatCompletedWeeks(ageWeeks)" in javascript
+    assert "Math.floor(ageWeeks)" in javascript
+    assert "Math.round(latest.ageWeeks)" not in javascript
+    assert "{ label: \"0.4th\", z: -2.6521, style: \"dashed\" }" in javascript
+    assert "{ label: \"99.6th\", z: 2.6521, style: \"dashed\" }" in javascript
     assert "transform: translateX(-50%);" in home
     assert "transform: translateX(-50%);" in summary
     assert "transform: translateX(-50%);" in weight
     assert "width: min(100%, 320px);" in home
-    assert summary.count("width: min(100%, 320px);") >= 2
-    assert "width: min(100%, 320px);" in weight
+    assert "width: 640px;" in summary
+    assert "width: 640px;" in weight
+    assert "@media (max-width: 540px) and (orientation: landscape)" in summary
+    assert "@media (max-width: 540px) and (orientation: landscape)" in weight
 
 
 def test_home_refresh_keeps_vertical_position_and_timers_use_header():
@@ -55,3 +63,16 @@ def test_home_refresh_keeps_vertical_position_and_timers_use_header():
     assert 'id="home-header-timers"' in home
     assert home.index('id="home-header-timers"') < home.index('<main class="content">')
     assert home.count('{% include "active_timer_banners.html" %}') == 1
+
+
+def test_background_network_work_is_throttled():
+    javascript = (ROOT / "src/web/static/app.js").read_text(encoding="utf-8")
+    service_worker = (ROOT / "src/web/templates/sw.js").read_text(encoding="utf-8")
+
+    assert "const BACKGROUND_SYNC_INTERVAL_MS = 5 * 60 * 1000;" in javascript
+    assert "const AUTO_REFRESH_INTERVAL_MS = 5 * 60 * 1000;" in javascript
+    assert 'document.visibilityState === "hidden"' in javascript
+    assert "autoRefreshInFlight" in javascript
+    assert "./summary" not in service_worker
+    assert "./timeline" not in service_worker
+    assert "./settings" not in service_worker

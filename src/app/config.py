@@ -32,7 +32,10 @@ def load_config() -> AppConfig:
     host = os.getenv("BABY_TRACKER_HOST", "0.0.0.0")
     port = int(os.getenv("BABY_TRACKER_PORT", "8000"))
     base_path = _normalize_base_path(os.getenv("BABY_TRACKER_BASE_PATH", ""))
-    static_version = os.getenv("BABY_TRACKER_STATIC_VERSION", "v2")
+    static_version = os.getenv(
+        "BABY_TRACKER_STATIC_VERSION",
+        "perf-polling-20260710-1",
+    )
     discord_webhook_url = os.getenv("BABY_TRACKER_DISCORD_WEBHOOK_URL")
     tls_cert_path_raw = os.getenv("BABY_TRACKER_TLS_CERT_PATH")
     tls_key_path_raw = os.getenv("BABY_TRACKER_TLS_KEY_PATH")
