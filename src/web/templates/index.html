@@ -265,6 +265,83 @@
         text-transform: uppercase;
         letter-spacing: 0.08em;
       }
+      .stat-card--feed-combined {
+        grid-column: span 2;
+        text-align: left;
+      }
+      .stat-card--feed-combined .stat-label {
+        justify-content: flex-start;
+      }
+      .feed-card-top {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto auto;
+        gap: 10px;
+        align-items: end;
+        margin-bottom: 10px;
+      }
+      .stat-card--feed-combined .stat-link {
+        margin-top: 0;
+        white-space: nowrap;
+      }
+      .stat-card--feed-combined .stat-flip-scene {
+        min-height: 104px;
+      }
+      .feed-card-kicker {
+        display: block;
+        margin-bottom: 3px;
+        font-size: 10px;
+        color: var(--text-secondary);
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      .feed-stat-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.2fr) minmax(58px, 0.55fr) minmax(74px, 0.8fr);
+        gap: 10px;
+        align-items: start;
+      }
+      .feed-stat-grid .stat-sub {
+        margin-top: 5px;
+      }
+      .feed-count-block,
+      .feed-goal-block {
+        padding-left: 10px;
+        border-left: 1px solid var(--border-light);
+      }
+      html.dark .feed-count-block,
+      html.dark .feed-goal-block {
+        border-left-color: var(--border-dark);
+      }
+      .feed-count-block .stat-value {
+        font-size: 24px;
+      }
+      .feed-goal-block .stat-value {
+        font-size: 24px;
+      }
+      .feed-count-label {
+        font-size: 10px;
+        color: var(--text-secondary);
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      @media (max-width: 520px) {
+        .stat-card--feed-combined {
+          grid-column: 1 / -1;
+        }
+        .feed-card-top {
+          grid-template-columns: minmax(0, 1fr) auto;
+          align-items: start;
+        }
+        .stat-card--feed-combined .stat-link {
+          justify-content: flex-start;
+        }
+        .feed-count-block,
+        .feed-goal-block {
+          padding-left: 8px;
+        }
+      }
       .stats-range {
         margin-top: 10px;
         font-size: 11px;
@@ -1581,6 +1658,10 @@
               <span class="material-symbols-outlined" aria-hidden="true">local_drink</span>
               <span class="nav-menu-label">Bottle library</span>
             </a>
+            <a class="nav-menu-item" id="nappy-stock-link" href="{{ base_path }}/nappy-stock" role="menuitem">
+              <span class="material-symbols-outlined" aria-hidden="true">inventory_2</span>
+              <span class="nav-menu-label">Nappy stock</span>
+            </a>
             <a class="nav-menu-item" href="{{ base_path }}/settings" role="menuitem">
               <span class="material-symbols-outlined" aria-hidden="true">settings</span>
               <span class="nav-menu-label">Settings</span>
@@ -1594,77 +1675,61 @@
       </header>
       <main class="content">
         <section class="stats">
-          <div class="stat-card" aria-label="Next feed time">
+          <div class="stat-card stat-card--feed-combined" data-home-stat-key="feed-total" data-home-stat-default-view="today" role="button" tabindex="0" aria-label="Show last 24 hours for feed stats">
             <div class="stat-label">
-              <span class="material-symbols-outlined" style="font-size: 18px; color: #f6c453;">schedule</span>
-              Next feed
+              <span class="material-symbols-outlined" style="font-size: 18px; color: var(--primary);">local_drink</span>
+              Feeding
             </div>
-            <div class="stat-value skeleton-text skeleton-mid" id="next-feed">--</div>
-            <a class="stat-link is-disabled" id="next-feed-shortcut" aria-label="Run feed reminder shortcut">
-              + Reminder
-              <span class="material-symbols-outlined" style="font-size: 14px;">arrow_forward</span>
-            </a>
-          </div>
-          <div class="stat-card" data-home-stat-key="feed-total" data-home-stat-default-view="today" role="button" tabindex="0" aria-label="Show last 24 hours for feed total">
+            <div class="feed-card-top">
+              <div>
+                <span class="feed-card-kicker">Next feed</span>
+                <div class="stat-value skeleton-text skeleton-mid" id="next-feed">--</div>
+              </div>
+              <a class="stat-link is-disabled" id="next-feed-shortcut" aria-label="Run feed reminder shortcut">
+                + Reminder
+                <span class="material-symbols-outlined" style="font-size: 14px;">arrow_forward</span>
+              </a>
+              <a class="stat-link" href="{{ base_path }}/goals" aria-label="Edit feeding goals">
+                Edit goals
+                <span class="material-symbols-outlined" style="font-size: 14px;">arrow_forward</span>
+              </a>
+            </div>
             <div class="stat-flip-scene">
               <div class="stat-face stat-face--front">
-                <div class="stat-label">
-                  <span class="material-symbols-outlined" style="font-size: 18px; color: var(--primary);">local_drink</span>
-                  Feed total (today)
+                <div class="feed-stat-grid">
+                  <div>
+                    <span class="feed-card-kicker">Feed total (today)</span>
+                    <div class="stat-value skeleton-text skeleton-mid" id="stat-feed-ml-today">0 ml</div>
+                    <div class="stat-sub skeleton-text skeleton-wide" id="stat-feed-breakdown-today">Expressed 0 ml · Formula 0 ml</div>
+                  </div>
+                  <div class="feed-count-block">
+                    <div class="feed-count-label">Feeds</div>
+                    <div class="stat-value skeleton-text" id="stat-feed-today">0</div>
+                  </div>
+                  <div class="feed-goal-block">
+                    <div class="feed-count-label">Goal</div>
+                    <div class="stat-value skeleton-text skeleton-mid" id="stat-goal-progress-today">--</div>
+                    <div class="stat-sub skeleton-text skeleton-wide" id="stat-goal-detail-today">Set a 24h goal</div>
+                  </div>
                 </div>
-                <div class="stat-value skeleton-text skeleton-mid" id="stat-feed-ml-today">0 ml</div>
-                <div class="stat-sub skeleton-text skeleton-wide" id="stat-feed-breakdown-today">Expressed 0 ml · Formula 0 ml</div>
               </div>
               <div class="stat-face stat-face--back" aria-hidden="true">
-                <div class="stat-label">
-                  <span class="material-symbols-outlined" style="font-size: 18px; color: var(--primary);">local_drink</span>
-                  Feed total (24h)
+                <div class="feed-stat-grid">
+                  <div>
+                    <span class="feed-card-kicker">Feed total (24h)</span>
+                    <div class="stat-value skeleton-text skeleton-mid" id="stat-feed-ml-24h">0 ml</div>
+                    <div class="stat-sub skeleton-text skeleton-wide" id="stat-feed-breakdown-24h">Expressed 0 ml · Formula 0 ml</div>
+                  </div>
+                  <div class="feed-count-block">
+                    <div class="feed-count-label">Feeds</div>
+                    <div class="stat-value skeleton-text" id="stat-feed-24h">0</div>
+                  </div>
+                  <div class="feed-goal-block">
+                    <div class="feed-count-label">Goal</div>
+                    <div class="stat-value skeleton-text skeleton-mid" id="stat-goal-progress-24h">--</div>
+                    <div class="stat-sub skeleton-text skeleton-wide" id="stat-goal-detail-24h">Set a 24h goal</div>
+                  </div>
                 </div>
-                <div class="stat-value skeleton-text skeleton-mid" id="stat-feed-ml-24h">0 ml</div>
-                <div class="stat-sub skeleton-text skeleton-wide" id="stat-feed-breakdown-24h">Expressed 0 ml · Formula 0 ml</div>
-              </div>
-            </div>
-            <div class="stat-flip-hint">Tap to flip 24h</div>
-          </div>
-          <div class="stat-card" data-home-stat-key="goal" data-home-stat-default-view="today" role="button" tabindex="0" aria-label="Show last 24 hours for feeding goal progress">
-            <div class="stat-flip-scene">
-              <div class="stat-face stat-face--front">
-                <div class="stat-label">
-                  <span class="material-symbols-outlined" style="font-size: 18px; color: #38bdf8;">track_changes</span>
-                  Goal (today)
-                </div>
-                <div class="stat-value skeleton-text skeleton-mid" id="stat-goal-progress-today">--</div>
-                <div class="stat-sub skeleton-text skeleton-wide" id="stat-goal-detail-today">Set a 24h goal</div>
-              </div>
-              <div class="stat-face stat-face--back" aria-hidden="true">
-                <div class="stat-label">
-                  <span class="material-symbols-outlined" style="font-size: 18px; color: #38bdf8;">track_changes</span>
-                  Goal (24h)
-                </div>
-                <div class="stat-value skeleton-text skeleton-mid" id="stat-goal-progress-24h">--</div>
-                <div class="stat-sub skeleton-text skeleton-wide" id="stat-goal-detail-24h">Set a 24h goal</div>
-              </div>
-            </div>
-            <a class="stat-link" href="{{ base_path }}/goals" aria-label="Edit feeding goals">
-              Edit goals
-              <span class="material-symbols-outlined" style="font-size: 14px;">arrow_forward</span>
-            </a>
-          </div>
-          <div class="stat-card" data-home-stat-key="feeds" data-home-stat-default-view="today" role="button" tabindex="0" aria-label="Show last 24 hours for feeds">
-            <div class="stat-flip-scene">
-              <div class="stat-face stat-face--front">
-                <div class="stat-label">
-                  <span class="material-symbols-outlined" style="font-size: 18px; color: var(--primary);">water_drop</span>
-                  Feeds (today)
-                </div>
-                <div class="stat-value skeleton-text" id="stat-feed-today">0</div>
-              </div>
-              <div class="stat-face stat-face--back" aria-hidden="true">
-                <div class="stat-label">
-                  <span class="material-symbols-outlined" style="font-size: 18px; color: var(--primary);">water_drop</span>
-                  Feeds (24h)
-                </div>
-                <div class="stat-value skeleton-text" id="stat-feed-24h">0</div>
               </div>
             </div>
             <div class="stat-flip-hint">Tap to flip 24h</div>

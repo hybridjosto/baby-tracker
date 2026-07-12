@@ -37,6 +37,7 @@ const RESERVED_USER_SLUGS = new Set([
   "goals",
   "milk-express",
   "bottles",
+  "nappy-stock",
 ]);
 const CUSTOM_TYPE_MAX_LENGTH = 32;
 const MILK_EXPRESS_TYPE = "milk express";

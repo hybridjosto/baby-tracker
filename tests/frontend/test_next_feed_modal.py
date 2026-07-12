@@ -139,7 +139,7 @@ def test_next_feed_modal_shows_big_suggestion_when_big_stays_under_goal(
     )
     goal_response = client.post(
         "/api/feeding-goals",
-        json={"goal_ml": 700, "start_date": "2026-01-01"},
+        json={"goal_ml": 1510, "start_date": "2026-01-01"},
     )
     assert goal_response.status_code == 201
     _create_feed_entry(client, "feed-big-1", "2026-01-01T01:00:00Z", 120)
@@ -220,7 +220,7 @@ def test_next_feed_modal_plans_against_full_remaining_day_not_visible_rows(
     )
     goal_response = client.post(
         "/api/feeding-goals",
-        json={"goal_ml": 900, "start_date": "2026-01-01"},
+        json={"goal_ml": 1050, "start_date": "2026-01-01"},
     )
     assert goal_response.status_code == 201
     _create_feed_entry(client, "feed-hidden-day-1", "2026-01-01T09:00:00Z", 120)
@@ -273,18 +273,20 @@ def test_homepage_stats_default_to_today_and_flip_to_24h(
     assert browser_page.locator("#stat-nappy-today").text_content() == "1"
 
     feed_total_card = browser_page.locator('[data-home-stat-key="feed-total"]')
-    goal_card = browser_page.locator('[data-home-stat-key="goal"]')
-    feeds_card = browser_page.locator('[data-home-stat-key="feeds"]')
     nappies_card = browser_page.locator('[data-home-stat-key="nappies"]')
 
+    assert feed_total_card.count() == 1
+    assert browser_page.locator('[data-home-stat-key="feeds"]').count() == 0
+    assert browser_page.locator('[data-home-stat-key="goal"]').count() == 0
+    assert feed_total_card.locator("#next-feed").count() == 1
+    assert feed_total_card.locator("#stat-feed-ml-today").count() == 1
+    assert feed_total_card.locator("#stat-feed-today").count() == 1
+    assert feed_total_card.locator("#stat-goal-progress-today").count() == 1
+
     assert "is-flipped" not in (feed_total_card.get_attribute("class") or "")
-    assert "is-flipped" not in (goal_card.get_attribute("class") or "")
-    assert "is-flipped" not in (feeds_card.get_attribute("class") or "")
     assert "is-flipped" not in (nappies_card.get_attribute("class") or "")
 
     feed_total_card.click()
-    goal_card.click()
-    feeds_card.click()
     nappies_card.click()
 
     assert browser_page.locator("#stat-feed-ml-24h").text_content() == "150 ml"
@@ -292,6 +294,4 @@ def test_homepage_stats_default_to_today_and_flip_to_24h(
     assert browser_page.locator("#stat-feed-24h").text_content() == "2"
     assert browser_page.locator("#stat-nappy-24h").text_content() == "2"
     assert "is-flipped" in (feed_total_card.get_attribute("class") or "")
-    assert "is-flipped" in (goal_card.get_attribute("class") or "")
-    assert "is-flipped" in (feeds_card.get_attribute("class") or "")
     assert "is-flipped" in (nappies_card.get_attribute("class") or "")

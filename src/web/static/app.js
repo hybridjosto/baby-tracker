@@ -123,6 +123,7 @@ const homeLinkEl = document.getElementById("home-link");
 const summaryLinkEl = document.getElementById("summary-link");
 const milkExpressLinkEl = document.getElementById("milk-express-link");
 const bottlesLinkEl = document.getElementById("bottles-link");
+const nappyStockLinkEl = document.getElementById("nappy-stock-link");
 const refreshBtn = document.getElementById("refresh-btn");
 const csvFormEl = document.getElementById("csv-upload-form");
 const csvFileEl = document.getElementById("csv-file");
@@ -357,17 +358,6 @@ const goalStartDateInputEl = document.getElementById("goal-start-date");
 const goalHistoryEl = document.getElementById("goal-history");
 const goalEmptyEl = document.getElementById("goal-empty");
 const goalsLinkEl = document.getElementById("goals-link");
-
-const bottleFormEl = document.getElementById("bottle-form");
-const bottleNameInputEl = document.getElementById("bottle-name");
-const bottleWeightInputEl = document.getElementById("bottle-weight");
-const bottleFormHintEl = document.getElementById("bottle-form-hint");
-const bottleListEl = document.getElementById("bottle-list");
-const bottleEmptyEl = document.getElementById("bottle-empty");
-const bottleSelectEl = document.getElementById("bottle-select");
-const bottleTotalWeightEl = document.getElementById("bottle-total-weight");
-const bottleResultValueEl = document.getElementById("bottle-result-value");
-const bottleLogMilkBtnEl = document.getElementById("bottle-log-milk");
 
 let breastfeedTickerId = null;
 let miscTimedEventTickerId = null;
@@ -1386,9 +1376,6 @@ let milkExpressSparklineMode = "all";
 let milkExpressAllEntries = [];
 let milkExpressAllLoading = null;
 let goalsInitialized = false;
-let bottlesInitialized = false;
-let bottlesCache = [];
-let bottleExpressedMl = null;
 let hasLoadedFeedingGoals = false;
 let calendarWeekOffset = 0;
 let calendarWeekStart = null;
@@ -1401,10 +1388,12 @@ const HOME_STAT_LABEL_BY_VIEW = {
   [HOME_STAT_VIEW_TODAY]: "today",
   [HOME_STAT_VIEW_24H]: "last 24 hours",
 };
+const HOME_STAT_LABEL_BY_KEY = {
+  "feed-total": "feeding",
+  nappies: "nappies",
+};
 const homeStatViews = {
   "feed-total": HOME_STAT_VIEW_TODAY,
-  goal: HOME_STAT_VIEW_TODAY,
-  feeds: HOME_STAT_VIEW_TODAY,
   nappies: HOME_STAT_VIEW_TODAY,
 };
 let hasLoadedTimelineEntries = false;
@@ -1477,7 +1466,8 @@ function initHomeHandlers() {
 function getHomeStatAriaLabel(statKey) {
   const currentView = homeStatViews[statKey] || HOME_STAT_VIEW_TODAY;
   const nextView = currentView === HOME_STAT_VIEW_TODAY ? HOME_STAT_VIEW_24H : HOME_STAT_VIEW_TODAY;
-  return `Show ${HOME_STAT_LABEL_BY_VIEW[nextView]} for ${statKey.replace("-", " ")}`;
+  const statLabel = HOME_STAT_LABEL_BY_KEY[statKey] || statKey.replace("-", " ");
+  return `Show ${HOME_STAT_LABEL_BY_VIEW[nextView]} for ${statLabel}`;
 }
 
 function syncHomeStatCardState(card) {
@@ -2319,237 +2309,6 @@ function initGoalsHandlers() {
   }
 }
 
-function formatWeightG(value) {
-  if (!Number.isFinite(value) || value <= 0) {
-    return "0 g";
-  }
-  const rounded = Math.round(value * 10) / 10;
-  return Number.isInteger(rounded) ? `${rounded} g` : `${rounded.toFixed(1)} g`;
-}
-
-function renderBottleOptions() {
-  if (!bottleSelectEl) {
-    return;
-  }
-  bottleSelectEl.innerHTML = "";
-  const defaultOption = document.createElement("option");
-  defaultOption.value = "";
-  defaultOption.textContent = "Select a bottle";
-  bottleSelectEl.appendChild(defaultOption);
-  bottlesCache.forEach((bottle) => {
-    const option = document.createElement("option");
-    option.value = String(bottle.id);
-    option.textContent = `${bottle.name} · ${formatWeightG(bottle.empty_weight_g)}`;
-    bottleSelectEl.appendChild(option);
-  });
-  bottleSelectEl.disabled = !bottlesCache.length;
-}
-
-function updateBottleResult() {
-  if (!bottleResultValueEl) {
-    return;
-  }
-  if (!bottleSelectEl || !bottleTotalWeightEl) {
-    bottleResultValueEl.textContent = "-- ml";
-    bottleExpressedMl = null;
-    updateBottleLogButton();
-    return;
-  }
-  const selectedId = Number.parseInt(bottleSelectEl.value, 10);
-  const bottle = bottlesCache.find((item) => item.id === selectedId);
-  const totalWeight = Number.parseFloat(bottleTotalWeightEl.value);
-  if (!bottle || !Number.isFinite(totalWeight) || totalWeight <= 0) {
-    bottleResultValueEl.textContent = "-- ml";
-    bottleExpressedMl = null;
-    updateBottleLogButton();
-    return;
-  }
-  const expressed = Math.max(0, totalWeight - bottle.empty_weight_g);
-  bottleResultValueEl.textContent = formatMl(expressed);
-  bottleExpressedMl = expressed;
-  updateBottleLogButton();
-}
-
-function updateBottleLogButton() {
-  if (!bottleLogMilkBtnEl) {
-    return;
-  }
-  const canLog = state.userValid && Number.isFinite(bottleExpressedMl) && bottleExpressedMl > 0;
-  toggleDisabled(bottleLogMilkBtnEl, !canLog);
-  if (canLog) {
-    bottleLogMilkBtnEl.removeAttribute("disabled");
-  } else {
-    bottleLogMilkBtnEl.setAttribute("disabled", "true");
-  }
-}
-
-function renderBottleList(bottles) {
-  if (!bottleListEl || !bottleEmptyEl) {
-    return;
-  }
-  bottleListEl.innerHTML = "";
-  if (!bottles.length) {
-    bottleEmptyEl.hidden = false;
-    return;
-  }
-  bottleEmptyEl.hidden = true;
-  bottles.forEach((bottle) => {
-    const row = document.createElement("div");
-    row.className = "bottle-row";
-
-    const meta = document.createElement("div");
-    meta.className = "bottle-meta";
-    const name = document.createElement("div");
-    name.className = "bottle-name";
-    name.textContent = bottle.name;
-    const weight = document.createElement("div");
-    weight.className = "bottle-weight";
-    weight.textContent = `Empty weight: ${formatWeightG(bottle.empty_weight_g)}`;
-    meta.appendChild(name);
-    meta.appendChild(weight);
-
-    const actions = document.createElement("div");
-    actions.className = "bottle-actions";
-
-    const useBtn = document.createElement("button");
-    useBtn.type = "button";
-    useBtn.className = "ghost-btn";
-    useBtn.textContent = "Use";
-    useBtn.addEventListener("click", () => {
-      if (bottleSelectEl) {
-        bottleSelectEl.value = String(bottle.id);
-      }
-      updateBottleResult();
-      if (bottleTotalWeightEl) {
-        bottleTotalWeightEl.focus();
-      }
-    });
-
-    const editBtn = document.createElement("button");
-    editBtn.type = "button";
-    editBtn.className = "ghost-btn";
-    editBtn.textContent = "Edit";
-    editBtn.addEventListener("click", () => {
-      const nextName = window.prompt("Bottle name", bottle.name || "");
-      if (nextName === null) {
-        return;
-      }
-      const nextWeight = window.prompt(
-        "Empty weight (g)",
-        String(bottle.empty_weight_g ?? ""),
-      );
-      if (nextWeight === null) {
-        return;
-      }
-      const trimmed = nextName.trim();
-      const weightValue = Number.parseFloat(nextWeight);
-      if (!trimmed) {
-        setStatus("Bottle name is required.");
-        return;
-      }
-      if (!Number.isFinite(weightValue) || weightValue <= 0) {
-        setStatus("Empty weight must be a positive number.");
-        return;
-      }
-      void updateBottle(bottle.id, {
-        name: trimmed,
-        empty_weight_g: weightValue,
-      }).then(() => {
-        void loadBottles();
-      });
-    });
-
-    const deleteBtn = document.createElement("button");
-    deleteBtn.type = "button";
-    deleteBtn.className = "ghost-btn";
-    deleteBtn.textContent = "Delete";
-    deleteBtn.addEventListener("click", () => {
-      if (!window.confirm(`Delete "${bottle.name}"?`)) {
-        return;
-      }
-      void deleteBottle(bottle.id).then(() => {
-        void loadBottles();
-      });
-    });
-
-    actions.appendChild(useBtn);
-    actions.appendChild(editBtn);
-    actions.appendChild(deleteBtn);
-
-    row.appendChild(meta);
-    row.appendChild(actions);
-    bottleListEl.appendChild(row);
-  });
-}
-
-function initBottlesHandlers() {
-  if (bottlesInitialized || pageType !== "bottles") {
-    return;
-  }
-  bottlesInitialized = true;
-  if (bottleFormEl) {
-    bottleFormEl.addEventListener("submit", (event) => {
-      event.preventDefault();
-      const name = bottleNameInputEl ? bottleNameInputEl.value.trim() : "";
-      const weightValue = bottleWeightInputEl
-        ? Number.parseFloat(bottleWeightInputEl.value)
-        : Number.NaN;
-      if (!name) {
-        setStatus("Bottle name is required.");
-        return;
-      }
-      if (!Number.isFinite(weightValue) || weightValue <= 0) {
-        setStatus("Empty weight must be a positive number.");
-        return;
-      }
-      void createBottle({
-        name,
-        empty_weight_g: weightValue,
-      }).then(() => {
-        if (bottleNameInputEl) {
-          bottleNameInputEl.value = "";
-        }
-        if (bottleWeightInputEl) {
-          bottleWeightInputEl.value = "";
-        }
-        if (bottleFormHintEl) {
-          bottleFormHintEl.textContent = "Bottle saved.";
-        }
-        void loadBottles();
-      });
-    });
-  }
-  if (bottleSelectEl) {
-    bottleSelectEl.addEventListener("change", () => {
-      updateBottleResult();
-    });
-  }
-  if (bottleTotalWeightEl) {
-    bottleTotalWeightEl.addEventListener("input", () => {
-      updateBottleResult();
-    });
-  }
-  if (bottleLogMilkBtnEl) {
-    bottleLogMilkBtnEl.addEventListener("click", async () => {
-      if (!state.userValid) {
-        setStatus("Choose a user below to start logging.");
-        return;
-      }
-      if (!Number.isFinite(bottleExpressedMl) || bottleExpressedMl <= 0) {
-        setStatus("Enter a bottle and total weight first.");
-        return;
-      }
-      const payload = buildEntryPayload(MILK_EXPRESS_TYPE);
-      payload.expressed_ml = Math.round(bottleExpressedMl * 10) / 10;
-      await saveEntry(payload);
-      if (bottleTotalWeightEl) {
-        bottleTotalWeightEl.value = "";
-      }
-      updateBottleResult();
-    });
-  }
-}
-
 function applyUserState() {
   initQuickLogHandlers();
   toggleDisabled(feedBtn, !state.userValid);
@@ -2573,16 +2332,8 @@ function applyUserState() {
     loadGoalHistory();
     return;
   }
-  if (pageType === "bottles") {
-    initBottlesHandlers();
-    updateUserDisplay();
-    setStatus("");
-    updateBottleLogButton();
-    loadBottles();
-    return;
-  }
   const allowTimeline = pageType === "timeline";
-  const allowSharedPage = allowTimeline || pageType === "calendar" || pageType === "calendar-form";
+  const allowSharedPage = allowTimeline || pageType === "calendar" || pageType === "calendar-form" || pageType === "bottles";
   toggleDisabled(refreshBtn, false);
   if (csvFileEl) {
     csvFileEl.disabled = !state.userValid;
@@ -2642,10 +2393,6 @@ function applyUserState() {
   if (pageType === "milk-express") {
     initMilkExpressLedgerHandlers();
     loadMilkExpressLedger();
-  }
-  if (pageType === "bottles") {
-    initBottlesHandlers();
-    loadBottles();
   }
 }
 
@@ -6794,74 +6541,6 @@ async function fetchFeedingGoals(params) {
   return normalizeGoalsResponse(data);
 }
 
-async function fetchBottles() {
-  const response = await fetch(buildUrl("/api/bottles"));
-  if (!response.ok) {
-    let detail = "";
-    try {
-      const err = await response.json();
-      detail = err.error || JSON.stringify(err);
-    } catch (parseError) {
-      detail = await response.text();
-    }
-    throw new Error(detail || `HTTP ${response.status}`);
-  }
-  const data = await response.json();
-  return Array.isArray(data) ? data : [];
-}
-
-async function createBottle(payload) {
-  const response = await fetch(buildUrl("/api/bottles"), {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  if (!response.ok) {
-    let detail = "";
-    try {
-      const err = await response.json();
-      detail = err.error || JSON.stringify(err);
-    } catch (parseError) {
-      detail = await response.text();
-    }
-    throw new Error(detail || `HTTP ${response.status}`);
-  }
-  return response.json();
-}
-
-async function updateBottle(bottleId, payload) {
-  const response = await fetch(buildUrl(`/api/bottles/${bottleId}`), {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  if (!response.ok) {
-    let detail = "";
-    try {
-      const err = await response.json();
-      detail = err.error || JSON.stringify(err);
-    } catch (parseError) {
-      detail = await response.text();
-    }
-    throw new Error(detail || `HTTP ${response.status}`);
-  }
-  return response.json();
-}
-
-async function deleteBottle(bottleId) {
-  const response = await fetch(buildUrl(`/api/bottles/${bottleId}`), { method: "DELETE" });
-  if (!response.ok) {
-    let detail = "";
-    try {
-      const err = await response.json();
-      detail = err.error || JSON.stringify(err);
-    } catch (parseError) {
-      detail = await response.text();
-    }
-    throw new Error(detail || `HTTP ${response.status}`);
-  }
-}
-
 async function fetchCurrentGoal() {
   const response = await fetch(buildUrl("/api/feeding-goals/current"));
   if (!response.ok) {
@@ -9356,19 +9035,6 @@ async function deleteFeedingGoal(goalId) {
   setStatus("Goal deleted");
 }
 
-async function loadBottles() {
-  try {
-    const bottles = await fetchBottles();
-    bottlesCache = bottles;
-    renderBottleList(bottles);
-    renderBottleOptions();
-    updateBottleResult();
-    setStatus("");
-  } catch (err) {
-    setStatus(`Failed to load bottles: ${err.message || "unknown error"}`);
-  }
-}
-
 async function loadGoalHistory() {
   const shouldShowLoading = pageType === "goals" && !hasLoadedFeedingGoals;
   if (shouldShowLoading) {
@@ -9807,6 +9473,10 @@ function initLinks() {
   if (bottlesLinkEl) {
     bottlesLinkEl.classList.remove("disabled");
     bottlesLinkEl.href = buildUrl("/bottles");
+  }
+  if (nappyStockLinkEl) {
+    nappyStockLinkEl.classList.remove("disabled");
+    nappyStockLinkEl.href = buildUrl("/nappy-stock");
   }
   if (goalsLinkEl) {
     goalsLinkEl.classList.remove("disabled");

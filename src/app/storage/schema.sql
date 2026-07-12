@@ -59,6 +59,19 @@ CREATE TABLE IF NOT EXISTS bottles (
 
 CREATE INDEX IF NOT EXISTS idx_bottles_updated_at_utc ON bottles (updated_at_utc DESC);
 
+CREATE TABLE IF NOT EXISTS nappy_stock_batches (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    total_count INTEGER NOT NULL CHECK (total_count >= 0),
+    threshold_count INTEGER NOT NULL CHECK (threshold_count >= 0),
+    stock_added_at_utc TEXT NOT NULL,
+    notes TEXT,
+    created_at_utc TEXT NOT NULL,
+    updated_at_utc TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_nappy_stock_batches_added_at
+    ON nappy_stock_batches (stock_added_at_utc DESC, id DESC);
+
 CREATE TABLE IF NOT EXISTS feeding_goals (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     goal_ml REAL NOT NULL,

@@ -30,6 +30,7 @@ def init_db(db_path: str) -> None:
         _ensure_entries_deleted_at_column(conn)
         _ensure_settings_table(conn)
         _ensure_bottles_table(conn)
+        _ensure_nappy_stock_batches_table(conn)
         _ensure_feeding_goals_table(conn)
         _ensure_current_goal_view(conn)
         _ensure_reminders_table(conn)
@@ -274,6 +275,34 @@ def _ensure_bottles_table(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE bottles ADD COLUMN deleted_at_utc TEXT")
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_bottles_updated_at_utc ON bottles (updated_at_utc DESC)"
+    )
+
+
+def _ensure_nappy_stock_batches_table(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS nappy_stock_batches (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            total_count INTEGER NOT NULL CHECK (total_count >= 0),
+            threshold_count INTEGER NOT NULL CHECK (threshold_count >= 0),
+            stock_added_at_utc TEXT NOT NULL,
+            notes TEXT,
+            created_at_utc TEXT NOT NULL,
+            updated_at_utc TEXT NOT NULL
+        )
+        """
+    )
+    columns = {
+        row["name"]
+        for row in conn.execute("PRAGMA table_info(nappy_stock_batches)").fetchall()
+    }
+    if "notes" not in columns:
+        conn.execute("ALTER TABLE nappy_stock_batches ADD COLUMN notes TEXT")
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_nappy_stock_batches_added_at
+            ON nappy_stock_batches (stock_added_at_utc DESC, id DESC)
+        """
     )
 
 
