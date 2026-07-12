@@ -34,7 +34,7 @@ def load_config() -> AppConfig:
     base_path = _normalize_base_path(os.getenv("BABY_TRACKER_BASE_PATH", ""))
     static_version = os.getenv(
         "BABY_TRACKER_STATIC_VERSION",
-        "modular-bottles-20260712-1",
+        "modular-goals-20260712-1",
     )
     discord_webhook_url = os.getenv("BABY_TRACKER_DISCORD_WEBHOOK_URL")
     tls_cert_path_raw = os.getenv("BABY_TRACKER_TLS_CERT_PATH")

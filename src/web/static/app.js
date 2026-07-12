@@ -57,7 +57,6 @@ import {
   formatDurationMinutes,
   formatEntryTypeLabel,
   formatFeedTime,
-  formatGoalDateLabel,
   formatMl,
   formatRangeLabel,
   formatRelativeTime,
@@ -352,11 +351,6 @@ const customTypeListEl = document.getElementById("custom-type-list");
 const customTypeHintEl = document.getElementById("custom-type-hint");
 const customTypeEmptyEl = document.getElementById("custom-type-empty");
 const exportCsvBtn = document.getElementById("export-csv");
-const goalsFormEl = document.getElementById("goals-form");
-const goalAmountInputEl = document.getElementById("goal-amount");
-const goalStartDateInputEl = document.getElementById("goal-start-date");
-const goalHistoryEl = document.getElementById("goal-history");
-const goalEmptyEl = document.getElementById("goal-empty");
 const goalsLinkEl = document.getElementById("goals-link");
 
 let breastfeedTickerId = null;
@@ -1375,7 +1369,6 @@ let sleepGanttOverlayTypes = new Set(SLEEP_GANTT_DEFAULT_OVERLAYS);
 let milkExpressSparklineMode = "all";
 let milkExpressAllEntries = [];
 let milkExpressAllLoading = null;
-let goalsInitialized = false;
 let hasLoadedFeedingGoals = false;
 let calendarWeekOffset = 0;
 let calendarWeekStart = null;
@@ -2278,37 +2271,6 @@ function initSettingsHandlers() {
   void refreshPushReminderState();
 }
 
-function initGoalsHandlers() {
-  if (goalsInitialized || pageType !== "goals") {
-    return;
-  }
-  goalsInitialized = true;
-  if (goalStartDateInputEl && !goalStartDateInputEl.value) {
-    goalStartDateInputEl.value = formatDateInputValue(new Date());
-  }
-  if (goalsFormEl) {
-    goalsFormEl.addEventListener("submit", (event) => {
-      event.preventDefault();
-      if (!goalAmountInputEl) {
-        return;
-      }
-      const amount = Number.parseFloat(goalAmountInputEl.value);
-      if (!Number.isFinite(amount) || amount <= 0) {
-        setStatus("Goal must be a positive number");
-        goalAmountInputEl.focus();
-        return;
-      }
-      const startDate = goalStartDateInputEl ? goalStartDateInputEl.value : "";
-      void saveFeedingGoal({
-        goal_ml: amount,
-        start_date: startDate || null,
-      }).then(() => {
-        void loadGoalHistory();
-      });
-    });
-  }
-}
-
 function applyUserState() {
   initQuickLogHandlers();
   toggleDisabled(feedBtn, !state.userValid);
@@ -2326,14 +2288,8 @@ function applyUserState() {
     }
     return;
   }
-  if (pageType === "goals") {
-    initGoalsHandlers();
-    updateUserDisplay();
-    loadGoalHistory();
-    return;
-  }
   const allowTimeline = pageType === "timeline";
-  const allowSharedPage = allowTimeline || pageType === "calendar" || pageType === "calendar-form" || pageType === "bottles";
+  const allowSharedPage = allowTimeline || pageType === "calendar" || pageType === "calendar-form" || pageType === "bottles" || pageType === "goals";
   toggleDisabled(refreshBtn, false);
   if (csvFileEl) {
     csvFileEl.disabled = !state.userValid;
@@ -7945,86 +7901,6 @@ function renderGoalComparison() {
   }
 }
 
-function renderGoalHistory(goals) {
-  if (!goalHistoryEl || !goalEmptyEl) {
-    return;
-  }
-  goalHistoryEl.innerHTML = "";
-  if (!goals.length) {
-    goalEmptyEl.textContent = "No goals yet.";
-    goalEmptyEl.style.display = "block";
-    return;
-  }
-  goalEmptyEl.style.display = "none";
-  goals.forEach((goal, index) => {
-    const item = document.createElement("div");
-    item.className = "goal-item";
-    const metaWrap = document.createElement("div");
-    const label = document.createElement("div");
-    label.className = "goal-meta";
-    const badge = state.activeFeedingGoal && goal.id === state.activeFeedingGoal.id
-      ? "Active"
-      : (index === 0 ? "Latest" : "Past");
-    label.textContent = `${badge} · ${formatGoalDateLabel(goal.start_date)}`;
-    const amount = document.createElement("div");
-    amount.className = "goal-amount";
-    amount.textContent = formatMl(Number.parseFloat(goal.goal_ml));
-    metaWrap.appendChild(label);
-    metaWrap.appendChild(amount);
-
-    const actions = document.createElement("div");
-    actions.className = "goal-actions";
-    const editBtn = document.createElement("button");
-    editBtn.type = "button";
-    editBtn.className = "goal-action-btn";
-    editBtn.textContent = "Edit";
-    editBtn.addEventListener("click", async () => {
-      const nextAmount = window.prompt("24h goal (ml)", String(goal.goal_ml ?? ""));
-      if (nextAmount === null) {
-        return;
-      }
-      const parsedAmount = Number.parseFloat(nextAmount);
-      if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
-        setStatus("Goal must be a positive number");
-        return;
-      }
-      const nextDate = window.prompt("Start date (YYYY-MM-DD)", goal.start_date || "");
-      if (nextDate === null) {
-        return;
-      }
-      try {
-        await updateFeedingGoal(goal.id, {
-          goal_ml: parsedAmount,
-          start_date: nextDate.trim() || null,
-        });
-        await loadGoalHistory();
-      } catch (err) {
-        setStatus(`Error: ${err.message || "unable to update goal"}`);
-      }
-    });
-    const deleteBtn = document.createElement("button");
-    deleteBtn.type = "button";
-    deleteBtn.className = "goal-action-btn";
-    deleteBtn.textContent = "Delete";
-    deleteBtn.addEventListener("click", async () => {
-      if (!window.confirm("Delete this goal?")) {
-        return;
-      }
-      try {
-        await deleteFeedingGoal(goal.id);
-        await loadGoalHistory();
-      } catch (err) {
-        setStatus(`Error: ${err.message || "unable to delete goal"}`);
-      }
-    });
-    actions.appendChild(editBtn);
-    actions.appendChild(deleteBtn);
-    item.appendChild(metaWrap);
-    item.appendChild(actions);
-    goalHistoryEl.appendChild(item);
-  });
-}
-
 function renderStatsWindow(windowBounds) {
   if (!statWindowEl) {
     return;
@@ -8968,93 +8844,6 @@ async function deleteEntry(entry) {
     await refreshEntriesForCurrentPage();
   } catch (err) {
     setStatus("Error: unable to delete entry");
-  }
-}
-
-async function saveFeedingGoal(payload) {
-  setStatus("Saving goal...");
-  try {
-    const response = await fetch(buildUrl("/api/feeding-goals"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (!response.ok) {
-      let detail = "";
-      try {
-        const err = await response.json();
-        detail = err.error || JSON.stringify(err);
-      } catch (parseError) {
-        detail = await response.text();
-      }
-      setStatus(`Error: ${detail || response.status}`);
-      return;
-    }
-    setStatus("Goal saved");
-  } catch (err) {
-    setStatus("Error: network issue saving goal");
-  }
-}
-
-async function updateFeedingGoal(goalId, payload) {
-  setStatus("Updating goal...");
-  const response = await fetch(buildUrl(`/api/feeding-goals/${goalId}`), {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  if (!response.ok) {
-    let detail = "";
-    try {
-      const err = await response.json();
-      detail = err.error || JSON.stringify(err);
-    } catch (parseError) {
-      detail = await response.text();
-    }
-    throw new Error(detail || `HTTP ${response.status}`);
-  }
-  setStatus("Goal updated");
-  return response.json();
-}
-
-async function deleteFeedingGoal(goalId) {
-  setStatus("Deleting goal...");
-  const response = await fetch(buildUrl(`/api/feeding-goals/${goalId}`), {
-    method: "DELETE",
-  });
-  if (!response.ok) {
-    let detail = "";
-    try {
-      const err = await response.json();
-      detail = err.error || JSON.stringify(err);
-    } catch (parseError) {
-      detail = await response.text();
-    }
-    throw new Error(detail || `HTTP ${response.status}`);
-  }
-  setStatus("Goal deleted");
-}
-
-async function loadGoalHistory() {
-  const shouldShowLoading = pageType === "goals" && !hasLoadedFeedingGoals;
-  if (shouldShowLoading) {
-    setLoadingState(true);
-  }
-  try {
-    const goals = await loadFeedingGoals(50);
-    const currentGoal = await loadCurrentGoal();
-    state.activeFeedingGoal = currentGoal;
-    renderGoalHistory(goals);
-    renderGoalComparison();
-    if (goalStartDateInputEl && !goalStartDateInputEl.value) {
-      goalStartDateInputEl.value = formatDateInputValue(new Date());
-    }
-  } catch (err) {
-    setStatus(`Failed to load goals: ${err.message || "unknown error"}`);
-  } finally {
-    if (shouldShowLoading) {
-      setLoadingState(false);
-    }
   }
 }
 
