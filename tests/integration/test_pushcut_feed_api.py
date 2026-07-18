@@ -47,52 +47,9 @@ def test_push_subscription_delete_route(client):
     assert payload["deleted"] is True
 
 
-def test_push_feed_due_requires_subscription(client):
+def test_push_feed_due_route_is_removed(client):
     response = client.post("/api/push/feed-due", json={"user_slug": "suz"})
-    assert response.status_code == 400
-    payload = response.get_json()
-    assert payload["error"] == "push_subscription_not_configured"
-
-
-def test_push_feed_due_sends_payload(client, monkeypatch):
-    captured: dict = {}
-
-    def fake_send(subscription, payload, vapid_config):
-        captured["subscription"] = subscription
-        captured["payload"] = payload
-        captured["subject"] = vapid_config.subject
-        return {"sent": True}
-
-    from src.app.routes import pushcut as push_module
-
-    monkeypatch.setattr(push_module, "send_web_push", fake_send)
-
-    client.post(
-        "/api/push/subscription",
-        json={
-            "user_slug": "suz",
-            "subscription": {
-                "endpoint": "https://push.example.com/device-1",
-                "keys": {"p256dh": "p256dh-1", "auth": "auth-1"},
-            },
-        },
-    )
-
-    response = client.post(
-        "/api/push/feed-due",
-        json={"user_slug": "suz", "title": "Feed", "body": "Now"},
-    )
-    assert response.status_code == 200
-    payload = response.get_json()
-    assert payload["sent"] is True
-    assert captured["subscription"]["endpoint"] == "https://push.example.com/device-1"
-    assert captured["payload"] == {
-        "title": "Feed",
-        "body": "Now",
-        "url": "/suz",
-        "tag": "feed-due-suz",
-    }
-    assert captured["subject"] == "mailto:test@example.com"
+    assert response.status_code == 404
 
 
 def test_push_subscription_requires_user_slug(client):
@@ -109,21 +66,13 @@ def test_push_subscription_requires_user_slug(client):
     assert response.get_json()["error"] == "user_slug is required"
 
 
-def test_push_subscription_triggers_due_check(client, monkeypatch):
-    captured: dict = {}
+def test_push_subscription_does_not_send_notification(client, monkeypatch):
+    def fail_send(*args, **kwargs):
+        raise AssertionError("saving a subscription must not send a notification")
 
-    def fake_dispatch(
-        db_path, vapid_config=None, base_path="", now_utc=None, send_fn=None
-    ):
-        captured["db_path"] = db_path
-        captured["vapid_config"] = vapid_config
-        captured["base_path"] = base_path
-        return {"sent": False, "reason": "not_due"}
+    from src.app.services import push_subscriptions as push_module
 
-    from src.app.routes import pushcut as push_module
-
-    monkeypatch.setattr(push_module, "dispatch_feed_due", fake_dispatch)
-
+    monkeypatch.setattr(push_module, "send_web_push", fail_send)
     response = client.post(
         "/api/push/subscription",
         json={
@@ -136,6 +85,3 @@ def test_push_subscription_triggers_due_check(client, monkeypatch):
     )
 
     assert response.status_code == 200
-    assert captured["db_path"].endswith("test.sqlite")
-    assert captured["base_path"] == ""
-    assert captured["vapid_config"].subject == "mailto:test@example.com"

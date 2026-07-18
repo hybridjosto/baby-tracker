@@ -14,7 +14,6 @@ class AppConfig:
     discord_webhook_url: str | None
     tls_cert_path: Path | None
     tls_key_path: Path | None
-    feed_due_poll_seconds: int
     home_kpis_poll_seconds: int
     enable_schedulers: bool
     vapid_public_key: str | None
@@ -34,20 +33,13 @@ def load_config() -> AppConfig:
     base_path = _normalize_base_path(os.getenv("BABY_TRACKER_BASE_PATH", ""))
     static_version = os.getenv(
         "BABY_TRACKER_STATIC_VERSION",
-        "modular-calendar-20260712-1",
+        "nappy-stock-feed-reminders-20260718-1",
     )
     discord_webhook_url = os.getenv("BABY_TRACKER_DISCORD_WEBHOOK_URL")
     tls_cert_path_raw = os.getenv("BABY_TRACKER_TLS_CERT_PATH")
     tls_key_path_raw = os.getenv("BABY_TRACKER_TLS_KEY_PATH")
     tls_cert_path = Path(tls_cert_path_raw) if tls_cert_path_raw else None
     tls_key_path = Path(tls_key_path_raw) if tls_key_path_raw else None
-    poll_raw = os.getenv("BABY_TRACKER_FEED_DUE_POLL_SECONDS", "60")
-    try:
-        feed_due_poll_seconds = int(poll_raw)
-    except ValueError as exc:
-        raise ValueError(
-            "BABY_TRACKER_FEED_DUE_POLL_SECONDS must be an integer"
-        ) from exc
     kpis_raw = os.getenv("BABY_TRACKER_HOME_KPIS_POLL_SECONDS", "900")
     try:
         home_kpis_poll_seconds = int(kpis_raw)
@@ -93,7 +85,6 @@ def load_config() -> AppConfig:
         discord_webhook_url=discord_webhook_url,
         tls_cert_path=tls_cert_path,
         tls_key_path=tls_key_path,
-        feed_due_poll_seconds=feed_due_poll_seconds,
         home_kpis_poll_seconds=home_kpis_poll_seconds,
         enable_schedulers=enable_schedulers,
         vapid_public_key=vapid_public_key,

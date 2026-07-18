@@ -253,6 +253,9 @@ const statNappyTodayEl = document.getElementById("stat-nappy-today");
 const statNappy24hEl = document.getElementById("stat-nappy-24h");
 const statNappyBreakdownTodayEl = document.getElementById("stat-nappy-breakdown-today");
 const statNappyBreakdown24hEl = document.getElementById("stat-nappy-breakdown-24h");
+const homeNappyStockSummaryEl = document.getElementById("home-nappy-stock-summary");
+const homeNappyStockRemainingEl = document.getElementById("home-nappy-stock-remaining");
+const homeNappyStockDetailEl = document.getElementById("home-nappy-stock-detail");
 const statDailyFeedTotalEl = document.getElementById("stat-daily-feed-total");
 const statDailyFeedSubEl = document.getElementById("stat-daily-feed-sub");
 const statFeedMlTodayEl = document.getElementById("stat-feed-ml-today");
@@ -308,7 +311,6 @@ const pushReminderUserEl = document.getElementById("push-reminder-user");
 const pushReminderStatusEl = document.getElementById("push-reminder-status");
 const enablePushRemindersBtn = document.getElementById("enable-push-reminders");
 const disablePushRemindersBtn = document.getElementById("disable-push-reminders");
-const testFeedDueNotificationBtn = document.getElementById("test-feed-due-notification");
 const customTypeAddBtn = document.getElementById("custom-type-add");
 const customTypeListEl = document.getElementById("custom-type-list");
 const customTypeHintEl = document.getElementById("custom-type-hint");
@@ -2220,11 +2222,6 @@ function initSettingsHandlers() {
     });
     toggleDisabled(exportCsvBtn, !state.userValid);
   }
-  if (testFeedDueNotificationBtn) {
-    testFeedDueNotificationBtn.addEventListener("click", () => {
-      void handleTestFeedDueNotification();
-    });
-  }
   void refreshPushReminderState();
 }
 
@@ -2629,34 +2626,6 @@ async function handleCsvExport() {
   }
 }
 
-async function handleTestFeedDueNotification() {
-  setStatus("Sending test notification...");
-  if (!state.userValid || !state.activeUser) {
-    setStatus("Choose a user before testing reminders");
-    return;
-  }
-  try {
-    const response = await fetch(buildUrl("/api/push/feed-due"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        user_slug: state.activeUser,
-        title: "Feed due (test)",
-        body: "This is a test notification from Baby Tracker settings.",
-      }),
-    });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      const detail = payload.error || response.status;
-      setStatus(`Error: ${detail}`);
-      return;
-    }
-    setStatus("Test feed-due notification sent");
-  } catch (error) {
-    setStatus("Error: network issue sending test notification");
-  }
-}
-
 function urlBase64ToUint8Array(value) {
   const base64 = `${value}`.replace(/-/g, "+").replace(/_/g, "/");
   const padding = "=".repeat((4 - (base64.length % 4)) % 4);
@@ -2685,7 +2654,7 @@ function renderPushReminderState() {
     if (state.userValid && state.activeUser) {
       pushReminderUserEl.textContent = `Current user: ${state.activeUser}`;
     } else {
-      pushReminderUserEl.textContent = "Choose a user to enable reminders.";
+      pushReminderUserEl.textContent = "Choose a user to enable confirmations.";
     }
   }
   if (!pushReminderStatusEl) {
@@ -2696,7 +2665,7 @@ function renderPushReminderState() {
   } else if (!pushReminderState.configured) {
     pushReminderStatusEl.textContent = "Push notifications are not configured on the server yet.";
   } else if (!state.userValid || !state.activeUser) {
-    pushReminderStatusEl.textContent = "Choose a user to enable reminders on this device.";
+    pushReminderStatusEl.textContent = "Choose a user to enable confirmations on this device.";
   } else if (pushReminderState.permission === "denied") {
     pushReminderStatusEl.textContent = "Notifications are blocked in this browser. Allow them in browser settings to continue.";
   } else if (pushReminderState.enabled && pushReminderState.isCurrentDevice) {
@@ -2716,13 +2685,6 @@ function renderPushReminderState() {
   }
   if (disablePushRemindersBtn) {
     disablePushRemindersBtn.disabled = !state.userValid || !pushReminderState.supported;
-  }
-  if (testFeedDueNotificationBtn) {
-    testFeedDueNotificationBtn.disabled = (
-      !state.userValid
-      || !pushReminderState.configured
-      || !pushReminderState.enabled
-    );
   }
 }
 
@@ -2757,21 +2719,21 @@ async function refreshPushReminderState() {
       registration && payload.endpoint && registration.endpoint === payload.endpoint,
     );
   } catch (error) {
-    console.error("Failed to refresh push reminders", error);
+    console.error("Failed to refresh push confirmations", error);
   }
   renderPushReminderState();
 }
 
 async function enablePushReminders() {
   if (!state.userValid || !state.activeUser) {
-    setStatus("Choose a user before enabling reminders");
+    setStatus("Choose a user before enabling confirmations");
     return;
   }
   if (!isPushSupported()) {
     setStatus("This browser does not support push notifications");
     return;
   }
-  setStatus("Enabling reminders on this device...");
+  setStatus("Enabling confirmations on this device...");
   try {
     const permission = await Notification.requestPermission();
     pushReminderState.permission = permission;
@@ -2814,19 +2776,19 @@ async function enablePushReminders() {
     pushReminderState.endpoint = payload.endpoint || subscription.endpoint || "";
     pushReminderState.isCurrentDevice = true;
     renderPushReminderState();
-    setStatus("Feed reminders enabled on this device");
+    setStatus("Entry confirmations enabled on this device");
   } catch (error) {
-    console.error("Failed to enable push reminders", error);
-    setStatus("Error: could not enable push reminders");
+    console.error("Failed to enable push confirmations", error);
+    setStatus("Error: could not enable push confirmations");
   }
 }
 
 async function disablePushReminders() {
   if (!state.userValid || !state.activeUser) {
-    setStatus("Choose a user before disabling reminders");
+    setStatus("Choose a user before disabling confirmations");
     return;
   }
-  setStatus("Disabling reminders on this device...");
+  setStatus("Disabling confirmations on this device...");
   try {
     const subscription = await getCurrentPushSubscription();
     await fetch(buildUrl("/api/push/subscription"), {
@@ -2841,10 +2803,10 @@ async function disablePushReminders() {
     pushReminderState.endpoint = "";
     pushReminderState.isCurrentDevice = false;
     renderPushReminderState();
-    setStatus("Feed reminders disabled on this device");
+    setStatus("Entry confirmations disabled on this device");
   } catch (error) {
-    console.error("Failed to disable push reminders", error);
-    setStatus("Error: could not disable push reminders");
+    console.error("Failed to disable push confirmations", error);
+    setStatus("Error: could not disable push confirmations");
   }
 }
 
@@ -8335,7 +8297,7 @@ async function loadHomeEntries() {
 
     void syncNow();
 
-    const [entries, chartSourceEntries, currentGoal, sleepTrendEntries, feedVolumeEntries] = await Promise.all([
+    const [entries, chartSourceEntries, currentGoal, sleepTrendEntries, feedVolumeEntries, nappyStock] = await Promise.all([
       loadEntriesWithFallback({
         limit: 200,
         since: statsWindow.sinceIso,
@@ -8358,6 +8320,7 @@ async function loadHomeEntries() {
         since: homeFeedVolumeWindow.sinceIso,
         until: homeFeedVolumeWindow.untilIso,
       }),
+      fetchNappyStockStatus(),
     ]);
     state.activeFeedingGoal = currentGoal;
     const chartEntries = chartSourceEntries.filter((entry) => entryOverlapsChartWindow(entry, chartWindow));
@@ -8370,6 +8333,7 @@ async function loadHomeEntries() {
     renderLatestEntry(entries[0] || null);
     renderHomeSleepTrendChart(sleepTrendEntries);
     renderHomeFeedVolumeChart(feedVolumeEntries);
+    renderHomeNappyStock(nappyStock);
   } catch (err) {
     setStatus(`Failed to load entries: ${err.message || "unknown error"}`);
   } finally {
@@ -8378,6 +8342,49 @@ async function loadHomeEntries() {
     }
     hasLoadedHomeEntries = true;
   }
+}
+
+async function fetchNappyStockStatus() {
+  if (!homeNappyStockRemainingEl || !homeNappyStockDetailEl) {
+    return null;
+  }
+  try {
+    const response = await fetch(buildUrl("/api/nappy-stock?history_limit=0"));
+    if (!response.ok) {
+      return { loadError: true };
+    }
+    return response.json();
+  } catch (error) {
+    return { loadError: true };
+  }
+}
+
+function renderHomeNappyStock(status) {
+  if (!homeNappyStockRemainingEl || !homeNappyStockDetailEl) {
+    return;
+  }
+  if (status && status.loadError) {
+    homeNappyStockRemainingEl.textContent = "--";
+    homeNappyStockDetailEl.textContent = "Stock unavailable";
+    return;
+  }
+  const configured = Boolean(status && status.configured);
+  homeNappyStockSummaryEl?.classList.toggle("is-low", configured && status.is_below_threshold);
+  if (!configured) {
+    homeNappyStockRemainingEl.textContent = "Not set";
+    homeNappyStockDetailEl.textContent = "Add stock to start tracking";
+    return;
+  }
+  homeNappyStockRemainingEl.textContent = String(status.remaining_count ?? 0);
+  const threshold = `Low at ${status.threshold_count ?? 0}`;
+  const rate = Number(status.average_per_day);
+  const days = Number(status.days_until_empty);
+  const forecast = Number.isFinite(days)
+    ? ` · ~${days < 1 ? "today" : `${days.toFixed(days >= 10 ? 0 : 1)} days`} left`
+    : Number.isFinite(rate) && rate > 0
+      ? ` · ${rate.toFixed(rate >= 10 ? 0 : 1)}/day`
+      : "";
+  homeNappyStockDetailEl.textContent = `${status.is_below_threshold ? "Low stock" : threshold}${forecast}`;
 }
 
 async function loadSummaryEntries() {

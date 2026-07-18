@@ -218,6 +218,26 @@ def _ensure_settings_table(conn: sqlite3.Connection) -> None:
         conn.execute(
             "ALTER TABLE baby_settings ADD COLUMN feed_due_last_sent_at_utc TEXT"
         )
+    if "nappy_stock_threshold_count" not in columns:
+        conn.execute(
+            "ALTER TABLE baby_settings "
+            "ADD COLUMN nappy_stock_threshold_count INTEGER NOT NULL DEFAULT 0"
+        )
+        conn.execute(
+            """
+            UPDATE baby_settings
+            SET nappy_stock_threshold_count = COALESCE(
+                (
+                    SELECT threshold_count
+                    FROM nappy_stock_batches
+                    ORDER BY datetime(stock_added_at_utc) DESC, id DESC
+                    LIMIT 1
+                ),
+                0
+            )
+            WHERE id = 1
+            """
+        )
     row = conn.execute("SELECT id FROM baby_settings WHERE id = 1").fetchone()
     if not row:
         now = datetime.now(timezone.utc).isoformat()
@@ -234,8 +254,9 @@ def _ensure_settings_table(conn: sqlite3.Connection) -> None:
                  ollama_thinking_enabled,
                  openai_model, openai_timeout_seconds, openai_prompt_template,
                  feed_due_last_entry_id, feed_due_last_sent_at_utc,
+                 nappy_stock_threshold_count,
                  updated_at_utc)
-            VALUES (1, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, ?)
+            VALUES (1, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, ?)
             """,
             (now,),
         )

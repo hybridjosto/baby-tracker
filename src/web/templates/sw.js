@@ -43,12 +43,12 @@ self.addEventListener("push", (event) => {
   }
   const title = typeof payload.title === "string" && payload.title.trim()
     ? payload.title.trim()
-    : "Feed due";
+    : "Baby Tracker";
   const body = typeof payload.body === "string" && payload.body.trim()
     ? payload.body.trim()
-    : "Time for a feed.";
+    : "Baby Tracker update.";
   const url = typeof payload.url === "string" && payload.url.trim() ? payload.url.trim() : "./";
-  const tag = typeof payload.tag === "string" && payload.tag.trim() ? payload.tag.trim() : "feed-due";
+  const tag = typeof payload.tag === "string" && payload.tag.trim() ? payload.tag.trim() : "baby-tracker";
   event.waitUntil(
     self.registration.showNotification(title, {
       body,

@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS baby_settings (
     openai_timeout_seconds INTEGER,
     feed_due_last_entry_id INTEGER,
     feed_due_last_sent_at_utc TEXT,
+    nappy_stock_threshold_count INTEGER NOT NULL DEFAULT 0,
     updated_at_utc TEXT NOT NULL DEFAULT (datetime('now'))
 );
 

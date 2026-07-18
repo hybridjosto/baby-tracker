@@ -167,8 +167,8 @@ def build_push_payload(
     tag: str,
 ) -> dict:
     return {
-        "title": title.strip() or "Feed due",
-        "body": body.strip() or "Time for a feed.",
+        "title": title.strip() or "Baby Tracker",
+        "body": body.strip() or "Baby Tracker update.",
         "url": url,
         "tag": tag,
     }

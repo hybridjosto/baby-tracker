@@ -346,15 +346,14 @@
             <div class="hint">Available placeholders: <code>$selected_day_since_utc</code>, <code>$selected_day_until_utc</code>, <code>$selected_day_stats_json</code>, <code>$selected_day_events_json</code>, <code>$comparison_days_json</code>.</div>
           </div>
           <div class="field">
-            <label>Feed reminders on this device</label>
-            <div class="hint" id="push-reminder-user">Choose a user to enable reminders.</div>
+            <label>Entry confirmations on this device</label>
+            <div class="hint" id="push-reminder-user">Choose a user to enable confirmations.</div>
             <div class="hint" id="push-reminder-status">Not enabled on this device.</div>
             <div class="inline-row" style="margin-top: 8px;">
               <button class="add-btn" id="enable-push-reminders" type="button">Enable</button>
               <button class="add-btn" id="disable-push-reminders" type="button">Disable</button>
-              <button class="add-btn" id="test-feed-due-notification" type="button">Send test</button>
             </div>
-            <div class="hint">Uses native browser notifications for the current user on this device.</div>
+            <div class="hint">Shows a native browser confirmation after an entry is logged for the current user. Feed-due reminders are no longer sent.</div>
           </div>
           <div class="field">
             <label>Export events</label>

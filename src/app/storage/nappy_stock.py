@@ -1,6 +1,33 @@
 import sqlite3
 
 
+def get_nappy_stock_threshold(conn: sqlite3.Connection | None) -> int:
+    assert conn is not None
+    row = conn.execute(
+        """
+        SELECT nappy_stock_threshold_count
+        FROM baby_settings
+        WHERE id = 1
+        """
+    ).fetchone()
+    return int(row["nappy_stock_threshold_count"] if row else 0)
+
+
+def update_nappy_stock_threshold(
+    conn: sqlite3.Connection | None, threshold_count: int, updated_at_utc: str
+) -> None:
+    assert conn is not None
+    conn.execute(
+        """
+        UPDATE baby_settings
+        SET nappy_stock_threshold_count = ?, updated_at_utc = ?
+        WHERE id = 1
+        """,
+        (threshold_count, updated_at_utc),
+    )
+    conn.commit()
+
+
 def create_nappy_stock_batch(conn: sqlite3.Connection | None, payload: dict) -> dict:
     assert conn is not None
     cursor = conn.execute(
@@ -117,6 +144,25 @@ def count_nappy_changes_since(
           AND datetime(timestamp_utc) >= datetime(?)
         """,
         (since_utc,),
+    )
+    row = cursor.fetchone()
+    return int(row["count"] if row else 0)
+
+
+def count_nappy_changes_between(
+    conn: sqlite3.Connection | None, since_utc: str, before_utc: str
+) -> int:
+    assert conn is not None
+    cursor = conn.execute(
+        """
+        SELECT COUNT(*) AS count
+        FROM entries
+        WHERE type IN ('wee', 'poo')
+          AND deleted_at_utc IS NULL
+          AND datetime(timestamp_utc) >= datetime(?)
+          AND datetime(timestamp_utc) < datetime(?)
+        """,
+        (since_utc, before_utc),
     )
     row = cursor.fetchone()
     return int(row["count"] if row else 0)

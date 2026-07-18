@@ -265,6 +265,30 @@
         text-transform: uppercase;
         letter-spacing: 0.08em;
       }
+      .nappy-stock-summary {
+        margin-top: 8px;
+        padding-top: 8px;
+        border-top: 1px solid var(--border-light);
+      }
+      html.dark .nappy-stock-summary {
+        border-top-color: var(--border-dark);
+      }
+      .nappy-stock-summary-row {
+        display: flex;
+        align-items: baseline;
+        justify-content: center;
+        gap: 6px;
+      }
+      .nappy-stock-summary.is-low .nappy-stock-value {
+        color: #dc2626;
+      }
+      html.dark .nappy-stock-summary.is-low .nappy-stock-value {
+        color: #fca5a5;
+      }
+      .nappy-stock-value {
+        font-size: 15px;
+        font-weight: 700;
+      }
       .stat-card--feed-combined {
         grid-column: span 2;
         text-align: left;
@@ -1754,6 +1778,17 @@
               </div>
             </div>
             <div class="stat-flip-hint">Tap to flip 24h</div>
+            <div class="nappy-stock-summary" id="home-nappy-stock-summary" aria-live="polite">
+              <div class="nappy-stock-summary-row">
+                <span class="feed-count-label">In stock</span>
+                <span class="nappy-stock-value skeleton-text" id="home-nappy-stock-remaining">--</span>
+              </div>
+              <div class="stat-sub skeleton-text skeleton-wide" id="home-nappy-stock-detail">Loading stock…</div>
+              <a class="stat-link" href="{{ base_path }}/nappy-stock">
+                Manage stock
+                <span class="material-symbols-outlined" style="font-size: 14px;">arrow_forward</span>
+              </a>
+            </div>
           </div>
           <div class="stat-card" aria-label="Total sleep time for today">
             <div class="stat-label">

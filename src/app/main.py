@@ -17,7 +17,6 @@ from src.app.routes.pages import create_pages_blueprint
 from src.app.routes.pushcut import pushcut_api
 from src.app.routes.settings import settings_api
 from src.app.routes.home_kpis import home_kpis_api
-from src.app.services.feed_due import start_feed_due_scheduler
 from src.app.services.home_kpis import start_home_kpis_scheduler
 from src.app.services.push_subscriptions import build_vapid_config
 from src.app.storage.db import init_db
@@ -73,7 +72,6 @@ def create_app() -> Flask:
         create_pages_blueprint(app_root), url_prefix=config.base_path
     )
     if _should_start_schedulers(config.enable_schedulers):
-        start_feed_due_scheduler(app, config.feed_due_poll_seconds)
         start_home_kpis_scheduler(app, config.home_kpis_poll_seconds)
 
     @app.context_processor

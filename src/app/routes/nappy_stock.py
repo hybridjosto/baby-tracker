@@ -4,7 +4,9 @@ from src.app.services.nappy_stock import (
     adjust_nappy_stock_remaining,
     create_nappy_stock_batch,
     get_nappy_stock_status,
+    restock_nappies,
     update_latest_nappy_stock_batch,
+    update_nappy_stock_threshold,
 )
 
 nappy_stock_api = Blueprint("nappy_stock_api", __name__, url_prefix="/api")
@@ -28,6 +30,24 @@ def create_nappy_stock_batch_route():
     payload = request.get_json(silent=True) or {}
     try:
         return jsonify(create_nappy_stock_batch(_db_path(), payload)), 201
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+
+@nappy_stock_api.post("/nappy-stock/restock")
+def restock_nappies_route():
+    payload = request.get_json(silent=True) or {}
+    try:
+        return jsonify(restock_nappies(_db_path(), payload)), 201
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+
+@nappy_stock_api.patch("/nappy-stock/threshold")
+def update_nappy_stock_threshold_route():
+    payload = request.get_json(silent=True) or {}
+    try:
+        return jsonify(update_nappy_stock_threshold(_db_path(), payload))
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
 

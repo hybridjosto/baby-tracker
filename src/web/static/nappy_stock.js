@@ -17,7 +17,18 @@
   const formEl = document.getElementById("nappy-stock-form");
   const formTitleEl = document.getElementById("nappy-stock-form-title");
   const totalEl = document.getElementById("nappy-stock-total");
+  const totalLabelEl = document.getElementById("nappy-stock-total-label");
   const thresholdEl = document.getElementById("nappy-stock-threshold");
+  const thresholdFormEl = document.getElementById("nappy-stock-threshold-form");
+  const thresholdHintEl = document.getElementById("nappy-stock-threshold-hint");
+  const modeEl = document.getElementById("nappy-stock-mode");
+  const looseModeEl = document.getElementById("nappy-stock-mode-loose");
+  const packsModeEl = document.getElementById("nappy-stock-mode-packs");
+  const looseFieldEl = document.getElementById("nappy-stock-loose-field");
+  const packFieldsEl = document.getElementById("nappy-stock-pack-fields");
+  const packCountEl = document.getElementById("nappy-stock-pack-count");
+  const packSizeEl = document.getElementById("nappy-stock-pack-size");
+  const packTotalEl = document.getElementById("nappy-stock-pack-total");
   const addedAtEl = document.getElementById("nappy-stock-added-at");
   const notesEl = document.getElementById("nappy-stock-notes");
   const saveEl = document.getElementById("nappy-stock-save");
@@ -127,11 +138,19 @@
     return readResponse(await fetch(buildUrl("/api/nappy-stock")));
   }
 
-  async function saveBatch(payload) {
-    return readResponse(await fetch(buildUrl("/api/nappy-stock"), {
+  async function restock(payload) {
+    return readResponse(await fetch(buildUrl("/api/nappy-stock/restock"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
+    }));
+  }
+
+  async function saveThreshold(thresholdCount) {
+    return readResponse(await fetch(buildUrl("/api/nappy-stock/threshold"), {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ threshold_count: thresholdCount }),
     }));
   }
 
@@ -167,7 +186,7 @@
       title.textContent = `${batch.total_count} nappies`;
       const meta = document.createElement("div");
       meta.className = "stock-history-meta";
-      meta.textContent = `Threshold ${batch.threshold_count} · ${formatStockDate(batch.stock_added_at_utc)}`;
+      meta.textContent = formatStockDate(batch.stock_added_at_utc);
       main.append(title, meta);
       const notes = document.createElement("div");
       notes.className = "stock-history-meta";
@@ -183,6 +202,9 @@
     remainingEl.textContent = configured ? String(status.remaining_count || 0) : "--";
     usedEl.textContent = configured ? String(status.used_count || 0) : "--";
     rateEl.textContent = formatRate(Number(status && status.average_per_day));
+    if (document.activeElement !== thresholdEl) {
+      thresholdEl.value = String(status && status.threshold_count || 0);
+    }
     alertEl.classList.toggle("ok", !configured || !status.is_below_threshold);
     if (!configured) {
       alertTitleEl.textContent = "No stock batch yet";
@@ -207,10 +229,16 @@
 
   function resetEditMode() {
     editMode = false;
-    formTitleEl.textContent = "Add stock batch";
+    formTitleEl.textContent = "Add stock";
     saveEl.textContent = "Save stock";
     cancelEditEl.hidden = true;
-    formHintEl.textContent = "Saving a new batch resets the stock baseline.";
+    modeEl.hidden = false;
+    totalLabelEl.textContent = "Nappies to add";
+    totalEl.value = "";
+    notesEl.value = "";
+    addedAtEl.value = toLocalDateTimeValue(new Date());
+    setStockMode(packsModeEl.checked ? "packs" : "loose");
+    formHintEl.textContent = "New stock is added to the current remaining total.";
   }
 
   function enterEditMode() {
@@ -223,31 +251,17 @@
     formTitleEl.textContent = "Edit latest stock batch";
     saveEl.textContent = "Save edit";
     cancelEditEl.hidden = false;
+    modeEl.hidden = true;
+    looseFieldEl.hidden = false;
+    packFieldsEl.hidden = true;
+    totalLabelEl.textContent = "Total baseline";
     totalEl.value = String(batch.total_count || "");
-    thresholdEl.value = String(batch.threshold_count || "");
     addedAtEl.value = toLocalDateTimeValue(new Date(batch.stock_added_at_utc));
     notesEl.value = batch.notes || "";
-    formHintEl.textContent = "Editing updates the latest stock batch.";
+    formHintEl.textContent = "Edit the saved baseline, date, or notes to correct a mistake.";
   }
 
-  function buildFormPayload() {
-    const total = Number.parseInt(totalEl.value, 10);
-    const threshold = Number.parseInt(thresholdEl.value, 10);
-    if (!Number.isInteger(total) || total < 0) {
-      setStatus("Total stock must be a whole number.");
-      totalEl.focus();
-      return null;
-    }
-    if (!Number.isInteger(threshold) || threshold < 0) {
-      setStatus("Threshold must be a whole number.");
-      thresholdEl.focus();
-      return null;
-    }
-    if (threshold > total) {
-      setStatus("Threshold cannot be higher than total stock.");
-      thresholdEl.focus();
-      return null;
-    }
+  function buildCommonPayload() {
     const addedAt = addedAtEl.value ? new Date(addedAtEl.value) : new Date();
     if (Number.isNaN(addedAt.getTime())) {
       setStatus("Stock added date is invalid.");
@@ -255,11 +269,47 @@
       return null;
     }
     return {
-      total_count: total,
-      threshold_count: threshold,
       stock_added_at_utc: addedAt.toISOString(),
       notes: notesEl.value,
     };
+  }
+
+  function buildFormPayload() {
+    const common = buildCommonPayload();
+    if (!common) {
+      return null;
+    }
+    if (editMode) {
+      const total = Number.parseInt(totalEl.value, 10);
+      if (!Number.isInteger(total) || total < 0) {
+        setStatus("Total baseline must be a whole number.");
+        totalEl.focus();
+        return null;
+      }
+      return { ...common, total_count: total };
+    }
+    if (packsModeEl.checked) {
+      const packCount = Number.parseInt(packCountEl.value, 10);
+      const packSize = Number.parseInt(packSizeEl.value, 10);
+      if (!Number.isInteger(packCount) || packCount <= 0) {
+        setStatus("Number of packs must be a positive whole number.");
+        packCountEl.focus();
+        return null;
+      }
+      if (!Number.isInteger(packSize) || packSize <= 0) {
+        setStatus("Nappies per pack must be a positive whole number.");
+        packSizeEl.focus();
+        return null;
+      }
+      return { ...common, pack_count: packCount, nappies_per_pack: packSize };
+    }
+    const looseCount = Number.parseInt(totalEl.value, 10);
+    if (!Number.isInteger(looseCount) || looseCount <= 0) {
+      setStatus("Nappies to add must be a positive whole number.");
+      totalEl.focus();
+      return null;
+    }
+    return { ...common, loose_count: looseCount };
   }
 
   async function submitForm(event) {
@@ -271,18 +321,60 @@
     try {
       const nextStatus = editMode
         ? await updateLatest(payload)
-        : await saveBatch(payload);
+        : await restock(payload);
       renderStatus(nextStatus);
       if (editMode) {
         resetEditMode();
         formHintEl.textContent = "Stock edit saved.";
       } else {
+        totalEl.value = "";
+        packCountEl.value = "";
         notesEl.value = "";
-        formHintEl.textContent = "Stock saved.";
+        formHintEl.textContent = `Added ${nextStatus.quantity_added} nappies to stock.`;
       }
       setStatus("");
     } catch (error) {
       setStatus(`Failed to save nappy stock: ${error.message || "unknown error"}`);
+    }
+  }
+
+  function setStockMode(mode) {
+    const packs = mode === "packs";
+    packsModeEl.checked = packs;
+    looseModeEl.checked = !packs;
+    looseFieldEl.hidden = packs;
+    packFieldsEl.hidden = !packs;
+    totalEl.required = !packs;
+    packCountEl.required = packs;
+    packSizeEl.required = packs;
+  }
+
+  function updatePackTotal() {
+    const packCount = Number.parseInt(packCountEl.value, 10);
+    const packSize = Number.parseInt(packSizeEl.value, 10);
+    if (Number.isInteger(packCount) && packCount > 0
+      && Number.isInteger(packSize) && packSize > 0) {
+      packTotalEl.textContent = `${packCount * packSize} nappies will be added.`;
+      return;
+    }
+    packTotalEl.textContent = "Enter the pack details to calculate the total.";
+  }
+
+  async function submitThreshold(event) {
+    event.preventDefault();
+    const threshold = Number.parseInt(thresholdEl.value, 10);
+    if (!Number.isInteger(threshold) || threshold < 0) {
+      setStatus("Threshold must be a whole number.");
+      thresholdEl.focus();
+      return;
+    }
+    try {
+      const nextStatus = await saveThreshold(threshold);
+      renderStatus(nextStatus);
+      thresholdHintEl.textContent = `Low-stock alert set to ${threshold}.`;
+      setStatus("");
+    } catch (error) {
+      setStatus(`Failed to save threshold: ${error.message || "unknown error"}`);
     }
   }
 
@@ -330,6 +422,11 @@
     addedAtEl.value = toLocalDateTimeValue(new Date());
   }
   formEl.addEventListener("submit", submitForm);
+  thresholdFormEl.addEventListener("submit", submitThreshold);
+  looseModeEl.addEventListener("change", () => setStockMode("loose"));
+  packsModeEl.addEventListener("change", () => setStockMode("packs"));
+  packCountEl.addEventListener("input", updatePackTotal);
+  packSizeEl.addEventListener("input", updatePackTotal);
   incrementEl.addEventListener("click", () => {
     void applyAdjustment(1);
   });

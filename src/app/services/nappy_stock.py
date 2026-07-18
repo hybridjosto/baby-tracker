@@ -3,11 +3,14 @@ import math
 
 from src.app.storage.db import get_connection
 from src.app.storage.nappy_stock import (
+    count_nappy_changes_between,
     count_nappy_changes_since,
     create_nappy_stock_batch as repo_create_nappy_stock_batch,
     get_latest_nappy_stock_batch,
+    get_nappy_stock_threshold,
     list_nappy_stock_batches as repo_list_nappy_stock_batches,
     update_nappy_stock_batch as repo_update_nappy_stock_batch,
+    update_nappy_stock_threshold as repo_update_nappy_stock_threshold,
 )
 
 
@@ -136,6 +139,7 @@ def get_nappy_stock_status(
     now = now_utc or _now_utc()
     with get_connection(db_path) as conn:
         batch = get_latest_nappy_stock_batch(conn)
+        threshold_count = get_nappy_stock_threshold(conn)
         used_count = (
             count_nappy_changes_since(conn, batch["stock_added_at_utc"])
             if batch
@@ -143,30 +147,108 @@ def get_nappy_stock_status(
         )
         history = repo_list_nappy_stock_batches(conn, safe_limit)
 
+    if batch:
+        batch["threshold_count"] = threshold_count
     summary = _build_summary(batch, used_count, now)
+    summary["threshold_count"] = threshold_count
     summary["history"] = history
     return summary
 
 
 def create_nappy_stock_batch(db_path: str, payload: dict) -> dict:
     total_count = _normalize_non_negative_int(payload.get("total_count"), "total_count")
-    threshold_count = _normalize_non_negative_int(
-        payload.get("threshold_count", 0), "threshold_count"
-    )
-    if threshold_count > total_count:
-        raise ValueError("threshold_count cannot be greater than total_count")
     stock_added_at_utc = _normalize_timestamp_utc(payload.get("stock_added_at_utc"))
     now = _now_utc_iso()
-    fields = {
-        "total_count": total_count,
-        "threshold_count": threshold_count,
-        "stock_added_at_utc": stock_added_at_utc,
-        "notes": _normalize_notes(payload.get("notes")),
-        "created_at_utc": now,
-        "updated_at_utc": now,
-    }
     with get_connection(db_path) as conn:
+        if "threshold_count" in payload:
+            threshold_count = _normalize_non_negative_int(
+                payload.get("threshold_count"), "threshold_count"
+            )
+            repo_update_nappy_stock_threshold(conn, threshold_count, now)
+        else:
+            threshold_count = get_nappy_stock_threshold(conn)
+        fields = {
+            "total_count": total_count,
+            "threshold_count": threshold_count,
+            "stock_added_at_utc": stock_added_at_utc,
+            "notes": _normalize_notes(payload.get("notes")),
+            "created_at_utc": now,
+            "updated_at_utc": now,
+        }
         repo_create_nappy_stock_batch(conn, fields)
+    return get_nappy_stock_status(db_path)
+
+
+def restock_nappies(db_path: str, payload: dict) -> dict:
+    loose_count = _normalize_non_negative_int(
+        payload.get("loose_count", 0), "loose_count"
+    )
+    pack_count = _normalize_non_negative_int(
+        payload.get("pack_count", 0), "pack_count"
+    )
+    nappies_per_pack = _normalize_non_negative_int(
+        payload.get("nappies_per_pack", 0), "nappies_per_pack"
+    )
+    if pack_count > 0 and nappies_per_pack == 0:
+        raise ValueError("nappies_per_pack must be greater than zero")
+    quantity_added = loose_count + (pack_count * nappies_per_pack)
+    if quantity_added <= 0:
+        raise ValueError("stock added must be greater than zero")
+
+    stock_added_at_utc = _normalize_timestamp_utc(payload.get("stock_added_at_utc"))
+    now = _now_utc_iso()
+    with get_connection(db_path) as conn:
+        latest = get_latest_nappy_stock_batch(conn)
+        current_remaining = 0
+        if latest:
+            latest_added_at = _parse_utc(latest["stock_added_at_utc"])
+            restock_added_at = _parse_utc(stock_added_at_utc)
+            if restock_added_at < latest_added_at:
+                raise ValueError(
+                    "stock_added_at_utc cannot be earlier than the latest stock batch"
+                )
+            used_before_restock = count_nappy_changes_between(
+                conn,
+                latest["stock_added_at_utc"],
+                stock_added_at_utc,
+            )
+            current_remaining = max(
+                0, int(latest["total_count"]) - used_before_restock
+            )
+        threshold_count = get_nappy_stock_threshold(conn)
+        fields = {
+            "total_count": current_remaining + quantity_added,
+            "threshold_count": threshold_count,
+            "stock_added_at_utc": stock_added_at_utc,
+            "notes": _normalize_notes(payload.get("notes")),
+            "created_at_utc": now,
+            "updated_at_utc": now,
+        }
+        repo_create_nappy_stock_batch(conn, fields)
+
+    status = get_nappy_stock_status(db_path)
+    status["quantity_added"] = quantity_added
+    return status
+
+
+def update_nappy_stock_threshold(db_path: str, payload: dict) -> dict:
+    threshold_count = _normalize_non_negative_int(
+        payload.get("threshold_count"), "threshold_count"
+    )
+    with get_connection(db_path) as conn:
+        repo_update_nappy_stock_threshold(
+            conn, threshold_count, _now_utc_iso()
+        )
+        batch = get_latest_nappy_stock_batch(conn)
+        if batch:
+            repo_update_nappy_stock_batch(
+                conn,
+                batch["id"],
+                {
+                    "threshold_count": threshold_count,
+                    "updated_at_utc": _now_utc_iso(),
+                },
+            )
     return get_nappy_stock_status(db_path)
 
 
@@ -178,7 +260,6 @@ def update_latest_nappy_stock_batch(db_path: str, payload: dict) -> dict:
 
         fields: dict = {}
         total_count = int(batch["total_count"])
-        threshold_count = int(batch["threshold_count"])
         if "total_count" in payload:
             total_count = _normalize_non_negative_int(
                 payload.get("total_count"), "total_count"
@@ -189,8 +270,9 @@ def update_latest_nappy_stock_batch(db_path: str, payload: dict) -> dict:
                 payload.get("threshold_count"), "threshold_count"
             )
             fields["threshold_count"] = threshold_count
-        if threshold_count > total_count:
-            raise ValueError("threshold_count cannot be greater than total_count")
+            repo_update_nappy_stock_threshold(
+                conn, threshold_count, _now_utc_iso()
+            )
         if "stock_added_at_utc" in payload:
             fields["stock_added_at_utc"] = _normalize_timestamp_utc(
                 payload.get("stock_added_at_utc")

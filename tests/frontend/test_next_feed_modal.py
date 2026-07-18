@@ -246,6 +246,16 @@ def test_homepage_stats_default_to_today_and_flip_to_24h(
     )
     assert goal_response.status_code == 201
 
+    stock_response = client.post(
+        "/api/nappy-stock",
+        json={
+            "total_count": 20,
+            "threshold_count": 5,
+            "stock_added_at_utc": "2025-12-31T00:00:00Z",
+        },
+    )
+    assert stock_response.status_code == 201
+
     _create_entry(client, "feed-prev-24h", "2025-12-31T12:00:00Z", "feed", amount_ml=30)
     _create_entry(client, "feed-today", "2026-01-01T07:00:00Z", "feed", amount_ml=120)
     _create_entry(client, "wee-prev-24h", "2025-12-31T20:00:00Z", "wee")
@@ -271,6 +281,11 @@ def test_homepage_stats_default_to_today_and_flip_to_24h(
     assert browser_page.locator("#stat-goal-progress-today").text_content() == "60%"
     assert browser_page.locator("#stat-feed-today").text_content() == "1"
     assert browser_page.locator("#stat-nappy-today").text_content() == "1"
+    assert browser_page.locator("#home-nappy-stock-remaining").text_content() == "18"
+    assert "Low at 5" in (
+        browser_page.locator("#home-nappy-stock-detail").text_content() or ""
+    )
+    assert browser_page.locator('a[href$="/nappy-stock"]').count() >= 1
 
     feed_total_card = browser_page.locator('[data-home-stat-key="feed-total"]')
     nappies_card = browser_page.locator('[data-home-stat-key="nappies"]')

@@ -56,25 +56,17 @@ def test_should_start_schedulers_disables_under_pytest(monkeypatch):
     assert _should_start_schedulers(True) is False
 
 
-def test_create_scheduler_app_includes_push_config():
+def test_create_scheduler_app_includes_runtime_config():
     app = _create_scheduler_app(
         "/tmp/test.sqlite",
         base_path="/baby",
-        vapid_public_key="public",
-        vapid_private_key="private",
-        vapid_subject="mailto:test@example.com",
     )
 
     assert app.config["DB_PATH"] == "/tmp/test.sqlite"
     assert app.config["BASE_PATH"] == "/baby"
-    assert app.config["VAPID_CONFIG"] is not None
-    assert app.config["VAPID_CONFIG"].public_key == "public"
-    assert app.config["VAPID_CONFIG"].private_key == "private"
-    assert app.config["VAPID_CONFIG"].subject == "mailto:test@example.com"
 
 
-def test_create_scheduler_app_leaves_vapid_unconfigured_without_keys():
+def test_create_scheduler_app_defaults_base_path():
     app = _create_scheduler_app("/tmp/test.sqlite")
 
     assert app.config["BASE_PATH"] == ""
-    assert app.config["VAPID_CONFIG"] is None

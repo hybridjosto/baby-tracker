@@ -2,13 +2,10 @@ from __future__ import annotations
 
 from flask import Blueprint, current_app, jsonify, request
 
-from src.app.services.feed_due import dispatch_feed_due
 from src.app.services.push_subscriptions import (
-    build_push_payload,
     delete_push_subscription,
     get_push_subscription,
     save_push_subscription,
-    send_web_push,
 )
 from src.lib.validation import normalize_user_slug
 
@@ -17,10 +14,6 @@ pushcut_api = Blueprint("push_api", __name__, url_prefix="/api")
 
 def _db_path() -> str:
     return current_app.config["DB_PATH"]
-
-
-def _base_path() -> str:
-    return current_app.config.get("BASE_PATH", "")
 
 
 def _vapid_config():
@@ -88,11 +81,6 @@ def save_push_subscription_route():
             subscription=subscription_payload,
             user_agent=request.headers.get("User-Agent"),
         )
-        dispatch_feed_due(
-            _db_path(),
-            vapid_config=config,
-            base_path=_base_path(),
-        )
         return jsonify(
             {
                 "enabled": True,
@@ -121,35 +109,3 @@ def delete_push_subscription_route():
             "user_slug": user_slug,
         }
     )
-
-
-@pushcut_api.post("/push/feed-due")
-def push_feed_due_route():
-    payload = request.get_json(silent=True) or {}
-    try:
-        config = _vapid_config()
-        if not config:
-            return jsonify({"error": "vapid_not_configured"}), 503
-        user_slug = _get_user_slug(payload)
-        subscription = get_push_subscription(_db_path(), user_slug)
-        if not subscription:
-            return jsonify({"error": "push_subscription_not_configured"}), 400
-        outbound = build_push_payload(
-            title=str(payload.get("title") or "Feed due (test)"),
-            body=str(
-                payload.get("body") or "This is a test notification from Baby Tracker."
-            ),
-            url=f"{_base_path()}/{user_slug}",
-            tag=f"feed-due-{user_slug}",
-        )
-        result = send_web_push(subscription, outbound, config)
-        if result.get("sent"):
-            return jsonify({"sent": True, "payload": outbound})
-        if result.get("reason") == "invalid_subscription":
-            delete_push_subscription(_db_path(), user_slug)
-            return jsonify({"sent": False, "error": "invalid_subscription"}), 410
-        return jsonify(
-            {"sent": False, "error": result.get("reason", "push_failed")}
-        ), 502
-    except ValueError as exc:
-        return jsonify({"error": str(exc)}), 400
