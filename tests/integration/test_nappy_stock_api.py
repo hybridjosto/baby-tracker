@@ -213,7 +213,14 @@ def test_nappy_stock_threshold_is_saved_separately_and_carried_to_new_stock(clie
     assert data["batch"]["threshold_count"] == 8
 
 
-def test_nappy_stock_restock_adds_bulk_packs_to_current_remaining(client):
+def test_nappy_stock_restock_adds_bulk_packs_without_resetting_usage(
+    client, monkeypatch
+):
+    from src.app.services import nappy_stock as service
+
+    fixed_now = datetime(2026, 7, 12, 8, 0, tzinfo=timezone.utc)
+    monkeypatch.setattr(service, "_now_utc", lambda: fixed_now)
+
     response = client.post(
         "/api/nappy-stock",
         json={
@@ -239,9 +246,18 @@ def test_nappy_stock_restock_adds_bulk_packs_to_current_remaining(client):
     data = response.get_json()
     assert data["quantity_added"] == 72
     assert data["remaining_count"] == 90
-    assert data["used_count"] == 0
+    assert data["used_count"] == 2
+    assert data["average_per_day"] == 1.0
     assert data["batch"]["total_count"] == 90
     assert data["batch"]["notes"] == "Three bulk packs"
+
+    _log_nappy(client, "wee", "2026-07-11T09:00:00+00:00", "nappy-pack-3")
+    response = client.get("/api/nappy-stock")
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data["remaining_count"] == 89
+    assert data["used_count"] == 3
+    assert data["average_per_day"] == 1.5
 
 
 def test_nappy_stock_restock_rejects_incomplete_pack_details(client):

@@ -70,6 +70,21 @@ def get_latest_nappy_stock_batch(conn: sqlite3.Connection | None) -> dict | None
     return dict(row) if row else None
 
 
+def get_first_nappy_stock_batch(conn: sqlite3.Connection | None) -> dict | None:
+    assert conn is not None
+    cursor = conn.execute(
+        """
+        SELECT id, total_count, threshold_count, stock_added_at_utc, notes,
+               created_at_utc, updated_at_utc
+        FROM nappy_stock_batches
+        ORDER BY datetime(stock_added_at_utc) ASC, id ASC
+        LIMIT 1
+        """
+    )
+    row = cursor.fetchone()
+    return dict(row) if row else None
+
+
 def get_nappy_stock_batch(
     conn: sqlite3.Connection | None, batch_id: int
 ) -> dict | None:

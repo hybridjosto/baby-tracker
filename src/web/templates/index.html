@@ -289,6 +289,24 @@
         font-size: 15px;
         font-weight: 700;
       }
+      .nap-estimate {
+        margin-top: 10px;
+        padding-top: 9px;
+        border-top: 1px solid var(--border-light);
+      }
+      html.dark .nap-estimate {
+        border-top-color: var(--border-dark);
+      }
+      .nap-estimate-value {
+        display: block;
+        margin-top: 3px;
+        font-size: 16px;
+        font-weight: 700;
+        color: #6469d9;
+      }
+      html.dark .nap-estimate-value {
+        color: #aeb2ff;
+      }
       .stat-card--feed-combined {
         grid-column: span 2;
         text-align: left;
@@ -1798,6 +1816,11 @@
             <div class="stat-value skeleton-text skeleton-mid" id="home-sleep-duration">0 min</div>
             <div class="stat-sub skeleton-text skeleton-wide" id="home-sleep-duration-avg">Avg / sleep: --</div>
             <div class="stat-sub skeleton-text skeleton-wide" id="home-sleep-day-night">Day -- · Night --</div>
+            <div class="nap-estimate" id="home-next-nap-estimate" aria-live="polite">
+              <span class="feed-count-label">Next nap estimate</span>
+              <strong class="nap-estimate-value skeleton-text skeleton-mid" id="home-next-nap-time">Learning…</strong>
+              <div class="stat-sub skeleton-text skeleton-wide" id="home-next-nap-detail">Checking the last 3 days</div>
+            </div>
           </div>
         </section>
         <div class="stats-range skeleton-text skeleton-wide" id="stat-window">Today so far: -- · Tap a card for 24h</div>

@@ -6,6 +6,7 @@ from src.app.storage.nappy_stock import (
     count_nappy_changes_between,
     count_nappy_changes_since,
     create_nappy_stock_batch as repo_create_nappy_stock_batch,
+    get_first_nappy_stock_batch,
     get_latest_nappy_stock_batch,
     get_nappy_stock_threshold,
     list_nappy_stock_batches as repo_list_nappy_stock_batches,
@@ -73,7 +74,13 @@ def _normalize_notes(value: object | None) -> str | None:
     return trimmed[:240] if trimmed else None
 
 
-def _build_summary(batch: dict | None, used_count: int, now_utc: datetime) -> dict:
+def _build_summary(
+    batch: dict | None,
+    stock_used_count: int,
+    usage_count: int,
+    usage_started_at_utc: str | None,
+    now_utc: datetime,
+) -> dict:
     if not batch:
         return {
             "configured": False,
@@ -88,19 +95,21 @@ def _build_summary(batch: dict | None, used_count: int, now_utc: datetime) -> di
             "estimated_threshold_at_utc": None,
         }
 
-    stock_added_at = _parse_utc(batch["stock_added_at_utc"])
-    elapsed_seconds = max(0.0, (now_utc - stock_added_at).total_seconds())
+    usage_started_at = _parse_utc(
+        usage_started_at_utc or batch["stock_added_at_utc"]
+    )
+    elapsed_seconds = max(0.0, (now_utc - usage_started_at).total_seconds())
     elapsed_days = elapsed_seconds / 86400
     total_count = int(batch["total_count"])
     threshold_count = int(batch["threshold_count"])
-    remaining_count = max(0, total_count - used_count)
+    remaining_count = max(0, total_count - stock_used_count)
     average_per_day = None
     days_until_empty = None
     estimated_empty_at_utc = None
     estimated_threshold_at_utc = None
 
-    if used_count > 0 and elapsed_days > 0:
-        average_per_day = used_count / elapsed_days
+    if usage_count > 0 and elapsed_days > 0:
+        average_per_day = usage_count / elapsed_days
         if average_per_day > 0:
             days_until_empty = remaining_count / average_per_day
             estimated_empty_at_utc = (
@@ -117,7 +126,7 @@ def _build_summary(batch: dict | None, used_count: int, now_utc: datetime) -> di
     return {
         "configured": True,
         "batch": batch,
-        "used_count": used_count,
+        "used_count": usage_count,
         "remaining_count": remaining_count,
         "threshold_count": threshold_count,
         "is_below_threshold": remaining_count <= threshold_count,
@@ -139,17 +148,29 @@ def get_nappy_stock_status(
     now = now_utc or _now_utc()
     with get_connection(db_path) as conn:
         batch = get_latest_nappy_stock_batch(conn)
+        first_batch = get_first_nappy_stock_batch(conn)
         threshold_count = get_nappy_stock_threshold(conn)
-        used_count = (
+        stock_used_count = (
             count_nappy_changes_since(conn, batch["stock_added_at_utc"])
             if batch
+            else 0
+        )
+        usage_count = (
+            count_nappy_changes_since(conn, first_batch["stock_added_at_utc"])
+            if first_batch
             else 0
         )
         history = repo_list_nappy_stock_batches(conn, safe_limit)
 
     if batch:
         batch["threshold_count"] = threshold_count
-    summary = _build_summary(batch, used_count, now)
+    summary = _build_summary(
+        batch,
+        stock_used_count,
+        usage_count,
+        first_batch["stock_added_at_utc"] if first_batch else None,
+        now,
+    )
     summary["threshold_count"] = threshold_count
     summary["history"] = history
     return summary

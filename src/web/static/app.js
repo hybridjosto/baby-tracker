@@ -166,6 +166,8 @@ const summaryWeightPercentileEl = document.getElementById("summary-weight-percen
 const homeSleepDurationEl = document.getElementById("home-sleep-duration");
 const homeSleepDurationAvgEl = document.getElementById("home-sleep-duration-avg");
 const homeSleepDayNightEl = document.getElementById("home-sleep-day-night");
+const homeNextNapTimeEl = document.getElementById("home-next-nap-time");
+const homeNextNapDetailEl = document.getElementById("home-next-nap-detail");
 const milkExpressCountEl = document.getElementById("milk-express-count");
 const milkExpressTotalsEl = document.getElementById("milk-express-totals");
 const milkExpressListEl = document.getElementById("milk-express-list");
@@ -234,6 +236,10 @@ const chartPanelsEl = document.getElementById("history-chart-panels");
 const chartEmptyEl = document.getElementById("chart-empty");
 const HOME_CHART_TOTAL_HOURS = 24;
 const HOME_CHART_CHUNK_HOURS = 6;
+const NAP_ESTIMATE_LOOKBACK_DAYS = 3;
+const NAP_ESTIMATE_MIN_SAMPLES = 2;
+const NAP_WAKE_MIN_MINUTES = 30;
+const NAP_WAKE_MAX_MINUTES = 8 * 60;
 const logListEl = document.getElementById("log-entries");
 const logEmptyEl = document.getElementById("log-empty");
 const editEntryBackdropEl = document.getElementById("edit-entry-backdrop");
@@ -4510,6 +4516,127 @@ function getSplitSleepMinutesForDay(entries, date) {
   });
 }
 
+function getMedian(values) {
+  if (!values.length) {
+    return null;
+  }
+  const sorted = [...values].sort((left, right) => left - right);
+  const midpoint = Math.floor(sorted.length / 2);
+  if (sorted.length % 2) {
+    return sorted[midpoint];
+  }
+  return (sorted[midpoint - 1] + sorted[midpoint]) / 2;
+}
+
+function formatNapEstimateTime(valueMs) {
+  return new Date(valueMs).toLocaleTimeString(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function buildNextNapEstimate(entries, now = new Date()) {
+  const nowMs = now.getTime();
+  if (!Number.isFinite(nowMs)) {
+    return {
+      time: "Estimate unavailable",
+      detail: "Could not read the current time",
+    };
+  }
+  const sleepEntries = (entries || [])
+    .filter((entry) => entry && isSleepType(entry.type) && !entry.deleted_at_utc)
+    .map((entry) => {
+      const startMs = Date.parse(entry.timestamp_utc || "");
+      const durationMin = Number.parseFloat(entry.feed_duration_min);
+      return {
+        startMs,
+        durationMin,
+        endMs: Number.isFinite(startMs) && Number.isFinite(durationMin)
+          ? startMs + durationMin * 60000
+          : null,
+      };
+    })
+    .filter((entry) => Number.isFinite(entry.startMs) && entry.startMs <= nowMs)
+    .sort((left, right) => left.startMs - right.startMs);
+  const completed = sleepEntries.filter((entry) => (
+    Number.isFinite(entry.durationMin)
+    && entry.durationMin > 0
+    && Number.isFinite(entry.endMs)
+    && entry.endMs <= nowMs
+  ));
+  const latestCompleted = completed[completed.length - 1] || null;
+  const latestActive = [...sleepEntries]
+    .reverse()
+    .find((entry) => !Number.isFinite(entry.durationMin));
+  if (latestActive && (!latestCompleted || latestActive.startMs > latestCompleted.startMs)) {
+    return {
+      time: "Asleep now",
+      detail: "Next estimate appears after wake-up",
+    };
+  }
+  if (!latestCompleted || nowMs - latestCompleted.endMs > 12 * 60 * 60000) {
+    return {
+      time: "Learning pattern",
+      detail: "Log a recent wake-up to anchor the estimate",
+    };
+  }
+
+  const lookbackStartMs = nowMs - NAP_ESTIMATE_LOOKBACK_DAYS * 24 * 60 * 60000;
+  const wakeWindows = [];
+  completed.forEach((session, index) => {
+    if (session.startMs < lookbackStartMs || index === 0) {
+      return;
+    }
+    const napStart = new Date(session.startMs);
+    const napStartHour = napStart.getHours();
+    if (napStartHour < 6 || napStartHour >= 19) {
+      return;
+    }
+    const previousSession = completed[index - 1];
+    const wakeMinutes = (session.startMs - previousSession.endMs) / 60000;
+    if (wakeMinutes >= NAP_WAKE_MIN_MINUTES && wakeMinutes <= NAP_WAKE_MAX_MINUTES) {
+      wakeWindows.push(wakeMinutes);
+    }
+  });
+  if (wakeWindows.length < NAP_ESTIMATE_MIN_SAMPLES) {
+    return {
+      time: "Learning pattern",
+      detail: `Need ${NAP_ESTIMATE_MIN_SAMPLES} recent daytime wake windows`,
+    };
+  }
+
+  const typicalWakeMinutes = getMedian(wakeWindows);
+  const estimateMs = latestCompleted.endMs + typicalWakeMinutes * 60000;
+  const estimateHour = new Date(estimateMs).getHours();
+  const currentHour = now.getHours();
+  if (currentHour < 5 || currentHour >= 20 || estimateHour < 5 || estimateHour >= 20) {
+    return {
+      time: "Daytime only",
+      detail: `Typical wake window ${formatDurationMinutes(typicalWakeMinutes)}`,
+    };
+  }
+  const minutesUntil = Math.round((estimateMs - nowMs) / 60000);
+  const timingText = minutesUntil <= 0
+    ? "likely due now"
+    : `in ${formatDurationMinutes(minutesUntil)}`;
+  const sampleLabel = `${wakeWindows.length} recent nap${wakeWindows.length === 1 ? "" : "s"}`;
+  return {
+    time: `~${formatNapEstimateTime(estimateMs)}`,
+    detail: `${timingText} · ${formatDurationMinutes(typicalWakeMinutes)} median from ${sampleLabel}`,
+  };
+}
+
+function renderNextNapEstimate(entries) {
+  if (!homeNextNapTimeEl || !homeNextNapDetailEl) {
+    return;
+  }
+  const estimate = buildNextNapEstimate(entries);
+  homeNextNapTimeEl.textContent = estimate.time;
+  homeNextNapDetailEl.textContent = estimate.detail;
+  homeNextNapTimeEl.classList.remove("skeleton-text", "skeleton-mid");
+  homeNextNapDetailEl.classList.remove("skeleton-text", "skeleton-wide");
+}
+
 function renderSummaryStats(entries) {
   if (!summaryTotalIntakeEl && !summarySleepDurationEl && !summarySleepDayNightEl) {
     return;
@@ -7215,6 +7342,7 @@ function renderStats(entries, options = {}) {
   if (homeSleepDayNightEl) {
     homeSleepDayNightEl.textContent = `Day ${formatDurationMinutes(todaySleepSplit.dayMinutes)} · Night ${formatDurationMinutes(todaySleepSplit.nightMinutes)}`;
   }
+  renderNextNapEstimate(sleepEntries);
   recentFeedVolumeEntries = feedVolumeEntries.sort((a, b) => a.ts - b.ts);
   latestFeedTotalsMl = {
     today: todayFeedTotalMl,
