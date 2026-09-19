@@ -10,6 +10,7 @@ from src.app.storage.settings import get_settings as repo_get_settings
 from src.app.storage.settings import update_settings as repo_update_settings
 from src.app.storage.settings import (
     DEFAULT_FEED_SIZE_BIG_ML,
+    DEFAULT_FEED_SIZE_MEDIUM_ML,
     DEFAULT_FEED_SIZE_SMALL_ML,
     DEFAULT_OPENAI_TIMEOUT_SECONDS,
     DEFAULT_OLLAMA_TIMEOUT_SECONDS,
@@ -320,6 +321,10 @@ def update_settings(db_path: str, payload: dict) -> dict:
         fields["feed_size_small_ml"] = _normalize_feed_size_ml(
             payload["feed_size_small_ml"], "feed_size_small_ml"
         )
+    if "feed_size_medium_ml" in payload:
+        fields["feed_size_medium_ml"] = _normalize_feed_size_ml(
+            payload["feed_size_medium_ml"], "feed_size_medium_ml"
+        )
     if "feed_size_big_ml" in payload:
         fields["feed_size_big_ml"] = _normalize_feed_size_ml(
             payload["feed_size_big_ml"], "feed_size_big_ml"
@@ -388,13 +393,18 @@ def update_settings(db_path: str, payload: dict) -> dict:
             )
 
         next_small = fields.get("feed_size_small_ml", current.get("feed_size_small_ml"))
+        next_medium = fields.get(
+            "feed_size_medium_ml", current.get("feed_size_medium_ml")
+        )
         next_big = fields.get("feed_size_big_ml", current.get("feed_size_big_ml"))
         if next_small is None:
             next_small = DEFAULT_FEED_SIZE_SMALL_ML
         if next_big is None:
             next_big = DEFAULT_FEED_SIZE_BIG_ML
-        if next_small > next_big:
-            raise ValueError("feed_size_small_ml must be <= feed_size_big_ml")
+        if next_medium is None:
+            next_medium = DEFAULT_FEED_SIZE_MEDIUM_ML
+        if next_small > next_medium or next_medium > next_big:
+            raise ValueError("feed sizes must satisfy small <= medium <= big")
 
         if fields:
             fields["updated_at_utc"] = _now_utc_iso()

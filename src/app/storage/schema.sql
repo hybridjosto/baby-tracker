@@ -34,6 +34,7 @@ CREATE TABLE IF NOT EXISTS baby_settings (
     pushcut_feed_due_url TEXT,
     home_kpis_webhook_url TEXT,
     feed_size_small_ml REAL,
+    feed_size_medium_ml REAL,
     feed_size_big_ml REAL,
     ollama_base_url TEXT,
     ollama_model TEXT,

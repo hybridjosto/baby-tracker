@@ -95,8 +95,6 @@ const timedEventBannerTitleEl = document.getElementById("timed-event-banner-titl
 const timedEventBannerTimerEl = document.getElementById("timed-event-banner-timer");
 const timedEventBannerMetaEl = document.getElementById("timed-event-banner-meta");
 const timedEventBannerActionEl = document.getElementById("timed-event-banner-action");
-const feedToggleFormulaBtn = document.getElementById("feed-toggle-formula");
-const feedToggleExpressedBtn = document.getElementById("feed-toggle-expressed");
 const feedQuickBtns = document.querySelectorAll("[data-quick-size], [data-quick-ml]");
 const feedManualToggleBtn = document.getElementById("feed-manual-toggle");
 const feedManualWrap = document.getElementById("feed-manual");
@@ -305,6 +303,7 @@ const dobInputEl = document.getElementById("dob-input");
 const ageOutputEl = document.getElementById("age-output");
 const intervalInputEl = document.getElementById("interval-input");
 const feedSizeSmallInputEl = document.getElementById("feed-size-small-input");
+const feedSizeMediumInputEl = document.getElementById("feed-size-medium-input");
 const feedSizeBigInputEl = document.getElementById("feed-size-big-input");
 const customTypeInputEl = document.getElementById("custom-type-input");
 const entryWebhookInputEl = document.getElementById("entry-webhook-input");
@@ -344,7 +343,6 @@ let backfillBatchId = null;
 let backfillDrafts = [];
 let breastfeedHydrated = false;
 let timedEventHydrated = false;
-let quickFeedKind = "formula";
 let pushReminderState = {
   enabled: false,
   endpoint: "",
@@ -1498,17 +1496,6 @@ function initQuickLogHandlers() {
       void handleTimedEventToggle(type);
     });
   }
-  if (feedToggleFormulaBtn) {
-    feedToggleFormulaBtn.addEventListener("click", () => {
-      setQuickFeedKind("formula");
-    });
-  }
-  if (feedToggleExpressedBtn) {
-    feedToggleExpressedBtn.addEventListener("click", () => {
-      setManualVisible(false);
-      setQuickFeedKind("expressed");
-    });
-  }
   if (feedQuickBtns.length > 0) {
     feedQuickBtns.forEach((btn) => {
       btn.addEventListener("click", () => {
@@ -1526,7 +1513,6 @@ function initQuickLogHandlers() {
       if (!feedManualWrap) {
         return;
       }
-      setQuickFeedKind("formula");
       setManualVisible(feedManualWrap.hidden);
     });
   }
@@ -1626,7 +1612,6 @@ function initQuickLogHandlers() {
       closeFeedMenu();
     }
   });
-  setQuickFeedKind(quickFeedKind);
 }
 
 function initLogHandlers() {
@@ -2128,6 +2113,16 @@ function initSettingsHandlers() {
       void saveBabySettings({ feed_size_small_ml: nextValue });
     });
   }
+  if (feedSizeMediumInputEl) {
+    feedSizeMediumInputEl.addEventListener("change", () => {
+      const nextValue = Number.parseFloat(feedSizeMediumInputEl.value);
+      if (Number.isNaN(nextValue) || nextValue <= 0) {
+        feedSizeMediumInputEl.value = String(state.feedSizeMediumMl);
+        return;
+      }
+      void saveBabySettings({ feed_size_medium_ml: nextValue });
+    });
+  }
   if (feedSizeBigInputEl) {
     feedSizeBigInputEl.addEventListener("change", () => {
       const nextValue = Number.parseFloat(feedSizeBigInputEl.value);
@@ -2469,6 +2464,7 @@ function syncQuickFeedButtons() {
   }
   const quickFeedValues = {
     small: state.feedSizeSmallMl,
+    medium: state.feedSizeMediumMl,
     big: state.feedSizeBigMl,
   };
   feedQuickBtns.forEach((btn) => {
@@ -2478,7 +2474,8 @@ function syncQuickFeedButtons() {
     }
     const amount = quickFeedValues[size];
     btn.dataset.quickMl = String(amount);
-    btn.textContent = `${size === "small" ? "Small" : "Big"} ${formatMl(amount)}`;
+    const label = size.charAt(0).toUpperCase() + size.slice(1);
+    btn.textContent = `${label} ${formatMl(amount)}`;
     btn.setAttribute("aria-label", `${size} quick feed ${formatMl(amount)}`);
   });
 }
@@ -2515,36 +2512,13 @@ function setStatus(message) {
   }
 }
 
-function setQuickFeedKind(kind) {
-  quickFeedKind = kind === "expressed" ? "expressed" : "formula";
-  if (feedToggleFormulaBtn) {
-    feedToggleFormulaBtn.classList.toggle(
-      "is-active",
-      quickFeedKind === "formula",
-    );
-  }
-  if (feedToggleExpressedBtn) {
-    feedToggleExpressedBtn.classList.toggle(
-      "is-active",
-      quickFeedKind === "expressed",
-    );
-  }
-  if (quickFeedKind === "expressed") {
-    setManualVisible(false);
-  }
-}
-
 function handleQuickLog(amountMl) {
   if (!state.userValid) {
     setStatus("Choose a user below to start logging.");
     return;
   }
   const payload = buildEntryPayload("feed");
-  if (quickFeedKind === "expressed") {
-    payload.expressed_ml = amountMl;
-  } else {
-    payload.formula_ml = amountMl;
-  }
+  payload.formula_ml = amountMl;
   closeFeedMenu();
   void saveEntry(payload);
 }
@@ -8884,6 +8858,9 @@ async function loadBabySettings() {
     state.feedSizeSmallMl = Number.isFinite(Number.parseFloat(data.feed_size_small_ml))
       ? Number.parseFloat(data.feed_size_small_ml)
       : 120;
+    state.feedSizeMediumMl = Number.isFinite(Number.parseFloat(data.feed_size_medium_ml))
+      ? Number.parseFloat(data.feed_size_medium_ml)
+      : 135;
     state.feedSizeBigMl = Number.isFinite(Number.parseFloat(data.feed_size_big_ml))
       ? Number.parseFloat(data.feed_size_big_ml)
       : 150;
@@ -8915,6 +8892,9 @@ async function loadBabySettings() {
     }
     if (feedSizeSmallInputEl) {
       feedSizeSmallInputEl.value = String(state.feedSizeSmallMl);
+    }
+    if (feedSizeMediumInputEl) {
+      feedSizeMediumInputEl.value = String(state.feedSizeMediumMl);
     }
     if (feedSizeBigInputEl) {
       feedSizeBigInputEl.value = String(state.feedSizeBigMl);
@@ -8955,6 +8935,9 @@ async function saveBabySettings(patch) {
     state.feedSizeSmallMl = Number.isFinite(Number.parseFloat(data.feed_size_small_ml))
       ? Number.parseFloat(data.feed_size_small_ml)
       : 120;
+    state.feedSizeMediumMl = Number.isFinite(Number.parseFloat(data.feed_size_medium_ml))
+      ? Number.parseFloat(data.feed_size_medium_ml)
+      : 135;
     state.feedSizeBigMl = Number.isFinite(Number.parseFloat(data.feed_size_big_ml))
       ? Number.parseFloat(data.feed_size_big_ml)
       : 150;
@@ -8978,6 +8961,9 @@ async function saveBabySettings(patch) {
     }
     if (feedSizeSmallInputEl) {
       feedSizeSmallInputEl.value = String(state.feedSizeSmallMl);
+    }
+    if (feedSizeMediumInputEl) {
+      feedSizeMediumInputEl.value = String(state.feedSizeMediumMl);
     }
     if (feedSizeBigInputEl) {
       feedSizeBigInputEl.value = String(state.feedSizeBigMl);

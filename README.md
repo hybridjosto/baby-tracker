@@ -213,3 +213,13 @@ Optional custom DB path:
 ```sh
 BABY_TRACKER_DB_PATH=/path/to/db.sqlite uv run python scripts/backfill_feed_amounts.py
 ```
+
+## Service retirement (2026-09-19)
+
+The Apple Container deployment on the Mac mini is retired. Stop both
+`baby-tracker` and `baby-tracker-scheduler`; keep the containers and the
+`data/` directory, including `data/baby-tracker.sqlite`, for recovery.
+No Baby Tracker login agent or cron task is configured on that host.
+
+To resume the service, run `just restart` from this repository on the Mac mini.
+That command rebuilds the image and starts the web and scheduler containers.

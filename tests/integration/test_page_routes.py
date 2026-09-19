@@ -53,6 +53,17 @@ def test_invalid_user_page_route_returns_bad_request(client):
     assert b"user_slug must be 1-24 chars" in response.data
 
 
+def test_served_quick_feed_menu_has_three_formula_sizes(client):
+    response = client.get("/josh")
+
+    assert response.status_code == 200
+    assert b'id="feed-toggle-expressed"' not in response.data
+    assert b'data-quick-size="small"' in response.data
+    assert b'data-quick-size="medium"' in response.data
+    assert b'data-quick-size="big"' in response.data
+    assert b'id="feed-manual-toggle"' in response.data
+
+
 def test_invalid_log_type_returns_bad_request(client):
     response = client.get("/josh/log/!!!")
 

@@ -10,6 +10,7 @@ def test_settings_defaults_include_feed_size_defaults(tmp_path):
         settings = get_settings(conn)
 
     assert settings["feed_size_small_ml"] == 120.0
+    assert settings["feed_size_medium_ml"] == 135.0
     assert settings["feed_size_big_ml"] == 150.0
     assert settings["ollama_base_url"] == "http://127.0.0.1:11434"
     assert settings["ollama_model"] == "gemma4"
@@ -52,6 +53,7 @@ def test_settings_migrates_missing_feed_size_columns(tmp_path):
         }
 
     assert "feed_size_small_ml" in columns
+    assert "feed_size_medium_ml" in columns
     assert "feed_size_big_ml" in columns
     assert "ollama_base_url" in columns
     assert "ollama_model" in columns
@@ -61,6 +63,7 @@ def test_settings_migrates_missing_feed_size_columns(tmp_path):
     assert "openai_timeout_seconds" in columns
     assert "openai_prompt_template" in columns
     assert settings["feed_size_small_ml"] == 120.0
+    assert settings["feed_size_medium_ml"] == 135.0
     assert settings["feed_size_big_ml"] == 150.0
     assert settings["ollama_base_url"] == "http://127.0.0.1:11434"
     assert settings["ollama_model"] == "gemma4"

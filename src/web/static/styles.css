@@ -556,43 +556,9 @@ html.dark .feed-menu {
   gap: 8px;
 }
 
-.feed-toggle {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-
-.feed-toggle-btn {
-  height: 36px;
-  border-radius: 12px;
-  border: 1px solid #a3d9a6;
-  background: var(--primary);
-  color: #0f1a12;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.feed-toggle-btn.is-active {
-  border-color: rgba(90, 140, 96, 0.9);
-  background: #0f1a12;
-  color: var(--primary);
-}
-
-html.dark .feed-toggle-btn {
-  border-color: rgba(19, 236, 91, 0.4);
-  background: var(--primary);
-  color: #0f1a12;
-}
-
-html.dark .feed-toggle-btn.is-active {
-  border-color: rgba(130, 200, 150, 0.7);
-  background: #0f1a12;
-  color: var(--primary);
-}
-
 .feed-quick-row {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 6px;
 }
 

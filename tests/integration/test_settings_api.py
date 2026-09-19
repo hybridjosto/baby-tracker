@@ -15,6 +15,7 @@ def test_get_settings_defaults(client):
     assert payload["pushcut_feed_due_url"] is None
     assert payload["home_kpis_webhook_url"] is None
     assert payload["feed_size_small_ml"] == 120.0
+    assert payload["feed_size_medium_ml"] == 135.0
     assert payload["feed_size_big_ml"] == 150.0
     assert payload["ollama_base_url"] == "http://127.0.0.1:11434"
     assert payload["ollama_model"] == "gemma4"
@@ -37,6 +38,7 @@ def test_patch_settings_updates_values(client):
             "default_user_slug": "suz",
             "pushcut_feed_due_url": "https://pushcut.example.com/feed",
             "feed_size_small_ml": 110,
+            "feed_size_medium_ml": 135,
             "feed_size_big_ml": 160,
             "ollama_base_url": "http://ollama.local:11434/",
             "ollama_model": "gemma4:latest",
@@ -57,6 +59,7 @@ def test_patch_settings_updates_values(client):
     assert payload["default_user_slug"] == "suz"
     assert payload["pushcut_feed_due_url"] == "https://pushcut.example.com/feed"
     assert payload["feed_size_small_ml"] == 110.0
+    assert payload["feed_size_medium_ml"] == 135.0
     assert payload["feed_size_big_ml"] == 160.0
     assert payload["ollama_base_url"] == "http://ollama.local:11434"
     assert payload["ollama_model"] == "gemma4:latest"
@@ -79,6 +82,7 @@ def test_patch_settings_updates_values(client):
     assert payload["default_user_slug"] == "suz"
     assert payload["pushcut_feed_due_url"] == "https://pushcut.example.com/feed"
     assert payload["feed_size_small_ml"] == 110.0
+    assert payload["feed_size_medium_ml"] == 135.0
     assert payload["feed_size_big_ml"] == 160.0
     assert payload["ollama_base_url"] == "http://ollama.local:11434"
     assert payload["ollama_model"] == "gemma4:latest"
@@ -123,11 +127,29 @@ def test_patch_settings_rejects_invalid_values(client):
     response = client.patch("/api/settings", json={"feed_size_small_ml": 0})
     assert response.status_code == 400
 
+    response = client.patch("/api/settings", json={"feed_size_medium_ml": 0})
+    assert response.status_code == 400
+
     response = client.patch("/api/settings", json={"feed_size_big_ml": -1})
     assert response.status_code == 400
 
     response = client.patch(
-        "/api/settings", json={"feed_size_small_ml": 160, "feed_size_big_ml": 120}
+        "/api/settings",
+        json={
+            "feed_size_small_ml": 160,
+            "feed_size_medium_ml": 140,
+            "feed_size_big_ml": 120,
+        },
+    )
+    assert response.status_code == 400
+
+    response = client.patch(
+        "/api/settings",
+        json={
+            "feed_size_small_ml": 110,
+            "feed_size_medium_ml": 170,
+            "feed_size_big_ml": 160,
+        },
     )
     assert response.status_code == 400
 

@@ -82,6 +82,42 @@ def _create_entry(
     assert response.status_code == 201
 
 
+def test_quick_feed_menu_uses_three_formula_sizes(
+    client,
+    live_server,
+    browser_page,
+):
+    response = client.patch(
+        "/api/settings",
+        json={
+            "feed_size_small_ml": 120,
+            "feed_size_medium_ml": 140,
+            "feed_size_big_ml": 160,
+        },
+    )
+    assert response.status_code == 200
+
+    browser_page.goto(f"{live_server}/suz")
+    browser_page.get_by_role("button", name="Feed", exact=True).click()
+
+    assert browser_page.get_by_role("button", name="Expressed").count() == 0
+    browser_page.get_by_role("button", name="medium quick feed 140 ml").click()
+    browser_page.wait_for_function(
+        """
+        async () => {
+          const response = await fetch("/api/users/suz/entries");
+          const entries = await response.json();
+          return entries.some((entry) => entry.formula_ml === 140);
+        }
+        """
+    )
+
+    entries = client.get("/api/users/suz/entries").get_json()
+    assert len(entries) == 1
+    assert entries[0]["formula_ml"] == 140
+    assert entries[0]["expressed_ml"] is None
+
+
 def _open_next_feed_modal(page, live_server: str) -> None:
     page.goto(f"{live_server}/suz")
     page.wait_for_function(

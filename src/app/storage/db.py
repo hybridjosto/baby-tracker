@@ -188,6 +188,8 @@ def _ensure_settings_table(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE baby_settings ADD COLUMN home_kpis_webhook_url TEXT")
     if "feed_size_small_ml" not in columns:
         conn.execute("ALTER TABLE baby_settings ADD COLUMN feed_size_small_ml REAL")
+    if "feed_size_medium_ml" not in columns:
+        conn.execute("ALTER TABLE baby_settings ADD COLUMN feed_size_medium_ml REAL")
     if "feed_size_big_ml" not in columns:
         conn.execute("ALTER TABLE baby_settings ADD COLUMN feed_size_big_ml REAL")
     if "ollama_base_url" not in columns:
@@ -249,14 +251,14 @@ def _ensure_settings_table(conn: sqlite3.Connection) -> None:
                  overnight_gap_min_hours, overnight_gap_max_hours,
                  behind_target_mode, entry_webhook_url, default_user_slug,
                  pushcut_feed_due_url, home_kpis_webhook_url,
-                 feed_size_small_ml, feed_size_big_ml,
+                 feed_size_small_ml, feed_size_medium_ml, feed_size_big_ml,
                  ollama_base_url, ollama_model, ollama_timeout_seconds,
                  ollama_thinking_enabled,
                  openai_model, openai_timeout_seconds, openai_prompt_template,
                  feed_due_last_entry_id, feed_due_last_sent_at_utc,
                  nappy_stock_threshold_count,
                  updated_at_utc)
-            VALUES (1, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, ?)
+            VALUES (1, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0, ?)
             """,
             (now,),
         )
